@@ -1,0 +1,1198 @@
+[[volatility_options]]
+
+
+== Volatility Options
+
+[quote, Carlos Ghosn]
+____
+[role="align_me_right"]
+We are facing extreme volatility.
+____
+
+((("derivatives analytics library", "volatility options", id="ix_DALvol", range="startofrange")))(((volatility options, main index)))(((VIX volatility index)))((("analytics", "derivatives analytics library", "volatility options", id="ix_ALvol", range="startofrange")))Volatility derivatives have become an important risk management and trading tool. While first-generation financial models for option pricing take volatility as just one of a number of input parameters, second-generation models and products consider __volatility as an asset class of its own__. For example, the VIX volatility index (cf. http://en.wikipedia.org/wiki/CBOE_Volatility_Index), introduced in 1993, has since 2003 been calculated as a weighted implied volatility measure of certain out-of-the-money put and call options with a constant maturity of 30 days on the S&P 500 index. Generally, the fixed 30-day maturity _main index_ values can only be calculated by interpolating between a shorter and a longer maturity value for the index--i.e., between _two subindices_ with varying maturity.
+
+The VSTOXX volatility index--introduced in 2005 by Eurex, the derivatives exchange operated by Deutsche Börse AG in Germany (cf. http://www.eurexchange.com/advanced-services/[])—is calculated similarly; however, it is based on implied volatilities from options on the EURO STOXX 50 index.footnote:[For details on how the VSTOXX is calculated and how you can calculate it by yourself--using +Python+ to collect the necessary data and to do the calculations--see the http://www.eurexchange.com/advanced-services/vstoxx/[+Python+-based tutorial].]
+
+This chapter is about the use of the +DX+ derivatives analytics library developed in Chapters pass:[<xref linkend="valuation_framework" xrefstyle="select:labelnumber" /> to <xref linkend="portfolio_valuation" xrefstyle="select:labelnumber" />] to value a _portfolio of American put options on the VSTOXX volatility index_. As of today, Eurex only offers futures contracts and _European_ call and put options on the VSTOXX. There are no American options on the VSTOXX available on public markets.
+
+This is quite a typical situation for a bank marketing and writing options on indices that are not offered by the respective exchanges themselves. For simplicity, we assume that the maturity of the American put options coincides with the maturity of one of the traded options series.
+
+As a model for the VSTOXX volatility index, we take the +square_root_diffusion+ class from the +DX+ library. This model satisfies the major requirements when it comes to the modeling of a quantity like volatility--i.e., mean reversion and positivity (see also Chapters pass:[<xref linkend="stochastics" xrefstyle="select:labelnumber" />, <xref linkend="web_integration" xrefstyle="select:labelnumber" />, and <xref linkend="model_simulation" xrefstyle="select:labelnumber" />]).footnote:[One of the earlier volatility option pricing models by Gruenbichler and Longstaff (1996) is also based on the square-root diffusion. However, they only consider European options, for which they come up with a closed-form solution. For a review of the model and a +Python+ implementation of it, refer to http://www.eurexchange.com/advanced-services/vstoxx/[]. See also the web service example in <<web_integration>>, which is based on their model and analytical valuation formula.]
+
+(((volatility options, tasks undertaken)))In particular, this chapter implements the following major tasks:
+
+Data collection:: 
+    We need three types of data, namely for the VSTOXX 
+    index itself, the futures on the index, and 
+    options data.
+Model calibration:: 
+    To value the nontraded options in a 
+    market-consistent fashion, one generally first 
+    calibrates the chosen model to quoted option 
+    prices in such a way that the model based on the 
+    optimal parameters replicates the market prices as 
+    well as possible. 
+Portfolio valuation:: 
+    Equipped with all the data and a market-calibrated 
+    model for the VSTOXX volatility index, the final 
+    task then is to model and value the nontraded 
+    options.
+
+
+=== The VSTOXX Data
+
+((("volatility options", "VSTOXX data", id="ix_VOvstox", range="startofrange")))(((VSTOXX data, libraries required)))((("data", "VSTOXX data", id="ix_vstoxx", range="startofrange")))This section collects step by step the necessary data to value the American put options on the VSTOXX. First, let us import our libraries of choice when it comes to the gathering and management of data:
+
+// code cell start uuid: 9d8e35b5-239f-4b3c-85dd-f7807b6fb39d
+[source, python]
+----
+In [1]: import numpy as np
+        import pandas as pd
+----
+
+// code cell end
+
+
+==== VSTOXX Index Data
+
+(((VSTOXX data, index data)))In <<fin_time_series>>, there is a regression example based on the VSTOXX and EURO STOXX 50 indices. There, we also use the following public source for VSTOXX daily closing data:
+
+// code cell start uuid: bec1849e-b622-463c-a559-bd3a6ab82824
+[source, python]
+----
+In [2]: url = 'http://www.stoxx.com/download/historical_values/h_vstoxx.txt'
+        vstoxx_index = pd.read_csv(url, index_col=0, header=2,
+                                   parse_dates=True, dayfirst=True)
+----
+
+// code cell end
+
+// code cell start uuid: e895e580-70dd-46b0-bcd1-9e686e226520
+[source, python]
+----
+In [3]: vstoxx_index.info()
+----
+
+----
+Out[3]: <class 'pandas.core.frame.DataFrame'>
+        DatetimeIndex: 4010 entries, 1999-01-04 00:00:00 to 2014-09-26 00:00:00
+        Data columns (total 9 columns):
+        V2TX    4010 non-null float64
+        V6I1    3591 non-null float64
+        V6I2    4010 non-null float64
+        V6I3    3960 non-null float64
+        V6I4    4010 non-null float64
+        V6I5    4010 non-null float64
+        V6I6    3995 non-null float64
+        V6I7    4010 non-null float64
+        V6I8    3999 non-null float64
+        dtypes: float64(9)
+----
+
+// code cell end
+
+For the options analysis to follow, we only need VSTOXX index data for the first quarter of 2014. Therefore, we can delete both older and newer data contained now in the +DataFrame+ +vstoxx_index+:
+
+// code cell start uuid: 2d7b9982-0f4a-4af9-abd0-af23ca157775
+[source, python]
+----
+In [4]: vstoxx_index = vstoxx_index[('2013/12/31' < vstoxx_index.index)
+                                    & (vstoxx_index.index < '2014/4/1')]
+----
+
+// code cell end
+
+Taking a look at the data reveals that the data set not only contains daily closing values for the main index +V2TX+, but also for all subindices from +V6I1+ to +V6I8+, where the last figure represents the maturity (1 = closest maturity, 8 = longest maturity). As pointed out before, the main index generally is an interpolation of two subindices, in particular +V6I1+ and +V6I2+, representing in the first case a maturity of under 30 days and in the second case of between 30 and 60 days:
+
+// code cell start uuid: 189bc6a0-af48-4e05-afaa-ddb78d44b0ae
+[source, python]
+----
+In [5]: np.round(vstoxx_index.tail(), 2)
+----
+
+----
+Out[5]:              V2TX   V6I1   V6I2   V6I3   V6I4   V6I5   V6I6   V6I7   V6I8
+        Date                                                                     
+        2014-03-25  18.26  18.23  18.31  19.04  19.84  20.31  18.11  20.83  21.20
+        2014-03-26  17.59  17.48  17.70  18.45  19.42  20.00  20.26  20.45  20.86
+        2014-03-27  17.64  17.50  17.76  18.62  19.49  20.05  20.11  20.49  20.94
+        2014-03-28  17.03  16.68  17.29  18.33  19.30  19.83  20.14  20.38  20.82
+        2014-03-31  17.66  17.61  17.69  18.57  19.43  20.04  19.98  20.44  20.90
+----
+
+// code cell end
+
+
+==== VSTOXX Futures Data
+
+(((VSTOXX data, futures data)))The data set we use for the futures and options data is not publicly available in this form. It is a complete data set with daily prices for all instruments traded on the VSTOXX volatility index provided by Eurex. The data set covers the complete first quarter of 2014:
+
+// code cell start uuid: f55aa47f-15d5-4bfb-858c-3464101550c2
+[source, python]
+----
+In [6]: vstoxx_futures = pd.read_excel('./source/vstoxx_march_2014.xlsx',
+                                       'vstoxx_futures')
+----
+
+// code cell end
+
+// code cell start uuid: b03426df-f692-4879-8136-e3adc53a7c73
+[source, python]
+----
+In [7]: vstoxx_futures.info()
+----
+
+----
+Out[7]: <class 'pandas.core.frame.DataFrame'>
+        Int64Index: 504 entries, 0 to 503
+        Data columns (total 8 columns):
+        A_DATE                       504 non-null datetime64[ns]
+        A_EXP_YEAR                   504 non-null int64
+        A_EXP_MONTH                  504 non-null int64
+        A_CALL_PUT_FLAG              504 non-null object
+        A_EXERCISE_PRICE             504 non-null int64
+        A_SETTLEMENT_PRICE_SCALED    504 non-null int64
+        A_PRODUCT_ID                 504 non-null object
+        SETTLE                       504 non-null float64
+        dtypes: datetime64[ns](1), float64(1), int64(4), object(2)
+----
+
+// code cell end
+
+Several columns are not populated or not needed, such that we can delete them without loss of any relevant information:
+
+// code cell start uuid: cb69ca05-6568-4742-8a15-1355eb25ab2a
+[source, python]
+----
+In [8]: del vstoxx_futures['A_SETTLEMENT_PRICE_SCALED']
+        del vstoxx_futures['A_CALL_PUT_FLAG']
+        del vstoxx_futures['A_EXERCISE_PRICE']
+        del vstoxx_futures['A_PRODUCT_ID']
+----
+
+// code cell end
+
+For brevity, we rename the remaining columns:
+
+// code cell start uuid: 3b0a398d-b9d0-4826-8a32-65259768396a
+[source, python]
+----
+In [9]: columns = ['DATE', 'EXP_YEAR', 'EXP_MONTH', 'PRICE']
+        vstoxx_futures.columns = columns
+----
+
+// code cell end
+
+As is common market practice, exchange-traded options expire on the _third Friday_ of the expiry month. To this end, it is helpful to have a helper function +third_friday+ available that gives, for a given year and month, the date of the third Friday:
+
+// code cell start uuid: f82ad34e-431b-4827-971c-cb768e4d3632
+[source, python]
+----
+In [10]: import datetime as dt
+         import calendar
+         
+         def third_friday(date):
+             day = 21 - (calendar.weekday(date.year, date.month, 1) + 2) % 7
+             return dt.datetime(date.year, date.month, day)
+----
+
+// code cell end
+
+For both VSTOXX futures and options, there are at any time eight relevant maturities with monthly differences starting either on the third Friday of the _current_ month (before this third Friday) or on the third Friday of the _next_ month (one day before, on, or after this third Friday).footnote:[VSTOXX volatility derivatives have their last trading day two days before expiry.] In our data set, there are 11 relevant maturities, ranging from January 2014 to November 2014:
+
+// code cell start uuid: 2715995a-3122-472c-9b6b-8c425e3eac10
+[source, python]
+----
+In [11]: set(vstoxx_futures['EXP_MONTH'])
+----
+
+----
+Out[11]: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+----
+
+// code cell end
+
+We calculate the specific dates of all third Fridays once to reuse them later. Note that April 18, 2014 was a public holiday in Germany, although that is irrelevant for the following analysis:
+
+// code cell start uuid: 7b62171f-6817-4fcb-9976-1d0fc7731375
+[source, python]
+----
+In [12]: third_fridays = {}
+         for month in set(vstoxx_futures['EXP_MONTH']):
+             third_fridays[month] = third_friday(dt.datetime(2014, month, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 0363243b-5218-45f5-9d92-263d13550a86
+[source, python]
+----
+In [13]: third_fridays
+----
+
+----
+Out[13]: {1: datetime.datetime(2014, 1, 17, 0, 0),
+          2: datetime.datetime(2014, 2, 21, 0, 0),
+          3: datetime.datetime(2014, 3, 21, 0, 0),
+          4: datetime.datetime(2014, 4, 18, 0, 0),
+          5: datetime.datetime(2014, 5, 16, 0, 0),
+          6: datetime.datetime(2014, 6, 20, 0, 0),
+          7: datetime.datetime(2014, 7, 18, 0, 0),
+          8: datetime.datetime(2014, 8, 15, 0, 0),
+          9: datetime.datetime(2014, 9, 19, 0, 0),
+          10: datetime.datetime(2014, 10, 17, 0, 0),
+          11: datetime.datetime(2014, 11, 21, 0, 0)}
+----
+
+// code cell end
+
+Wrapping the maturity date +dict+ object in a +lambda+ function allows for easy application to the respective +EXP_MONTH+ column of the +DataFrame+ object. For convenience, we store the maturity dates alongside the other futures data:
+
+// code cell start uuid: 55c35e4b-359d-49b5-a002-e5dfb4c89bae
+[source, python]
+----
+In [14]: tf = lambda x: third_fridays[x]
+         vstoxx_futures['MATURITY'] = vstoxx_futures['EXP_MONTH'].apply(tf)
+----
+
+// code cell end
+
+// code cell start uuid: 861ce5e7-6a8a-4ad0-998a-4f998b3f1abe
+[source, python]
+----
+In [15]: vstoxx_futures.tail()
+----
+
+----
+Out[15]:           DATE  EXP_YEAR  EXP_MONTH  PRICE   MATURITY
+         499 2014-03-31      2014          7  20.40 2014-07-18
+         500 2014-03-31      2014          8  20.70 2014-08-15
+         501 2014-03-31      2014          9  20.95 2014-09-19
+         502 2014-03-31      2014         10  21.05 2014-10-17
+         503 2014-03-31      2014         11  21.25 2014-11-21
+----
+
+// code cell end
+
+
+==== VSTOXX Options Data
+
+(((VSTOXX data, options data)))At any time, there are eight futures traded on the VSTOXX. In comparison, there are of course many more options, such that we expect a much larger data set for the volatility options. In fact, we have almost 47,000 option quotes for the first quarter of 2014:
+
+// code cell start uuid: e57c3899-e4f4-41d4-8caf-a48a33cf5f1d
+[source, python]
+----
+In [16]: vstoxx_options = pd.read_excel('./source/vstoxx_march_2014.xlsx',
+                                        'vstoxx_options')
+----
+
+// code cell end
+
+// code cell start uuid: 530e2488-d694-4bf9-8a36-925dda5a1169
+[source, python]
+----
+In [17]: vstoxx_options.info()
+----
+
+----
+Out[17]: <class 'pandas.core.frame.DataFrame'>
+         Int64Index: 46960 entries, 0 to 46959
+         Data columns (total 8 columns):
+         A_DATE                       46960 non-null datetime64[ns]
+         A_EXP_YEAR                   46960 non-null int64
+         A_EXP_MONTH                  46960 non-null int64
+         A_CALL_PUT_FLAG              46960 non-null object
+         A_EXERCISE_PRICE             46960 non-null int64
+         A_SETTLEMENT_PRICE_SCALED    46960 non-null int64
+         A_PRODUCT_ID                 46960 non-null object
+         SETTLE                       46960 non-null float64
+         dtypes: datetime64[ns](1), float64(1), int64(4), object(2)
+----
+
+// code cell end
+
+As before, not all columns are needed:
+
+// code cell start uuid: d327407e-5645-4850-9296-8ed2a42a9f02
+[source, python]
+----
+In [18]: del vstoxx_options['A_SETTLEMENT_PRICE_SCALED']
+         del vstoxx_options['A_PRODUCT_ID']
+----
+
+// code cell end
+
+A renaming of the columns simplifies later queries a bit:
+
+// code cell start uuid: aa1b23d5-3f09-4059-a5c1-c5c3d7b5619e
+[source, python]
+----
+In [19]: columns = ['DATE', 'EXP_YEAR', 'EXP_MONTH', 'TYPE', 'STRIKE', 'PRICE']
+         vstoxx_options.columns = columns
+----
+
+// code cell end
+
+We use the +tf+ function to again store the maturity dates alongside the options data:
+
+// code cell start uuid: 9c503624-0ad5-43d4-aa05-bef9123b65cd
+[source, python]
+----
+In [20]: vstoxx_options['MATURITY'] = vstoxx_options['EXP_MONTH'].apply(tf)
+----
+
+// code cell end
+
+// code cell start uuid: 2f07b024-89ff-40d2-b99a-23715299fdb5
+[source, python]
+----
+In [21]: vstoxx_options.head()
+----
+
+----
+Out[21]:         DATE  EXP_YEAR  EXP_MONTH TYPE  STRIKE  PRICE   MATURITY
+         0 2014-01-02      2014          1    C    1000   7.95 2014-01-17
+         1 2014-01-02      2014          1    C    1500   3.05 2014-01-17
+         2 2014-01-02      2014          1    C    1600   2.20 2014-01-17
+         3 2014-01-02      2014          1    C    1700   1.60 2014-01-17
+         4 2014-01-02      2014          1    C    1800   1.15 2014-01-17
+----
+
+// code cell end
+
+A single options contract is on 100 times the index value. Therefore, the strike price is also scaled up accordingly. To have a view of a single unit, we rescale the strike price by dividing it by 100:
+
+// code cell start uuid: ad2ab7b1-ea0b-4275-90a6-89b9f78f50b0
+[source, python]
+----
+In [22]: vstoxx_options['STRIKE'] = vstoxx_options['STRIKE'] / 100.
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_VOvstox")))(((range="endofrange", startref="ix_vstoxx")))All data from the external resources has now been collected and prepared. If needed, one can save the three +DataFrame+ objects for later reuse:
+
+// code cell start uuid: a2590862-a144-402c-998f-9161797fb7d2
+[source, python]
+----
+In [23]: save = False
+         if save is True:
+             import warnings
+             warnings.simplefilter('ignore')
+             h5 = pd.HDFStore('./source/vstoxx_march_2014.h5',
+                              complevel=9, complib='blosc')
+             h5['vstoxx_index'] = vstoxx_index
+             h5['vstoxx_futures'] = vstoxx_futures
+             h5['vstoxx_options'] = vstoxx_options
+             h5.close()
+----
+
+// code cell end
+
+
+=== Model Calibration
+
+((("volatility options", "model calibration", id="ix_VOmdlcal", range="startofrange")))The next important step is the calibration of the financial model used to value the VSTOXX options to available market data. For an in-depth discussion of this topic and example code in +Python+ see Hilpisch (2015), in particular Chapter 11.
+
+
+==== Relevant Market Data
+
+(((model calibration, relevant market data)))The first step when calibrating a model is to decide on the relevant market data to be used. For the example, let us assume the following:
+
+* __Pricing date__ shall be 31 March 2014.
+* __Option maturity__ shall be October 2014.
+
+The following +Python+ code defines the +pricing_date+ and +maturity+, reads the +initial_value+ for the VSTOXX from the respective +DataFrame+ object, and also reads the corresponding value +forward+ for the VSTOXX future with the appropriate maturity.
+
+// code cell start uuid: c93f5398-8620-48d1-9c6b-ae0c79653751
+[source, python]
+----
+In [24]: pricing_date = dt.datetime(2014, 3, 31)
+           # last trading day in March 2014
+         maturity = third_fridays[10]
+           # October maturity
+         initial_value = vstoxx_index['V2TX'][pricing_date]
+           # VSTOXX on pricing_date
+         forward = vstoxx_futures[(vstoxx_futures.DATE == pricing_date)
+                     & (vstoxx_futures.MATURITY == maturity)]['PRICE'].values[0]
+----
+
+// code cell end
+
+Out of the many options quotes in the data set, we take only those that are:
+
+* From the pricing date
+* For the right maturity date
+* For call options that are less than 20% out-of-the-money or in-the-money
+
+We therefore have:
+
+// code cell start uuid: bd8f1656-44b5-46fc-ab91-f3d14398c09a
+[source, python]
+----
+In [25]: tol = 0.20
+         option_selection = \
+             vstoxx_options[(vstoxx_options.DATE == pricing_date)
+                          & (vstoxx_options.MATURITY == maturity)
+                          & (vstoxx_options.TYPE == 'C')
+                          & (vstoxx_options.STRIKE > (1 - tol) * forward)
+                          & (vstoxx_options.STRIKE < (1 + tol) * forward)]                            
+----
+
+// code cell end
+
+This leaves the following option quotes for the calibration procedure:
+
+// code cell start uuid: ca4e9611-eda9-4868-8823-5187695ea02f
+[source, python]
+----
+In [26]: option_selection
+----
+
+----
+Out[26]:             DATE  EXP_YEAR  EXP_MONTH TYPE  STRIKE  PRICE   MATURITY
+         46482 2014-03-31      2014         10    C      17   4.85 2014-10-17
+         46483 2014-03-31      2014         10    C      18   4.30 2014-10-17
+         46484 2014-03-31      2014         10    C      19   3.80 2014-10-17
+         46485 2014-03-31      2014         10    C      20   3.40 2014-10-17
+         46486 2014-03-31      2014         10    C      21   3.05 2014-10-17
+         46487 2014-03-31      2014         10    C      22   2.75 2014-10-17
+         46488 2014-03-31      2014         10    C      23   2.50 2014-10-17
+         46489 2014-03-31      2014         10    C      24   2.25 2014-10-17
+         46490 2014-03-31      2014         10    C      25   2.10 2014-10-17
+----
+
+// code cell end
+
+
+==== Option Modeling
+
+(((model calibration, option modeling)))(((square-root diffusion)))For the calibration of the +square_root_diffusion+ model, the options selected before have to be modeled. This is the first time that the +DX+ analytics library comes into play; everything else so far was "just" preparation for the following derivatives analytics tasks. We begin by importing the library:
+
+// code cell start uuid: b2f6b10c-bf01-46f6-958a-e0e6266adbe8
+[source, python]
+----
+In [27]: from dx import *
+----
+
+// code cell end
+
+The first task is then the definition of a +market_environment+ object for the VSTOXX index, in which we mainly store the previously collected and/or defined data:
+
+// code cell start uuid: c191a3e9-286e-4c84-8044-aaf05f88377b
+[source, python]
+----
+In [28]: me_vstoxx = market_environment('me_vstoxx', pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 52879659-97e7-4c0f-a14f-b29bea60b3c8
+[source, python]
+----
+In [29]: me_vstoxx.add_constant('initial_value', initial_value)
+         me_vstoxx.add_constant('final_date', maturity)
+         me_vstoxx.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+// code cell start uuid: f1862ff5-ef88-4364-beba-502872ac5450
+[source, python]
+----
+In [30]: me_vstoxx.add_constant('frequency', 'B')
+         me_vstoxx.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: b6c44b38-27b6-4c0e-8713-d4c46e2f46c8
+[source, python]
+----
+In [31]: csr = constant_short_rate('csr', 0.01)
+           # somewhat arbitrarily chosen here
+----
+
+// code cell end
+
+// code cell start uuid: f0aedd9b-a2c9-4713-a02d-cc5a8959408e
+[source, python]
+----
+In [32]: me_vstoxx.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+The major goal of the calibration procedure is to derive optimal parameters for the +square_root_diffusion+ simulation class, namely +kappa+, +theta+, and +volatility+. These are the, so to say, _degrees of freedom_ that this class offers. All other parameters are in general dictated by the market or the task at hand.
+
+Although the three (optimal) parameters are to be numerically derived, we need to provide some dummy values to instantiate the simulation class. For the +volatility+ parameter, we take the historical volatility given our data set:
+
+// code cell start uuid: 11c8a827-c54c-451a-93c3-9f8db6df970c
+[source, python]
+----
+In [33]: # parameters to be calibrated later
+         me_vstoxx.add_constant('kappa', 1.0)
+         me_vstoxx.add_constant('theta', 1.2 * initial_value)
+         vol_est =  vstoxx_index['V2TX'].std() \
+                     * np.sqrt(len(vstoxx_index['V2TX']) / 252.)
+         me_vstoxx.add_constant('volatility', vol_est)
+----
+
+// code cell end
+
+// code cell start uuid: e48f0a24-715c-417f-91ce-86ad49e837bc
+[source, python]
+----
+In [34]: vol_est
+----
+
+----
+Out[34]: 1.0384283035169406
+----
+
+// code cell end
+
+Then we provide the +market_environment+ object to the simulation class:
+
+// code cell start uuid: fd70a940-895e-43a4-a66c-d2c3bcc7c285
+[source, python]
+----
+In [35]: vstoxx_model = square_root_diffusion('vstoxx_model', me_vstoxx)
+----
+
+// code cell end
+
+Although the +DX+ library is designed to be completely modular, to model risk factors independently (and nonredundantly) from the derivatives to be valued, this does not necessarily have to be the case when it comes to a +market_environment+ object. A single such object can be used for both the underlying risk factor and the option to be valued. To complete the market environment for use with a valuation class, just add values for the +strike+ and the option +maturity+:
+
+// code cell start uuid: fe6d0c61-4907-4466-98ae-3ca782f83964
+[source, python]
+----
+In [36]: me_vstoxx.add_constant('strike', forward)
+         me_vstoxx.add_constant('maturity', maturity)
+----
+
+// code cell end
+
+Of course, a payoff function is also needed to instantiate the valuation class:
+
+// code cell start uuid: 8e36b826-9439-49f2-b4fa-e35928b8df41
+[source, python]
+----
+In [37]: payoff_func = 'np.maximum(maturity_value - strike, 0)'
+----
+
+// code cell end
+
+// code cell start uuid: d33efcec-e027-4b1a-8fa1-c13696779de3
+[source, python]
+----
+In [38]: vstoxx_eur_call = valuation_mcs_european('vstoxx_eur_call',
+                                 vstoxx_model, me_vstoxx, payoff_func)
+----
+
+// code cell end
+
+A brief sanity check to see if the modeling so far works "in principle":
+
+// code cell start uuid: cedcee4e-1135-4b38-9381-d74b306de63e
+[source, python]
+----
+In [39]: vstoxx_eur_call.present_value()
+----
+
+----
+Out[39]: 0.379032
+----
+
+// code cell end
+
+To calibrate the model to the previously selected option quotes, we need to model all relevant European call options. They only differentiate themselves by the relevant strike price; everything else in the market environment is the same. We store the single valuation objects in a +dict+ object. As keys for the +dict+ object, we take the index values of the option quotes in the +DataFrame+ object +option_selection+ for unique identification:
+
+// code cell start uuid: a4a9ab6f-0810-403f-b172-d08deb80c582
+[source, python]
+----
+In [40]: option_models = {}
+         for option in option_selection.index:
+             strike = option_selection['STRIKE'].ix[option]
+             me_vstoxx.add_constant('strike', strike)
+             option_models[option] = \
+                                 valuation_mcs_european(
+                                         'eur_call_%d' % strike,
+                                         vstoxx_model,
+                                         me_vstoxx,
+                                         payoff_func)
+----
+
+// code cell end
+
+A single step in the calibration routine makes the updating of all valuation objects and a revaluation of all options necessary. For convenience, we put this functionality into a separate function:
+
+// code cell start uuid: 89ec1029-091b-4ab1-8d60-b7a604c02f69
+[source, python]
+----
+In [41]: def calculate_model_values(p0):
+             ''' Returns all relevant option values.
+         
+             Parameters
+             ===========
+             p0 : tuple/list
+                 tuple of kappa, theta, volatility
+         
+             Returns
+             =======
+             model_values : dict
+                 dictionary with model values
+             '''
+             kappa, theta, volatility = p0
+             vstoxx_model.update(kappa=kappa,
+                                 theta=theta,
+                                 volatility=volatility)
+             model_values = {}
+             for option in option_models:
+                model_values[option] = \
+                  option_models[option].present_value(fixed_seed=True)
+             return model_values
+----
+
+// code cell end
+
+Providing a parameter tuple of +kappa+, +theta+, and +volatility+ to the function +calculate_model_values+ gives back, _ceteris paribus_, model option values for all relevant options:
+
+// code cell start uuid: d16e0a95-8543-4b08-b056-3d4f83d05e51
+[source, python]
+----
+In [42]: calculate_model_values((0.5, 27.5, vol_est))
+----
+
+----
+Out[42]: {46482: 3.206401,
+          46483: 2.412354,
+          46484: 1.731028,
+          46485: 1.178823,
+          46486: 0.760421,
+          46487: 0.46249,
+          46488: 0.263662,
+          46489: 0.142177,
+          46490: 0.07219}
+----
+
+// code cell end
+
+
+==== Calibration Procedure
+
+(((model calibration, procedure for)))((("mean-squared error (MSE)")))((("errors", "mean-squared error (MSE)")))Calibration of an option pricing model is, in general, a convex optimization problem. The most widely used function used for the calibration--i.e., the minimization--is the _mean-squared error_ (MSE) for the model option values given the market quotes of the options. Assume there are __N__ relevant options, and also model and market quotes. The problem of calibrating a financial model to the market quotes based on the MSE is then given in <<mean_squared_error>>. There, latexmath:[$C_n^*$] and latexmath:[$C_{n}^{mod}$] are the market price and the model price of the __n__th option, respectively. __p__ is the parameter set provided as input to the option pricing model.
+
+[[mean_squared_error]]
+[latexmath]
+.Model calibration based on mean-squared error
+++++
+\begin{equation*}
+\min_{p } \frac{1}{N}\sum_{n=1}^{N}\left( C_{n}^{*} - C_{n}^{mod}(p )\right)^{2}
+\end{equation*}
+++++
+
+The +Python+ function +mean_squared_error+ implements this approach to model calibration technically. A global variable is used to control the output of intermediate parameter +tuple+ objects and the resulting MSE:
+
+// code cell start uuid: 6d94c077-ebf9-46e3-8185-d4c80d12116d
+[source, python]
+----
+In [43]: i = 0
+         def mean_squared_error(p0):
+             ''' Returns the mean-squared error given
+             the model and market values.
+         
+             Parameters
+             ===========
+             p0 : tuple/list
+                 tuple of kappa, theta, volatility
+         
+             Returns
+             =======
+             MSE : float
+                 mean-squared error
+             '''
+             global i
+             model_values = np.array(calculate_model_values(p0).values())
+             market_values = option_selection['PRICE'].values
+             option_diffs = model_values - market_values
+             MSE = np.sum(option_diffs ** 2) / len(option_diffs)
+               # vectorized MSE calculation
+             if i % 20 == 0:
+                 if i == 0:
+                     print '%4s  %6s  %6s  %6s --> %6s' % \
+                          ('i', 'kappa', 'theta', 'vola', 'MSE')
+                 print '%4d  %6.3f  %6.3f  %6.3f --> %6.3f' % \
+                         (i, p0[0], p0[1], p0[2], MSE)
+             i += 1
+             return MSE        
+----
+
+// code cell end
+
+Again, a brief check to see if the function works in principle:
+
+// code cell start uuid: 489f4f60-5237-4eff-be12-19abc6583ecb
+[source, python]
+----
+In [44]: mean_squared_error((0.5, 27.5, vol_est))
+----
+
+----
+Out[44]:    i   kappa   theta    vola -->    MSE
+            0   0.500  27.500   1.038 -->  4.390
+         
+         4.3899900376937779
+----
+
+// code cell end
+
+(((convex optimization, functions for)))(((global optimization)))(((local optimization)))(((brute function)))(((fmin function)))<<math_tools>> introduces the +Python+ and +SciPy+ functions for convex optimization problems. We will apply these here as well, so we begin with an import: 
+
+// code cell start uuid: d4d06a9e-929b-4a02-95c1-433529015988
+[source, python]
+----
+In [45]: import scipy.optimize as spo
+----
+
+// code cell end
+
+The following calibration uses both _global_ optimization via the +brute+ function and _local_ optimization via the +fmin+ function. First, the global optimization:
+
+// code cell start uuid: 15b93990-3228-4330-b5df-10915827ebcc
+[source, python]
+----
+In [46]: %%time
+         i = 0
+         opt_global = spo.brute(mean_squared_error,
+                         ((0.5, 3.01, 0.5),  # range for kappa
+                          (15., 30.1, 5.),  # range for theta
+                          (0.5, 5.51, 1)),  # range for volatility
+                          finish=None)
+----
+
+----
+Out[46]:    i   kappa   theta    vola -->    MSE
+            0   0.500  15.000   0.500 --> 10.393
+           20   0.500  30.000   1.500 -->  2.071
+           40   1.000  25.000   3.500 -->  0.180
+           60   1.500  20.000   5.500 -->  0.718
+           80   2.000  20.000   1.500 -->  5.501
+          100   2.500  15.000   3.500 -->  5.571
+          120   2.500  30.000   5.500 --> 22.992
+          140   3.000  30.000   1.500 --> 14.493
+         CPU times: user 18.6 s, sys: 1.68 s, total: 20.3 s
+         Wall time: 20.3 s
+         
+----
+
+// code cell end
+
+The intermediate optimal results are as follows. The MSE is already quite low:
+
+// code cell start uuid: 359c3f5f-4f47-4e53-a916-85d3c745ed1b
+[source, python]
+----
+In [47]: i = 0
+         mean_squared_error(opt_global)
+----
+
+----
+Out[47]:    i   kappa   theta    vola -->    MSE
+            0   1.500  20.000   4.500 -->  0.008
+         
+         0.0076468730485555626
+----
+
+// code cell end
+
+Next, we use the intermediate optimal parameters as input for the local optimization:
+
+// code cell start uuid: 9fd46baf-28af-4276-a1c1-b3e521550cdd
+[source, python]
+----
+In [48]: %%time
+         i = 0
+         opt_local = spo.fmin(mean_squared_error, opt_global,
+                              xtol=0.00001, ftol=0.00001,
+                              maxiter=100, maxfun=350)
+----
+
+----
+Out[48]:    i   kappa   theta    vola -->    MSE
+            0   1.500  20.000   4.500 -->  0.008
+           20   1.510  19.235   4.776 -->  0.008
+           40   1.563  18.926   4.844 -->  0.005
+           60   1.555  18.957   4.828 -->  0.005
+           80   1.556  18.947   4.832 -->  0.005
+          100   1.556  18.948   4.831 -->  0.005
+          120   1.556  18.948   4.831 -->  0.005
+         Optimization terminated successfully.
+                  Current function value: 0.004654
+                  Iterations: 64
+                  Function evaluations: 138
+         CPU times: user 17.7 s, sys: 1.67 s, total: 19.3 s
+         Wall time: 19.4 s
+         
+----
+
+// code cell end
+
+This time the results are:
+
+// code cell start uuid: d7c22ea7-b3dd-4408-9ef2-3a986354ba26
+[source, python]
+----
+In [49]: i = 0
+         mean_squared_error(opt_local)
+----
+
+----
+Out[49]:    i   kappa   theta    vola -->    MSE
+            0   1.556  18.948   4.831 -->  0.005
+         
+         0.0046542736439999875
+----
+
+// code cell end
+
+The resulting model values are:
+
+// code cell start uuid: 70b888ee-8d31-46b2-86be-ad95dedd347a
+[source, python]
+----
+In [50]: calculate_model_values(opt_local)
+----
+
+----
+Out[50]: {46482: 4.746597,
+          46483: 4.286923,
+          46484: 3.863346,
+          46485: 3.474144,
+          46486: 3.119211,
+          46487: 2.793906,
+          46488: 2.494882,
+          46489: 2.224775,
+          46490: 1.98111}
+----
+
+// code cell end
+
+Let us store these in the +option_selection+ +DataFrame+ and calculate the differences from the market prices:
+
+// code cell start uuid: d6cf96da-5139-435e-8ed9-6be593fa7a15
+[source, python]
+----
+In [51]: option_selection['MODEL'] = \
+                 np.array(calculate_model_values(opt_local).values())
+         option_selection['ERRORS'] = \
+                 option_selection['MODEL'] - option_selection['PRICE']
+----
+
+// code cell end
+
+We get the following results:
+
+// code cell start uuid: 716cd81a-0e06-405c-ade7-7fa407ce19cb
+[source, python]
+----
+In [52]: option_selection[['MODEL', 'PRICE', 'ERRORS']]
+----
+
+----
+Out[52]:           MODEL  PRICE    ERRORS
+         46482  4.746597   4.85 -0.103403
+         46483  4.286923   4.30 -0.013077
+         46484  3.863346   3.80  0.063346
+         46485  3.474144   3.40  0.074144
+         46486  3.119211   3.05  0.069211
+         46487  2.793906   2.75  0.043906
+         46488  2.494882   2.50 -0.005118
+         46489  2.224775   2.25 -0.025225
+         46490  1.981110   2.10 -0.118890
+----
+
+// code cell end
+
+The average pricing error is relatively low, at less than 1 cent:
+
+// code cell start uuid: 91c24e54-e18a-4cfe-88b2-82ef82947b9c
+[source, python]
+----
+In [53]: round(option_selection['ERRORS'].mean(), 3)
+----
+
+----
+Out[53]: -0.002
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_VOmdlcal")))<<vstoxx_calibration>> shows all the results graphically. The largest difference is observed for the call option that is farthest out of the money:
+
+// code cell start uuid: 9d2912c2-9ab3-4423-95d5-984df6f9f31e
+[source, python]
+----
+In [54]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         fix, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(8, 8))
+         strikes = option_selection['STRIKE'].values
+         ax1.plot(strikes, option_selection['PRICE'], label='market quotes')
+         ax1.plot(strikes, option_selection['MODEL'], 'ro', label='model values')
+         ax1.set_ylabel('option values')
+         ax1.grid(True)
+         ax1.legend(loc=0)
+         wi = 0.25
+         ax2.bar(strikes - wi / 2., option_selection['ERRORS'],
+                 label='market quotes', width=wi)
+         ax2.grid(True)
+         ax2.set_ylabel('differences')
+         ax2.set_xlabel('strikes')
+----
+
+[[vstoxx_calibration]]
+.Calibrated model values for VSTOXX call options vs. market quotes
+image::images/pyfi_1901.png[]
+
+// code cell end
+
+
+=== American Options on the VSTOXX
+
+((("volatility options", "American on the VSTOXX", id="ix_VOamer", range="startofrange")))((("American options", "on the VSTOXX", id="ix_Avstox", range="startofrange")))A major prerequisite for valuing and managing options not traded at exchanges is a calibrated model that is as consistent as possible with market realities--i.e., quotes for liquidly traded options in the relevant market. This is what the previous section has as the main result. This main result is used in this section to value American put options on the VSTOXX, a kind of derivative instrument not traded in the market. We assume a portfolio consisting of American put options with the same maturity and strikes as the European call options used for the model calibration.
+
+
+==== Modeling Option Positions
+
+The first step when valuing a derivatives portfolio with the +DX+ analytics library is to define the relevant risk factors by a +market_environment+ object. At this stage, it does not necessarily have to be complete; missing data and objects might be added during the portfolio valuation (e.g., +paths+ or +frequency+):
+
+// code cell start uuid: 40decf0f-1908-48e8-b5c3-0fa5b667575c
+[source, python]
+----
+In [55]: me_vstoxx = market_environment('me_vstoxx', pricing_date)
+         me_vstoxx.add_constant('initial_value', initial_value)
+         me_vstoxx.add_constant('final_date', pricing_date)
+         me_vstoxx.add_constant('currency', 'NONE')
+----
+
+// code cell end
+
+Of course, we use the optimal parameters from the model calibration:
+
+// code cell start uuid: 88c93f7b-7944-4724-8b7d-a8f9d231d926
+[source, python]
+----
+In [56]: # adding optimal parameters to environment
+         me_vstoxx.add_constant('kappa', opt_local[0])
+         me_vstoxx.add_constant('theta', opt_local[1])
+         me_vstoxx.add_constant('volatility', opt_local[2])
+----
+
+// code cell end
+
+In a portfolio context, the specification of a simulation class/model is necessary:
+
+// code cell start uuid: 8d92c037-79db-4663-9ad4-863dc720d160
+[source, python]
+----
+In [57]: me_vstoxx.add_constant('model', 'srd')
+----
+
+// code cell end
+
+To define the valuation classes for the American put options, we are mainly missing an appropriate payoff function:
+
+// code cell start uuid: ee26163e-cfc2-4bd4-99ef-d9d877dc9592
+[source, python]
+----
+In [58]: payoff_func = 'np.maximum(strike - instrument_values, 0)'
+----
+
+// code cell end
+
+As before, all American options differ only with respect to their strike prices. It therefore makes sense to define a shared +market_environment+ object first:
+
+// code cell start uuid: f4882acb-2157-4073-b2e7-b9c79a428a2c
+[source, python]
+----
+In [59]: shared = market_environment('share', pricing_date)
+         shared.add_constant('maturity', maturity)
+         shared.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+It remains to loop over all relevant options, pick the relevant strike, and define one +derivatives_position+ after the other, using the defining +market_environment+ object:
+
+// code cell start uuid: e48619d3-c12d-4387-bc0d-51dccd00d19e
+[source, python]
+----
+In [60]: option_positions = {}
+           # dictionary for option positions
+         option_environments = {}
+           # dictionary for option environments
+         for option in option_selection.index:
+             option_environments[option] = \
+                 market_environment('am_put_%d' % option, pricing_date)
+                 # define new option environment, one for each option
+             strike = option_selection['STRIKE'].ix[option]
+               # pick the relevant strike
+             option_environments[option].add_constant('strike', strike)
+               # add it to the environment
+             option_environments[option].add_environment(shared)
+               # add the shared data
+             option_positions['am_put_%d' % strike] = \
+                             derivatives_position(
+                                 'am_put_%d' % strike,
+                                 quantity=100.,
+                                 underlying='vstoxx_model',
+                                 mar_env=option_environments[option],
+                                 otype='American',
+                                 payoff_func=payoff_func)
+----
+
+// code cell end
+
+Note that we use 100 as the position quantity throughout, which is the typical contract size for VSTOXX options.
+
+
+==== The Options Portfolio
+
+To compose the portfolio, we need to specify a couple of parameters that together define our valuation environment--i.e., those parameters shared by all objects in the portfolio:
+
+// code cell start uuid: f885f822-7d78-4841-99c5-f30f1bf23ebb
+[source, python]
+----
+In [61]: val_env = market_environment('val_env', pricing_date)
+         val_env.add_constant('starting_date', pricing_date)
+         val_env.add_constant('final_date', pricing_date)
+           # temporary value, is updated during valuation
+         val_env.add_curve('discount_curve', csr)
+         val_env.add_constant('frequency', 'B')
+         val_env.add_constant('paths', 25000)
+----
+
+// code cell end
+
+The market is rather simple; it consists of a single risk factor:
+
+// code cell start uuid: d9a3a473-3cfb-49ab-be94-848349683a9a
+[source, python]
+----
+In [62]: underlyings = {'vstoxx_model' : me_vstoxx}
+----
+
+// code cell end
+
+Taking all this together allows us to define a +derivatives_portfolio+ object:
+
+// code cell start uuid: 590ae8ed-39b9-42a3-84f2-35b2b400d8b8
+[source, python]
+----
+In [63]: portfolio = derivatives_portfolio('portfolio', option_positions,
+                                           val_env, underlyings)
+----
+
+// code cell end
+
+The valuation takes quite a bit of time, since multiple American options are valued by the Least-Squares Monte Carlo approach and multiple Greeks also have to be estimated by revaluations using the same computationally demanding algorithm:
+
+// code cell start uuid: 11539da8-35b0-4daf-94ee-52aae7d9fca8
+[source, python]
+----
+In [64]: %time results = portfolio.get_statistics(fixed_seed=True)
+----
+
+----
+Out[64]: CPU times: user 38.6 s, sys: 1.96 s, total: 40.6 s
+         Wall time: 40.6 s
+         
+----
+
+// code cell end
+
+The +results+ +DataFrame+ object is best sorted by the +name+ column to have a better comparative view of the statistics:
+
+// code cell start uuid: 883fa311-3410-4572-a8d1-a526e2914f69
+[source, python]
+----
+In [65]: results.sort(columns='name')
+----
+
+----
+Out[65]:         name  quant.      value curr.  pos_value  pos_delta  pos_vega
+         8  am_put_17     100   4.575197   EUR   457.5197     -24.85    102.77
+         1  am_put_18     100   5.203648   EUR   520.3648     -30.62    107.93
+         0  am_put_19     100   5.872686   EUR   587.2686     -33.31    107.79
+         2  am_put_20     100   6.578714   EUR   657.8714     -34.82    110.01
+         6  am_put_21     100   7.320523   EUR   732.0523     -39.46    105.20
+         7  am_put_22     100   8.081625   EUR   808.1625     -40.61    102.38
+         3  am_put_23     100   8.871962   EUR   887.1962     -43.26    104.37
+         4  am_put_24     100   9.664272   EUR   966.4272     -40.14    101.04
+         5  am_put_25     100  10.475168   EUR  1047.5168     -45.74    102.81
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DALvol")))(((range="endofrange", startref="ix_VOamer")))(((range="endofrange", startref="ix_Avstox")))(((range="endofrange", startref="ix_ALvol")))This portfolio is, as expected for a portfolio of long American put options, short (negative) Delta and long (positive) Vega:
+
+// code cell start uuid: 8ceae186-64e2-405d-8563-b6349c0f13b2
+[source, python]
+----
+In [66]: results[['pos_value','pos_delta','pos_vega']].sum()
+----
+
+----
+Out[66]: pos_value    6664.3795
+         pos_delta    -332.8100
+         pos_vega      944.3000
+         dtype: float64
+----
+
+// code cell end
+
+
+=== Conclusions
+
+This chapter presents a larger, realistic use case for the application of the +DX+ analytics library to the valuation of a portfolio of nontraded American options on the VSTOXX volatility index. The chapter addresses three main tasks involved in any real-world pass:[<phrase role="keep-together">application</phrase>]:
+
+Data gathering:: 
+    Current, correct market data builds the basis of 
+    any modeling and valuation effort in derivatives 
+    analytics; we need index data and futures data, as 
+    well as options data for the VSTOXX.
+Model calibration:: 
+    To value, manage, and hedge nontraded options and 
+    derivatives in a market-consistent fashion, one 
+    needs to calibrate the model parameters to the 
+    relevant option market quotes (relevant with 
+    regard to maturity and strikes). Our model of 
+    choice is the square-root diffusion, which is 
+    appropriate for modeling a volatility index; the 
+    calibration results are quite good although the 
+    model only offers three degrees of freedom 
+    (+kappa+ as the mean-reversion factor, +theta+ as 
+    the long-term volatility, and +volatility+ as the 
+    volatility of the volatility, or so-called 
+    "vol-vol").
+Portfolio valuation:: 
+    Based on the market data and the calibrated model, 
+    a portfolio with the American put options on the 
+    VSTOXX is modeled and major statistics (position 
+    values, Deltas, and Vegas) are generated.
+
+The realistic use case in this chapter shows the flexibility and the power of the +DX+ library; it essentially allows us to address any analytical task with regard to derivatives. The very approach and architecture make the application largely comparable to the benchmark case of a Black-Scholes-Merton analytical formula for European options. Once the valuation objects are defined, you can use them similarly to an analytical formula--and this despite the fact that underneath the surface, heavy numerical routines and algorithms are applied.
+
+
+=== Further Reading
+
+Eurex's "VSTOXX Advanced Services" tutorial pages provide a wealth of information about the VSTOXX index and related volatility derivatives. These pages also provide lots of readily usable +Python+ scripts to replicate the results and analyses presented in the tutorials:
+
+* The VSTOXX Advanced Services tutorial pages from Eurex are available at http://www.eurexchange.com/advanced-services/vstoxx/, while a backtesting application is provided at http://www.eurexchange.com/advanced-services/app2/.
+
+The following book is a good general reference for the topics covered in this chapter, especially when it comes to the calibration of option pricing models: 
+
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://derivatives-analytics-with-python.com[].
+
+With regard to the consistent valuation and management of derivatives portfolios, see also the hints at the end of <<portfolio_valuation>>.
+

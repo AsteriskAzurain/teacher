@@ -1,0 +1,58 @@
+
+
+  <othercredit role="proofreader">
+    <firstname>Rachel</firstname>
+    <surname>Head</surname>
+  </othercredit>
+  <othercredit role="illustrator">
+    <firstname>Rebecca</firstname>
+    <surname>Demarest</surname>
+  </othercredit>
+
+  <!-- All rights reserved. -->
+
+  <publisher>
+    <publishername>O’Reilly Media, Inc.    </publishername>
+    <address format="linespecific">
+      <street>1005 Gravenstein Highway North</street>
+      <city>Sebastopol</city>
+      <state>CA</state>
+      <postcode>95472</postcode>
+    </address>
+  </publisher>
+
+  <legalnotice role="printlocation">
+    <para>Printed in the United States of America.</para>
+  </legalnotice>
+
+  <legalnotice role="printer">
+    <para>[LSI]</para>
+  </legalnotice>
+
+  <legalnotice role="use">
+    <para>O’Reilly books may be purchased for educational, business, or sales promotional use. Online editions are also available for most 
+          titles (<ulink role="orm:hideurl:ital" url="http://safaribooksonline.com">http://safaribooksonline.com</ulink>). For more information, contact our corporate/institutional sales department:
+          800-998-9938 or <phrase role="keep-together"><email>corporate@oreilly.com</email></phrase>.</para>
+  </legalnotice>
+
+  <legalnotice role="trademarks">
+    <para>The O’Reilly logo is a registered trademark of O’Reilly Media, Inc. <emphasis>Python for Finance</emphasis>, the cover image of a Hispaniolan solenodon,
+          and related trade dress are trademarks of O’Reilly Media, Inc.    </para>
+    <para>Many of the designations used by manufacturers and sellers to distinguish
+          their products are claimed as trademarks. Where those designations appear
+          in this book, and O’Reilly Media, Inc. was aware of a trademark claim,
+          the designations have been printed in caps or initial caps.    </para>
+  </legalnotice>
+
+  <legalnotice role="damages">
+    <para>While the publisher and the author have used good faith efforts to ensure that the information and instructions contained in this work are accurate, the publisher and the author disclaim all responsibility for errors or omissions, including without limitation responsibility for damages resulting from the use of or reliance on this work. Use of the information and instructions contained in this work is at your own risk. If any code samples or other technology this work contains or describes is subject to open source licenses or the intellectual property rights of others, it is your responsibility to ensure that your use thereof complies with such licenses and/or rights.</para>
+    <para>This book is not intended as financial advice. Please consult a qualified professional if you require financial advice.</para>
+  </legalnotice>
+<isbn>9781491945285</isbn><edition>1</edition><author><firstname>Yves</firstname><surname>Hilpisch</surname><authorblurb><para><emphasis role="strong">Yves Hilpisch</emphasis> is founder and managing partner of The Python Quants GmbH, Germany, as well as cofounder of The Python Quants LLC, New York City. The group provides Python-based financial and derivatives analytics software (cf. <ulink url="http://pythonquants.com" role="orm:hideurl">http://pythonquants.com</ulink>, <ulink url="http://quant-platform.com" role="orm:hideurl">http://quant-platform.com</ulink>, and <ulink url="http://dx-analytics.com" role="orm:hideurl">http://dx-analytics.com</ulink>), as well as consulting, development, and training services related to Python and finance.</para>
+
+  <para>Yves is also author of the book <emphasis>Derivatives Analytics with Python</emphasis> (Wiley Finance, 2015). As a graduate in Business Administration with a Dr.rer.pol. in Mathematical Finance, he lectures on Numerical Methods in Computational Finance at Saarland University. </para></authorblurb></author><editor><firstname>Brian</firstname><surname>MacDonald</surname></editor><editor><firstname>Meghan</firstname><surname>Blanchette</surname></editor><copyright><year>2015</year><holder>Yves Hilpisch</holder></copyright><editor role="production"><firstname>Matthew</firstname><surname>Hacker</surname></editor><editor role="copy"><firstname>Charles</firstname><surname>Roumeliotis</surname></editor><othercredit role="indexer"><firstname>Judith</firstname><surname>McConville</surname></othercredit><othercredit role="coverdesigner"><firstname>Ellie</firstname><surname>Volckhausen</surname></othercredit><othercredit role="interiordesigner"><firstname>David</firstname><surname>Futato</surname></othercredit><printhistory><formalpara><title>First Edition</title><para>December, 2014</para></formalpara></printhistory><revhistory><revision><date>2014-12-09</date><revremark>First release</revremark></revision></revhistory>
+  <mediaobject role="cover"> <!-- source in the cover -->
+<imageobject role="front-large" remap="lrg">
+<imagedata format="PNG" fileref="images/cover.png"/>
+</imageobject>
+</mediaobject>

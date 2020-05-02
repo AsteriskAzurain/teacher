@@ -1,0 +1,743 @@
+[[derivatives_valuation]]
+== Derivatives Valuation
+
+[quote, Judd Gregg]
+____
+[role="align_me_right"]
+Derivatives are a huge, complex issue.
+____
+
+((("derivatives analytics library", "derivatives valuation", id="ix_DALder", range="startofrange")))(((derivatives valuation, methods available)))((("analytics", "derivatives analytics library", "derivatives valuation", id="ix_ALder", range="startofrange")))Options and derivatives valuation has long been the domain of so-called _rocket scientists_ on Wall Street—i.e., people with a Ph.D. in physics or a similarly demanding discipline when it comes to the mathematics involved. However, the application of the models by the means of numerical methods like Monte Carlo simulation is generally a little less involved than the theoretical models themselves.
+
+(((European exercise, definition of)))(((American exercise, definition of)))(((Least-Squares Monte Carlo (LSM) algorithm)))((("Monte Carlo simulation", "Least-Squares Monte Carlo (LSM) algorithm")))This is particularly true for the valuation of options and derivatives with __European exercise__—i.e., where exercise is only possible at a certain, predetermined date. It is a bit less true for options and derivatives with __American exercise__, where exercise is allowed at any point over a prespecified period of time. This chapter introduces and uses the _Least-Squares Monte Carlo_ (LSM) algorithm, which has become a benchmark algorithm when it comes to American options valuation based on Monte Carlo simulation.
+
+The current chapter is similar in structure to <<model_simulation>> in that it first introduces a generic valuation class and then provides two specialized valuation classes, one for European exercise and another one for American exercise.
+
+((("risk management", seealso="derivatives valuation; risk measures")))The generic valuation class contains methods to numerically estimate the most important Greeks of an option: the _Delta_ and the _Vega_. Therefore, the valuation classes are important not only for valuation purposes, but also for _risk management_ purposes.
+
+=== Generic Valuation Class
+
+((("derivatives valuation", "generic valuation class", id="ix_DVgen", range="startofrange")))(((classes, generic valuation class)))As with the generic simulation class, we instantiate an object of the valuation class by providing only a few inputs (in this case, four):
+
+++++
+<?hard-pagebreak?>
+++++
+
+++name++::
+    A +string+ object as a name for the model simulation object
+++underlying++::
+    An instance of a simulation class representing the underlying
+++mar_env++::
+    An instance of the +market_environment+ class
+++payoff_func++::
+    A +Python+ string containing the payoff function for the option/derivative
+
+The generic class has three methods:
+
+++update++::
+    This method updates selected valuation parameters (attributes).
+++delta++::
+    This method calculates a numerical value for the Delta of an option/derivative.
+++vega++::
+    This method calculates the Vega of an option/derivative.
+
+Equipped with the background knowledge from the previous chapters about the +DX+ library, the generic valuation class as presented in <<valuation_class>> should be almost self-explanatory; where appropriate, inline comments are also provided. We again present the class in its entirety first and highlight selected topics immediately afterward and in the subsequent sections.
+
+[[valuation_class]]
+.Generic valuation class
+====
+[source, python]
+----
+include::python/dx/valuation_class.py[]
+----
+====
+
+((("Greeks, estimation of")))(((Deltas)))One topic covered by the generic +valuation_class+ class is the estimation of Greeks. This is something we should take a closer look at. To this end, consider that we have a continuously differentiable function latexmath:[$V(S_0, \sigma_0)$] available that represents the present value of an option. The _Delta_ of the option is then defined as the first partial derivative with respect to the current value of the underlying __S__~0~; i.e., latexmath:[$\Delta = \frac{\partial V(\cdot)}{\partial S_0}$].
+
+Suppose now that we have from Monte Carlo valuation (see <<stochastics>> and subsequent sections in this chapter) a numerical Monte Carlo estimator latexmath:[$\bar{V}(S_0, \sigma_0)$] for the option value. A numerical approximation for the Delta of the option is then given in <<num_delta>>.footnote:[For details on how to estimate Greeks numerically by Monte Carlo simulation, refer to Chapter 7 of Glasserman (2004). We only use _forward-difference_ schemes here since this leads to only _one_ additional simulation and revaluation of the option. For example, a _central-difference_ approximation would lead to _two_ option revaluations and therefore a higher computational burden.] This is what the +delta+ method of the generic valuation class implements. The method assumes the existence of a +present_value+ method that returns the Monte Carlo estimator given a certain set of parameter values.
+
+
+[[num_delta]]
+[latexmath]
+.Numerical Delta of an option
+++++
+\begin{equation*}
+\bar{\Delta} = \frac{\bar{V}(S_0 + \Delta S, \sigma_0) - \bar{V}(S_0, \sigma_0) }{\Delta S}, \Delta S > 0
+\end{equation*}
+++++
+
+
+(((Vega, definition of)))Similarly, the _Vega_ of the instrument is defined as the first partial derivative of the present value with respect to the current (instantaneous) volatility &#x1d70e;~0~, i.e., latexmath:[$\mathbf{V} = \frac{\partial V(\cdot)}{\partial \sigma_0}$]. Again assuming the existence of a Monte Carlo estimator for the value of the option, <<num_vega>> provides a numerical approximation for the Vega. This is what the +vega+ method of the +valuation_class+ class implements.
+
+
+[[num_vega]]
+[latexmath]
+.Numerical Vega of an option
+++++
+\begin{equation*}
+\mathbf{V} = \frac{\bar{V}(S_0, \sigma_0 + \Delta \sigma) - \bar{V}(S_0, \sigma_0)}{\Delta \sigma}, \Delta \sigma > 0
+\end{equation*}
+++++
+
+(((range="endofrange", startreg="ix_DVgen")))Note that the discussion of Delta and Vega is based only on the _existence_ of either a differentiable function or a Monte Carlo estimator for the present value of an option. This is the very reason why we can define methods to numerically estimate these quantities without knowledge of the exact definition and numerical implementation of the Monte Carlo estimator.
+
+=== European Exercise
+
+((("derivatives valuation", "European exercise", id="ix_DVeuro", range="startofrange")))(((European exercise, Monte Carlo estimator for option values)))The first case to which we want to specialize the generic valuation class is _European exercise_. To this end, consider the following simplified recipe to generate a Monte Carlo estimator for an option value:
+
+. Simulate the relevant underlying risk factor __S__ under the risk-neutral measure __I__ times to come up with as many simulated values of the underlying at the maturity of the option __T__—i.e.,  latexmath:[$\bar{S}_T(i), i \in \{1, 2, ..., I\}$]
+. Calculate the payoff __h~T~__ of the option at maturity for every simulated value of the underlying--i.e., latexmath:[$h_T(\bar{S}_T(i)), i \in \{1, 2, ..., I\}$]
+. Derive the Monte Carlo estimator for the option's present value as latexmath:[$\bar{V}_0 \equiv e^{-rT} \frac{1}{I} \sum_{i=1}^{I} h_T(\bar{S}_T(i))$]
+
+==== The Valuation Class
+
+(((European exercise, valuation class)))(((classes, valuation class for European exercise)))(((present_value method)))(((generate_payoff method)))<<valuation_european>> shows the class implementing the +present_value+ method based on this recipe. In addition, it contains the method +generate_payoff+ to generate the simulated paths and the payoff of the option given the simulated paths. This, of course, builds the very basis for the Monte Carlo estimator. 
+
+[[valuation_european]]
+.Valuation class for European exercise
+====
+[source, python]
+----
+include::python/dx/valuation_mcs_european.py[]
+----
+====
+
+The +generate_payoff+ method provides some special objects to be used for the definition of the payoff of the option:
+
+* +strike+ is the _strike_ of the option.
+* +maturity_value+ represents the 1D +ndarray+ object with the simulated values of the _underlying at maturity_ of the option.
+* +mean_value+ is the _average_ of the underlying over a whole path from today until maturity.
+* +max_value+ is the _maximum value_ of the underlying over a whole path.
+* +min_value+ gives the _minimum value_ of the underlying over a whole path.
+
+The last three especially allow for the efficient handling of options with Asian (i.e., lookback) features.
+
+==== A Use Case
+
+((("European exercise", "use case", id="ix_EEuse", range="startofrange")))The application of the valuation class +valuation_mcs_european+ is best illustrated by a specific use case. However, before a valuation class can be instantiated, we need a simulation object--i.e., an underlying for the option to be valued. From <<model_simulation>>, we use the +geometric_brownian_motion+ class to model the underlying. We also use the example parameterization of the respective use case there:
+
+// code cell start uuid: 57252fe1-29a2-44bb-8cab-64337ea2bdc7
+[source, python]
+----
+In [1]: from dx import *
+----
+
+// code cell end
+
+// code cell start uuid: 9f6df028-fd97-4dc9-9960-d5202b94feb1
+[source, python]
+----
+In [2]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 527be3e7-3e98-4fe5-b41e-23af730c0921
+[source, python]
+----
+In [3]: me_gbm.add_constant('initial_value', 36.)
+        me_gbm.add_constant('volatility', 0.2)
+        me_gbm.add_constant('final_date', dt.datetime(2015, 12, 31))
+        me_gbm.add_constant('currency', 'EUR')
+        me_gbm.add_constant('frequency', 'M')
+        me_gbm.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: fc61c07b-7bb2-45ac-a10d-617a24747953
+[source, python]
+----
+In [4]: csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: 6acd3ae9-5986-4cec-9f66-407ddd79202e
+[source, python]
+----
+In [5]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+// code cell start uuid: dc0c43ae-c6f0-434e-ad6e-c3fbe91b1175
+[source, python]
+----
+In [6]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+In addition to a simulation object, we need to provide a market environment for the option itself. It has to contain at least a +maturity+ and a +currency+. Optionally, we can provide a +strike+:
+
+// code cell start uuid: 17f4b627-7fb8-43f6-bb15-26a6a4d60b0b
+[source, python]
+----
+In [7]: me_call = market_environment('me_call', me_gbm.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 838f54a8-e11c-4ab5-85ce-8393d89f957f
+[source, python]
+----
+In [8]: me_call.add_constant('strike', 40.)
+        me_call.add_constant('maturity', dt.datetime(2015, 12, 31))
+        me_call.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+A central element, of course, is the payoff function, provided here as a +string+ object containing +Python+ code that the +eval+ function can evaluate. We want to define a European _call_ option. Such an option has a payoff of __h~T~__ = max(__S~T~__ – __K__,0), with __S~T~__ being the value of the underlying at maturity and __K__ being the strike price of the option. In +Python+ and ++NumPy++—i.e., with vectorized storage of all simulated values--this takes on the following form:
+
+// code cell start uuid: 4bfb5550-ab6b-4b56-9604-3fad05c5f334
+[source, python]
+----
+In [9]: payoff_func = 'np.maximum(maturity_value - strike, 0)'
+----
+
+// code cell end
+
+We can now put all the ingredients together to instantiate the +valuation_mcs_european+ class:
+
+// code cell start uuid: 5a331672-9004-43b0-9ba6-61622d4e1b65
+[source, python]
+----
+In [10]: from valuation_mcs_european import valuation_mcs_european
+----
+
+// code cell end
+
+// code cell start uuid: 0ba08733-7d34-488e-b460-e5abc223a85a
+[source, python]
+----
+In [11]: eur_call = valuation_mcs_european('eur_call', underlying=gbm,
+                                 mar_env=me_call, payoff_func=payoff_func)
+----
+
+// code cell end
+
+With this valuation object available, all quantities of interest are only one method call away. Let us start with the present value of the option:
+
+// code cell start uuid: 1869f59a-2c88-4bb4-bde6-b662edbd5f62
+[source, python]
+----
+In [12]: %time eur_call.present_value()
+----
+
+----
+Out[12]: CPU times: user 41.7 ms, sys: 11 ms, total: 52.7 ms
+         Wall time: 44.6 ms
+         
+Out[12]: 2.180511
+----
+
+// code cell end
+
+The Delta of the option is, as expected for a European call option, positive—i.e., the present value of the option increases with increasing initial value of the underlying:
+
+// code cell start uuid: 62330fe7-0fbe-4a24-886e-a9c64b61122c
+[source, python]
+----
+In [13]: %time eur_call.delta()
+----
+
+----
+Out[13]: CPU times: user 10.9 ms, sys: 1.09 ms, total: 12 ms
+         Wall time: 11.1 ms
+         
+         0.4596
+----
+
+// code cell end
+
+The Vega is calculated similarly. It shows the increase in the present value of the option given an increase in the initial volatility of 1%; e.g., from 24% to 25%. The Vega is positive for both European put and call options:
+
+// code cell start uuid: 999b5d90-57b9-46da-b7cc-981841df58b8
+[source, python]
+----
+In [14]: %time eur_call.vega()
+----
+
+----
+Out[14]: CPU times: user 15.2 ms, sys: 1.34 ms, total: 16.5 ms
+         Wall time: 15.6 ms
+         
+         14.2782
+----
+
+// code cell end
+
+Once we have the valuation object, a more comprehensive analysis of the present value and the Greeks is easily implemented. The following code calculates the present value, Delta, and Vega for initial values of the underlying ranging from 34 to 46 EUR:
+
+// code cell start uuid: bf5e7430-eea7-47ae-b1a6-e335c144929b
+[source, python]
+----
+In [15]: %%time
+         s_list = np.arange(34., 46.1, 2.)
+         p_list = []; d_list = []; v_list = []
+         for s in s_list:
+             eur_call.update(initial_value=s)
+             p_list.append(eur_call.present_value(fixed_seed=True))
+             d_list.append(eur_call.delta())
+             v_list.append(eur_call.vega())
+----
+
+----
+Out[15]: CPU times: user 239 ms, sys: 8.18 ms, total: 248 ms
+         Wall time: 248 ms
+         
+----
+
+// code cell end
+
+Equipped with all these values, we can graphically inspect the results. To this end, we use a helper function as shown in <<plot_option_stats>>.
+
+[[plot_option_stats]]
+.Helper function to plot options statistics
+====
+[source, python]
+----
+include::python/dx/plot_option_stats.py[]
+----
+====
+
+Importing this function and providing the valuation results to it generates a picture like that shown in <<option_stats_1>>:
+
+// code cell start uuid: 70b7e095-a138-47bb-90b5-2a658d74b87c
+[source, python]
+----
+In [16]: from plot_option_stats import plot_option_stats
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: 2590618e-3bfd-4416-82b6-eef269a28f38
+[source, python]
+----
+In [17]: plot_option_stats(s_list, p_list, d_list, v_list)
+----
+
+[[option_stats_1]]
+.Present value, Delta, and Vega estimates for European call option
+image::images/pyfi_1701.png[]
+
+// code cell end
+
+This illustrates that working with the +DX+ library--although heavy numerics are pass:[<phrase role="keep-together">involved—</phrase>]boils down to an approach that is comparable to having a closed-form option pricing formula available. However, this approach does not only apply to such simple payoffs as the one considered so far. With exactly the same approach, we can handle much more complex payoffs. To this end, consider the following payoff, a _mixture of a regular and an Asian payoff_:
+
+// code cell start uuid: 2d5ca812-5448-47fe-9fd3-af2ab7eca13e
+[source, python]
+----
+In [18]: payoff_func = 'np.maximum(0.33 * (maturity_value + max_value) - 40, 0)'
+           # payoff dependent on both the simulated maturity value
+           # and the maximum value
+----
+
+// code cell end
+
+Everything else shall remain the same:
+
+// code cell start uuid: 62c9340d-a2a3-477e-b640-389d81c3b8a1
+[source, python]
+----
+In [19]: eur_as_call = valuation_mcs_european('eur_as_call', underlying=gbm,
+                                     mar_env=me_call, payoff_func=payoff_func)
+----
+
+// code cell end
+
+All statistics, of course, change in this case:
+
+// code cell start uuid: 50f5cf9a-d2c7-4e69-9361-e3bf8678c4a3
+[source, python]
+----
+In [20]: %%time
+         s_list = np.arange(34., 46.1, 2.)
+         p_list = []; d_list = []; v_list = []
+         for s in s_list:
+             eur_as_call.update(s)
+             p_list.append(eur_as_call.present_value(fixed_seed=True))
+             d_list.append(eur_as_call.delta())
+             v_list.append(eur_as_call.vega())
+----
+
+----
+Out[20]: CPU times: user 286 ms, sys: 14.5 ms, total: 300 ms
+         Wall time: 303 ms
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_EEuse")))(((range="endofrange", startref="ix_DVeuro")))<<option_stats_2>> shows that Delta becomes 1 when the initial value of the underlying reaches the strike price of 40 in this case. Every (marginal) increase of the initial value of the underlying leads to the same (marginal) increase in the option's value from this particular point on:
+
+// code cell start uuid: a4602156-ade5-49fe-97c8-3088dc47944c
+[source, python]
+----
+In [21]: plot_option_stats(s_list, p_list, d_list, v_list)
+----
+
+[[option_stats_2]]
+.Present value, Delta, and Vega estimates for European–Asian call option
+image::images/pyfi_1702.png[]
+
+// code cell end
+
+=== American Exercise
+
+((("derivatives valuation", "American exercise", id="ix_DVamer", range="startofrange")))(((American exercise, definition of)))(((Bermudan exercises)))The valuation of options with __American exercise__—or __Bermudan exercise__, to this endfootnote:[_American_ exercise refers to a situation where exercise is possible at every instant of time over a fixed time interval (at least during trading hours). _Bermudan_ exercise generally refers to a situation where there are multiple, discrete exercise dates. In numerical applications, American exercise is approximated by Bermudan exercise, and maybe letting the number of exercise dates go to infinity in the limit.]—is much more involved than with European exercise. Therefore, we have to introduce a bit more valuation theory first before proceeding to the valuation class.
+
+==== Least-Squares Monte Carlo
+
+((("American exercise", "Least-Squares Monte Carlo (LSM) algorithm")))(((valuation theory)))(((Least-Squares Monte Carlo (LSM) algorithm)))(((Cox-Ross-Rubinstein binomial model)))(((Longstaff-Schwartz model)))(((Monte Carlo simulation, drawbacks of)))(((binomial model)))Although Cox, Ross, and Rubinstein (1979) presented with their binomial model a simple numerical method to value European and American options in the same framework, only with the Longstaff-Schwartz (2001) model was the valuation of American options by Monte Carlo simulation (MCS) satisfactorily solved. The major problem is that MCS per se is a forward-moving algorithm, while the valuation of American options is generally accomplished by backward induction, estimating the continuation value of the American option starting at maturity and working _back_ to the present.
+
+((("ordinary least-squares regression (OLS)")))The major insight of the Longstaff-Schwartz (2001) model is to use an ordinary least-squares regressionfootnote:[That is why their algorithm is generally abbreviated as LSM, for _Least-Squares Monte Carlo_.] to estimate the continuation value based on the cross section of all available simulated values--taking into account, per path:
+
+* The simulated value of the underlying(s)
+* The inner value of the option
+* The actual continuation value given the specific path
+
+(((optimal stopping problems)))In discrete time, the value of a Bermudan option (and in the limit of an American option) is given by the _optimal stopping problem_, as presented in <<opt_stop_ch17>> for a finite set of points in time 0 < __t__~1~ < __t__~2~ < ... < __T__.footnote:[Kohler (2010) provides a concise overview of the theory of American option valuation in general and the use of regression-based methods in particular.]
+
+[[opt_stop_ch17]]
+[latexmath]
+.Optimal stopping problem in discrete time for Bermudan option
+++++
+\begin{equation}
+V_{0}=\sup_{\tau\in\{0,t_1,t_2,...,T\}}e^{-r\tau} \mathbf{E}_{0}^{Q}(h_{\tau}(S_{\tau}))
+\end{equation}
+++++
+
+(((martingale measures)))(((continuation value)))<<cont_value>> presents the continuation value of the American option at date pass:[<phrase role="keep-together">0 &#x2264; <emphasis>t<subscript>m</subscript></emphasis> &lt; <emphasis>T</emphasis></phrase>]. It is just the risk-neutral expectation at date __t~m+1~__ under the martingale measure of the value of the American option latexmath:[$V_{t_{m+1}}$] at the subsequent date.
+
+[[cont_value]]
+[latexmath]
+.Continuation value for the American option
+++++
+\begin{equation}
+C_{t_m}(s)=e^{-r (t_{m+1} - t_{m})} \mathbf{E}_{t_m}^{Q}( V_{t_{m+1}}(S_{t_{m+1}})|S_{t_m}=s)
+\end{equation}
+++++
+
+The value of the American option latexmath:[$V_{t_{m}}$] at date latexmath:[$t_{m}$] can be shown to equal the formula in <<opt_value>>—i.e., the maximum of the payoff of immediate exercise (inner value) and the expected payoff of not exercising (continuation value).
+
+[[opt_value]]
+[latexmath]
+.Value of American option at any given date
+++++
+\begin{equation}
+V_{t_{m}}=\max \left( h_{t_m}(s), C_{t_m}(s) \right)
+\end{equation}
+++++
+
+In <<opt_value>>, the inner value is of course easily calculated. The continuation value is what makes it a bit trickier. The Longstaff-Schwartz (2001) model approximates this value by a regression, as presented in <<lsm_regression>>. There, __i__ stands for the current simulated path, __D__ is the number of basis functions for the regression used, &#x1d6fc;^*^ are the optimal regression parameters, and __b~d~__ is the regression function numbered __d__.
+
+
+[[lsm_regression]]
+[latexmath]
+.Regression-based approximation of continuation value
+++++
+\begin{equation}
+\bar{C}_{t_m, i} = \sum_{d=1}^{D} \alpha_{d, t_m}^{*} \cdot b_{d}(S_{t_m, i})
+\end{equation}
+++++
+
+The optimal regression parameters are the result of the solution of the least-squares regression problem presented in <<lsm_problem>>. Here, latexmath:[$Y_{t_{m}, i} \equiv e^{-r (t_{m+1} - t_m)} V_{t_{m+1}, i}$] is the actual continuation value at date __t~m~__ for path __i__ (and not a regressed/estimated one).
+
+[[lsm_problem]]
+[latexmath]
+.Ordinary least-squares regression
+++++
+\begin{equation}
+\min_{\alpha_{1,t_m},...,\alpha_{D,t_m}} \frac{1}{I} \sum_{i=1}^{I} \left( Y_{t_{m},i}-\sum_{d=1}^{D}\alpha_{d,t_m}\cdot b_{d}(S_{t_m,i}) \right)^{2}
+\end{equation}
+++++
+
+This completes the basic (mathematical) tool set to value an American option by MCS.
+
+==== The Valuation Class
+
+(((American exercise, valuation class)))(((classes, valuation class for American exercise)))(((optimal decision step)))(((actual continuation value)))(((estimated continuation value)))<<valuation_american>> presents the class for the valuation of options and derivatives with American exercise. There is one noteworthy step in the implementation of the LSM algorithm in the +present_value+ method (which is also commented on inline): the _optimal decision step_. Here, it is important that, based on the decision that is made, the LSM algorithm takes either the inner value or the _actual_ continuation value--and _not_ the estimated continuation value.footnote:[See also Chapter 6 of Hilpisch (2015).]
+
+[[valuation_american]]
+.Valuation class for American exercise
+====
+[source, python]
+----
+include::python/dx/valuation_mcs_american.py[]
+----
+====
+
+==== A Use Case
+
+((("American exercise", "use case", id="ix_AEuse", range="startofrange")))(((Longstaff-Schwartz model)))As has become by now the means of choice, a use case shall illustrate how to work with the +valuation_mcs_american+ class. The use case replicates all American option values as presented in Table 1 of the seminal paper by Longstaff and Schwartz (2001). The underlying is the same as before, a +geometric_brownian_motion+ object. The starting parameterization for the underlying is as follows:
+
+// code cell start uuid: 5d69e0ae-939b-49fa-a329-2f0538f8cb20
+[source, python]
+----
+In [22]: from dx_simulation import *
+----
+
+// code cell end
+
+// code cell start uuid: 81d66ea7-15df-429a-9f87-fc2f2c881726
+[source, python]
+----
+In [23]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: f822430b-6875-4b81-9c15-4684eea1225c
+[source, python]
+----
+In [24]: me_gbm.add_constant('initial_value', 36.)
+         me_gbm.add_constant('volatility', 0.2)
+         me_gbm.add_constant('final_date', dt.datetime(2016, 12, 31))
+         me_gbm.add_constant('currency', 'EUR')
+         me_gbm.add_constant('frequency', 'W')
+           # weekly frequency
+         me_gbm.add_constant('paths', 50000)
+----
+
+// code cell end
+
+// code cell start uuid: ed806c52-2dc7-4dec-a8dc-8e0d99e18a3c
+[source, python]
+----
+In [25]: csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: 78738a9b-8f75-4710-b31d-415cdade6bb8
+[source, python]
+----
+In [26]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+// code cell start uuid: 4b0692ba-91f6-4d19-adfd-d4b31590542b
+[source, python]
+----
+In [27]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+The _option type_ is an American put option with payoff:
+
+// code cell start uuid: ab695214-a424-4ead-9c96-ef75a8f52ed0
+[source, python]
+----
+In [28]: payoff_func = 'np.maximum(strike - instrument_values, 0)'
+----
+
+// code cell end
+
+The first option in Table 1 of the paper has a maturity of one year, and the strike price is 40 throughout:
+
+// code cell start uuid: 558b7076-4cc6-4e45-9e04-395eb3ba8aac
+[source, python]
+----
+In [29]: me_am_put = market_environment('me_am_put', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 783eb5ab-6dd6-4561-9614-aedb4247d6ab
+[source, python]
+----
+In [30]: me_am_put.add_constant('maturity', dt.datetime(2015, 12, 31))
+         me_am_put.add_constant('strike', 40.)
+         me_am_put.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+The next step is to instantiate the valuation object based on the numerical assumptions:
+
+// code cell start uuid: dd6bc5f2-ed01-4877-a7da-dee5d9bd9c45
+[source, python]
+----
+In [31]: from valuation_mcs_american import valuation_mcs_american
+----
+
+// code cell end
+
+// code cell start uuid: a43bc735-e35e-4621-9185-5d9d415b0efd
+[source, python]
+----
+In [32]: am_put = valuation_mcs_american('am_put', underlying=gbm,
+                             mar_env=me_am_put, payoff_func=payoff_func)
+----
+
+// code cell end
+
+The valuation of the American put option takes much longer than the same task for the European options. Not only have we increased the number of paths and the frequency for the valuation, but the algorithm is much more computationally demanding due to the backward induction and the regression per induction step. Our numerical value is pretty close to the correct one reported in the original paper of 4.478:
+
+// code cell start uuid: eeb5de5d-f95b-4acd-bbab-2eae998d8f46
+[source, python]
+----
+In [33]: %time am_put.present_value(fixed_seed=True, bf=5)
+----
+
+----
+Out[33]: CPU times: user 1.36 s, sys: 239 ms, total: 1.6 s
+         Wall time: 1.6 s
+         
+         4.470627
+----
+
+// code cell end
+
+Due to the very construction of the LSM Monte Carlo estimator, it represents a _lower bound_ of the mathematically correct American option value.footnote:[The main reason is that the "optimal exercise policy" based on the regression estimates of the continuation value is only "suboptimal."] Therefore, we would expect the numerical estimate to lie under the true value in any numerically realistic case. Alternative dual estimators can provide _upper bounds_ as well.footnote:[Cf. Chapter 6 in Hilpisch (2015) for a dual algorithm leading to an upper bound and a +Python+ implementation thereof.] Taken together, two such different estimators then define an interval for the true American option value.
+
+The main stated goal of this use case is to replicate all American option values of Table 1 in the original paper. To this end, we only need to combine the valuation object with a nested loop. During the innermost loop, the valuation object has to be updated according to the then-current parameterization:
+
+// code cell start uuid: 671c9254-1fa5-432c-accb-4d0610abd910
+[source, python]
+----
+In [34]: %%time
+         ls_table = []
+         for initial_value in (36., 38., 40., 42., 44.):
+             for volatility in (0.2, 0.4):
+                 for maturity in (dt.datetime(2015, 12, 31),
+                                  dt.datetime(2016, 12, 31)):
+                     am_put.update(initial_value=initial_value,
+                                   volatility=volatility,
+                                   maturity=maturity)
+                     ls_table.append([initial_value,
+                                      volatility,
+                                      maturity,
+                                      am_put.present_value(bf=5)])
+----
+
+----
+Out[34]: CPU times: user 31.1 s, sys: 3.22 s, total: 34.3 s
+         Wall time: 33.9 s
+         
+----
+
+// code cell end
+
+Following is our simplified version of Table 1 in the paper by Longstaff and Schwartz (2001). Overall, our numerical values come pretty close to those reported in the paper, where some different parameters have been used (they use, for example, double the number of paths):
+
+// code cell start uuid: 125e9a02-1db7-4fdd-bdd8-6f0f522281d3
+[source, python]
+----
+In [35]: print "S0  | Vola | T | Value"
+         print 22 * "-"
+         for r in ls_table:
+             print "%d  | %3.1f  | %d | %5.3f" % \
+                   (r[0], r[1], r[2].year - 2014, r[3])
+----
+
+----
+Out[35]: S0  | Vola | T | Value
+         ----------------------
+         36  | 0.2  | 1 | 4.444
+         36  | 0.2  | 2 | 4.769
+         36  | 0.4  | 1 | 7.000
+         36  | 0.4  | 2 | 8.378
+         38  | 0.2  | 1 | 3.210
+         38  | 0.2  | 2 | 3.645
+         38  | 0.4  | 1 | 6.066
+         38  | 0.4  | 2 | 7.535
+         40  | 0.2  | 1 | 2.267
+         40  | 0.2  | 2 | 2.778
+         40  | 0.4  | 1 | 5.203
+         40  | 0.4  | 2 | 6.753
+         42  | 0.2  | 1 | 1.554
+         42  | 0.2  | 2 | 2.099
+         42  | 0.4  | 1 | 4.459
+         42  | 0.4  | 2 | 6.046
+         44  | 0.2  | 1 | 1.056
+         44  | 0.2  | 2 | 1.618
+         44  | 0.4  | 1 | 3.846
+         44  | 0.4  | 2 | 5.494
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DALder")))(((range="endofrange", startref="ix_AEuse")))(((range="endofrange", startref="ix_DVamer")))(((range="endofrange", startref="ix_ALder")))To conclude the use case, note that the estimation of Greeks for American options is formally the same as for European options--a major advantage of our approach over alternative numerical methods (like the binomial model):
+
+// code cell start uuid: 481d5438-d32b-40a2-aa8c-687b19138e29
+[source, python]
+----
+In [36]: am_put.update(initial_value=36.)
+         am_put.delta()
+----
+
+----
+Out[36]: -0.4655
+----
+
+// code cell end
+
+// code cell start uuid: 84cf9547-c8b3-4205-81e5-8949ae798394
+[source, python]
+----
+In [37]: am_put.vega()
+----
+
+----
+Out[37]: 17.3411
+----
+
+// code cell end
+
+=== Conclusions
+
+This chapter is about the numerical valuation of both _European_ and _American_ options based on Monte Carlo simulation. The chapter introduces a generic valuation class, called +valuation_class+. This class provides methods, for example, to estimate the most important Greeks (Delta, Vega) for both types of options, independent of the simulation object (risk factor/stochastic process) used for the valuation.
+
+Based on the generic valuation class, the chapter presents two specialized classes, +valuation_mcs_european+ and +valuation_mcs_american+. The class for the valuation of European options is mainly a straightforward implementation of the risk-neutral valuation approach presented in <<valuation_framework>> in combination with the numerical estimation of an expectation term (i.e., an integral by Monte Carlo simulation, as discussed in <<math_tools>>).
+
+The class for the valuation of American options needs a certain kind of regression-based valuation algorithm. This is due to the fact that for American options an optimal exercise policy has to be derived for a valuation. This is theoretically and numerically a bit more involved. However, the respective +present_value+ method of the class is still concise. 
+
+The approach taken with the +DX+ derivatives analytics library proves to be beneficial. Without too much effort we are able to value a pretty large class of options with the following features:
+
+* Single risk factor options
+* European or American exercise
+* Arbitrary payoff
+
+In addition, we can estimate the most important Greeks for this class of options. To simplify future imports, we will again use a wrapper module, this time called +dx_valuation.py+, as presented in <<dx_valuation>>.
+
+[[dx_valuation]]
+.Wrapper module for all components of the library including valuation classes
+====
+[source, python]
+----
+include::python/dx/dx_valuation.py[]
+----
+====
+
+Again, let us enhance the +init+ file in the +dx+ directory (see <<dx_lib_3>>) to stay consistent here.
+
+[[dx_lib_3]]
+.Enhanced Python packaging file
+====
+[source, python]
+----
+include::python/dx/__init__3.py[]
+----
+====
+
+=== Further Reading
+
+References for the topics of this chapter in book form are:
+
+* Glasserman, Paul (2004): _Monte Carlo Methods in Financial Engineering_. Springer, New York.
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://derivatives-analytics-with-python.com[].
+
+Original papers cited in this chapter:
+
+* Cox, John, Stephen Ross, and Mark Rubinstein (1979): "Option Pricing: A Simplified Approach." _Journal of Financial Economics_, Vol. 7, No. 3, pp. 229–263.
+* Kohler, Michael (2010): "A Review on Regression-Based Monte Carlo Methods for Pricing American Options." In Luc Devroye et al. (eds.): _Recent Developments in Applied Probability and Statistics_. Physica-Verlag, Heidelberg, pp. 37–58.
+* Longstaff, Francis and Eduardo Schwartz (2001): "Valuing American Options by Simulation: A Simple Least Squares Approach." _Review of Financial Studies_, Vol. 14, No. 1, pp. 113–147.
+

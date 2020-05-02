@@ -1,0 +1,164 @@
+[appendix]
+[[bsm_option_class]]
+== Call Option Class
+
+<<bsm_class>> contains a class definition for a European call option in the Black-Scholes-Merton (1973) model (cf. <<introductory_examples>>, and in particular <<bsm_functions>>).((("call options", "class definition for European", id="ix_COclassdefE", range="startofrange")))((("Black-Scholes-Merton model", "class definition for European call option", id="ix_BSMclassdefE", range="startofrange")))
+
+[[bsm_class]]
+.Implementation of a Black-Scholes-Merton call option class
+====
+[source, python]
+----
+include::ipython/bsm_option_class.py[]
+----
+====
+
+This class can be used in an interactive +IPython+ session as follows:
+
+// code cell start uuid: c6c61e9c-0a76-42f3-ba72-5ddfa15a76a0
+[source, python]
+----
+In [1]: from bsm_option_class import call_option
+----
+
+// code cell end
+
+// code cell start uuid: 6fbac054-7632-4b1a-905a-1e7617ab1353
+[source, python]
+----
+In [2]: o = call_option(100., 105., 1.0, 0.05, 0.2)
+        type(o)
+----
+
+----
+Out[2]: bsm_option_class.call_option
+----
+
+// code cell end
+
+// code cell start uuid: 29db884c-ae9d-44fc-ac14-ac7f42842d58
+[source, python]
+----
+In [3]: value = o.value()
+        value
+----
+
+----
+Out[3]: 8.0213522351431763
+----
+
+// code cell end
+
+// code cell start uuid: ad80b6ae-ba85-4e77-bc51-d539888e3ad1
+[source, python]
+----
+In [4]: o.vega()
+----
+
+----
+Out[4]: 54.222833358480528
+----
+
+// code cell end
+
+// code cell start uuid: 498adc88-13d0-4440-adbd-d4214e9529dc
+[source, python]
+----
+In [5]: o.imp_vol(C0=value)
+----
+
+----
+Out[5]: 0.20000000000000001
+----
+
+// code cell end
+
+The option class can be easily used to visualize, for example, the value and Vega of the option for different strikes and maturities. This is, in the end, one of the major advantages of having such formulae available. The following +Python+ code generates the option statistics for different maturity-strike combinations:
+
+// code cell start uuid: a3bd9b68-82cc-45e5-8c29-407a98ad1aec
+[source, python]
+----
+In [6]: import numpy as np
+        maturities = np.linspace(0.05, 2.0, 20)
+        strikes = np.linspace(80, 120, 20)
+        T, K = np.meshgrid(strikes, maturities)
+        C = np.zeros_like(K)
+        V = np.zeros_like(C)
+        for t in enumerate(maturities):
+            for k in enumerate(strikes):
+                o.T = t[1]
+                o.K = k[1]
+                C[t[0], k[0]] = o.value()
+                V[t[0], k[0]] = o.vega()
+----
+
+// code cell end
+
+First, let us have a look at the option values. For plotting, we need to import some libraries and functions:
+
+// code cell start uuid: 4beed5a6-ed44-4fd3-aaf0-6bc4be2b1c83
+[source, python]
+----
+In [7]: import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        from pylab import cm
+        %matplotlib inline
+----
+
+// code cell end
+
+The output of the following code is presented in <<bsm_value_3d>>:
+
+// code cell start uuid: aae2d996-fa8e-469d-8ffa-f0a5684160a7
+[source, python]
+----
+In [8]: fig = plt.figure(figsize=(12, 7))
+        ax = fig.gca(projection='3d')
+        surf = ax.plot_surface(T, K, C, rstride=1, cstride=1,
+                    cmap=cm.coolwarm, linewidth=0.5, antialiased=True)
+        ax.set_xlabel('strike')
+        ax.set_ylabel('maturity')
+        ax.set_zlabel('European call option value')
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+----
+
+// code cell end
+
+Second, we have the results for the Vega of the call option, as shown in <<bsm_vega_3d>>:
+
+// code cell start uuid: a0fc3738-180b-4be7-9c31-460b3d015194
+[source, python]
+----
+In [9]: fig = plt.figure(figsize=(12, 7))
+        ax = fig.gca(projection='3d')
+        surf = ax.plot_surface(T, K, V, rstride=1, cstride=1,
+                    cmap=cm.coolwarm, linewidth=0.5, antialiased=True)
+        ax.set_xlabel('strike')
+        ax.set_ylabel('maturity')
+        ax.set_zlabel('Vega of European call option')
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        plt.show()
+----
+
+[[bsm_value_3d]]
+.Value of European call option
+image::images/pyfi_ab01.png[]
+
+[[bsm_vega_3d]]
+.Vega of European call option
+image::images/pyfi_ab02.png[]
+
+// code cell end
+
+++++
+<?hard-pagebreak?>
+++++
+
+Compared with the code in <<bsm_functions>> of <<introductory_examples>>, the code in <<bsm_class>> of this appendix shows a number of advantages:
+
+ * Better overall code structure and readability
+ * Avoidance of redundant definitions as far as possible
+ * Better reusability and more compact method calls
+
+The option class also lends itself pretty well to the visualization of option statistics.(((range="endofrange", startref="ix_BSMclassdefE")))(((range="endofrange", startref="ix_COclassdefE")))
+

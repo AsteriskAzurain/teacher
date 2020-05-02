@@ -1,0 +1,1357 @@
+[[objects_guis]]
+
+
+== Object Orientation and Graphical pass:[<phrase role="keep-together">User Interfaces</phrase>]
+
+[quote, Jon Johnson]
+____
+[role="align_me_right"]
+First, solve the problem. Then, write the code.
+____
+
+Object orientation has its fans and critics. Referring to the quote above, object-oriented implementation styles might provide the most benefit when they are applied by programmers who really understand the problem at hand and when there is much to gain from abstraction and generalization. On the other hand, if you do not know what exactly to do, a different, more interactive and exploratory programming style, like procedural programming, might be a better choice.
+
+In this chapter, we do not want to discuss the risks and merits of using object orientation. We take it for granted that this approach has its place when it comes to the development of more complex financial applications (cf. the project implemented in <<dx_library>> of the book) and that it brings along a number of measurable benefits in these cases. When it comes to building graphical user interfaces (GUIs), object orientation in general is a __conditio sine qua non__.
+
+Therefore, we combine the two topics in this chapter and introduce first fundamental concepts of +Python+ classes and objects. Equipped with this knowledge, it is much easier to introduce the development of GUIs.
+
+
+=== Object Orientation
+
+((("object orientation", id="ix_OO", range="startofrange")))((("object orientation", "definition of")))http://bit.ly/oo_programming[Wikipedia] provides the following definition for __object-oriented programming__:
+
+[quote]
+____
+Object-oriented programming (OOP) is a programming paradigm that represents concepts as "objects" that have data fields (attributes that describe the object) and associated procedures known as methods. Objects, which are usually instances of classes, are used to interact with one another to design applications and computer programs.
+____
+
+This already provides the main technical terms that are also used in the +Python+ world for classes and objects and that will be made clearer in the remainder of this section.
+
+
+==== Basics of Python Classes
+
+((("object orientation", "Python classes")))((("Python", "classes in", id="ix_Pcls", range="startofrange")))(((classes, defining)))We start by defining a new class (of objects). To this end, use the statement +class+, which is applied like a +def+ statement for function definitions. The following code defines a new +Python+ class named +ExampleOne+. This class does nothing but "exist." The +pass+ command simply does what its name says--it passes and does nothing:
+
+// code cell start uuid: 1ce92033-098b-4e27-9d87-8e2666ec5cea
+[source, python]
+----
+In [1]: class ExampleOne(object):
+            pass
+----
+
+// code cell end
+
+However, the existence of the class +ExampleOne+ allows us to generate instances of the class as new +Python+ objects:
+
+// code cell start uuid: b456addd-be22-4c83-8540-83e23537a955
+[source, python]
+----
+In [2]: c = ExampleOne()
+----
+
+// code cell end
+
+(((classes, inheritance in)))In addition, since this class inherits from the general +object+ class, it already has some batteries included. For example, the following provides the string representation of the newly generated object based on our class:
+
+// code cell start uuid: 5b6cf9da-239e-43ae-b08b-a68ce7fa1866
+[source, python]
+----
+In [3]: c.__str__()
+----
+
+----
+Out[3]: '<__main__.ExampleOne object at 0x7f8fcc28ef10>'
+----
+
+// code cell end
+
+We can also use +type+ to learn about the type of the object—in this case, an instance of the class ++ExampleOne++:
+
+// code cell start uuid: 61841014-fc42-4e7b-af9b-7c00726e30f0
+[source, python]
+----
+In [4]: type(c)
+----
+
+----
+Out[4]: __main__.ExampleOne
+----
+
+// code cell end
+
+(((classes, attributes and)))Let us now define a class that has two attributes, say, +a+ and +b+. To this end, we define a special method called +init+ that is automatically invoked at every instantiation of the class. Note that the object itself—i.e., by +Python+ convention, ++self++—is also a parameter of this function:
+
+// code cell start uuid: 02b764ef-2c2e-4b16-a172-3abe15bfe608
+[source, python]
+----
+In [5]: class ExampleTwo(object):
+            def __init__(self, a, b):
+                self.a = a
+                self.b = b
+----
+
+// code cell end
+
+Instantiating the new class +ExampleTwo+ now takes two values, one for attribute +a+ and one for attribute +b+. Note in the preceding definition that these attributes are referenced internally (i.e., in the class definition) by +self.a+ and +self.b+, respectively:
+
+// code cell start uuid: 1697f007-4187-458b-9cca-86996f72c187
+[source, python]
+----
+In [6]: c = ExampleTwo(1, 'text')
+----
+
+// code cell end
+
+(((classes, accessing attribute values)))Similarly, we can access the values of the attributes of the object +c+ as follows:
+
+// code cell start uuid: 66a76e9c-3dce-4fa4-a02f-045e18230ce9
+[source, python]
+----
+In [7]: c.a
+----
+
+----
+Out[7]: 1
+----
+
+// code cell end
+
+// code cell start uuid: bdef0545-bdbe-4205-94e8-ff4d8d25da8e
+[source, python]
+----
+In [8]: c.b
+----
+
+----
+Out[8]: 'text'
+----
+
+// code cell end
+
+(((classes, assigning new attribute values)))We can also overwrite our initial values by simply assigning new values to the attributes:
+
+// code cell start uuid: 5e53f978-44c5-48bb-82c8-488e744ee714
+[source, python]
+----
+In [9]: c.a = 100
+----
+
+// code cell end
+
+// code cell start uuid: 2886b794-29e2-4650-afff-cb4528f1837b
+[source, python]
+----
+In [10]: c.a
+----
+
+----
+Out[10]: 100
+----
+
+// code cell end
+
+(((classes, defining object attributes)))+Python+ is quite flexible when it comes to the use of classes and objects. For example, attributes of an object can be defined even after instantiation, as the following example illustrates:
+
+// code cell start uuid: 97cd1970-5234-45ea-a03f-0c2e82713d42
+[source, python]
+----
+In [11]: c = ExampleOne()
+----
+
+// code cell end
+
+// code cell start uuid: 8fa2b86a-8182-4689-80b1-a9ddb8aaabeb
+[source, python]
+----
+In [12]: c.first_name = 'Jason'
+         c.last_name = 'Bourne'
+         c.movies = 4
+----
+
+// code cell end
+
+// code cell start uuid: 01aaaa84-30eb-4aa1-91f1-45da021090d3
+[source, python]
+----
+In [13]: print c.first_name, c.last_name, c.movies
+----
+
+----
+Out[13]: Jason Bourne 4
+         
+----
+
+// code cell end
+
+The class definition that follows introduces methods for classes. In this case, the class +ExampleThree+ is the same as +ExampleTwo+ apart from the fact that there is a definition for a custom method, ++addition++:
+
+// code cell start uuid: 8bab6ecc-0164-4cab-99cc-6dd085c6573a
+[source, python]
+----
+In [14]: class ExampleThree(object):
+             def __init__(self, a, b):
+                 self.a = a
+                 self.b = b
+             def addition(self):
+                 return self.a + self.b
+----
+
+// code cell end
+
+Instantiation works as before. This time we use only integers for the attributes ++a++ and ++b++:
+
+// code cell start uuid: e1972182-b358-43e0-aa65-5edcb5ff22d2
+[source, python]
+----
+In [15]: c = ExampleThree(10, 15)
+----
+
+// code cell end
+
+A call of the method +addition+ then returns the sum of the two attribute values (as long as it is defined, given the types of the attributes):
+
+// code cell start uuid: d5108fab-7b72-4c84-8d35-e8f10532bcfd
+[source, python]
+----
+In [16]: c.addition()
+----
+
+----
+Out[16]: 25
+----
+
+// code cell end
+
+// code cell start uuid: ce192d08-30fd-49fa-9332-f7c12b3041fb
+[source, python]
+----
+In [17]: c.a += 10
+         c.addition()
+----
+
+----
+Out[17]: 35
+----
+
+// code cell end
+
+(((classes, reusability and)))One of the advantages of the object-oriented programming paradigm is reusability. As pointed out, the class definitions for +ExampleTwo+ and +ExampleThree+ are only different with respect to the custom method definition. Another way of defining the class +ExampleThree+ is therefore to use the class +ExampleTwo+ and to inherit from this class the definition of the special function +init+:
+
+// code cell start uuid: e7be5636-de6c-445f-ad25-7f0bccfcb848
+[source, python]
+----
+In [18]: class ExampleFour(ExampleTwo):
+             def addition(self):
+                 return self.a + self.b
+----
+
+// code cell end
+
+The behavior of instances of class +ExampleFour+ is now exactly the same as that of instances of class ++ExampleThree++:
+
+// code cell start uuid: 174ae69d-a1c4-4181-9be6-76246b171787
+[source, python]
+----
+In [19]: c = ExampleFour(10, 15)
+----
+
+// code cell end
+
+// code cell start uuid: 921600a6-6068-473f-9a6f-91df0d5ae8b2
+[source, python]
+----
+In [20]: c.addition()
+----
+
+----
+Out[20]: 25
+----
+
+// code cell end
+
+(((classes, readability and maintainability of)))+Python+ allows for multiple inheritances. However, one should be careful with regard to readability and maintainability, especially by others:
+
+// code cell start uuid: a433da66-70d6-4e55-a16f-cb5ceabbc795
+[source, python]
+----
+In [21]: class ExampleFive(ExampleFour):
+             def multiplication(self):
+                 return self.a * self.b
+----
+
+// code cell end
+
+// code cell start uuid: 55e4676e-552d-4c91-98ac-bcda1f1661bd
+[source, python]
+----
+In [22]: c = ExampleFive(10, 15)
+----
+
+// code cell end
+
+// code cell start uuid: a00a11b9-64cb-4b84-937f-d4a08e55a866
+[source, python]
+----
+In [23]: c.addition()
+----
+
+----
+Out[23]: 25
+----
+
+// code cell end
+
+// code cell start uuid: 602e2b76-9282-41fb-a2ae-f5e8f8700542
+[source, python]
+----
+In [24]: c.multiplication()
+----
+
+----
+Out[24]: 150
+----
+
+// code cell end
+
+For example, custom method definitions do not necessarily need to be included in the class definition itself. They can be placed somewhere else, and as long as they are in the global namespace, they can be used within a class definition. The following code illustrates this approach:
+
+// code cell start uuid: 7e0ec289-2e12-422e-a6e8-928467ced561
+[source, python]
+----
+In [25]: def multiplication(self):
+                 return self.a * self.b
+----
+
+// code cell end
+
+// code cell start uuid: eef676a7-1aa2-48bb-8df1-faa0d6e376c2
+[source, python]
+----
+In [26]: class ExampleSix(ExampleFour):
+             multiplication = multiplication
+----
+
+// code cell end
+
+And again, the instance of the class +ExampleSix+ behaves exactly the same as the instance of the earlier class ++ExampleFive++:
+
+// code cell start uuid: b6914c5b-ef2c-4e89-8658-945230a0d8d1
+[source, python]
+----
+In [27]: c = ExampleSix(10, 15)
+----
+
+// code cell end
+
+// code cell start uuid: 09c11cdf-8a11-44fc-bfa6-ab7d0e5fb1f0
+[source, python]
+----
+In [28]: c.addition()
+----
+
+----
+Out[28]: 25
+----
+
+// code cell end
+
+// code cell start uuid: 3d48c537-1b7e-47ca-8265-7ec6d22ccdbb
+[source, python]
+----
+In [29]: c.multiplication()
+----
+
+----
+Out[29]: 150
+----
+
+// code cell end
+
+(((classes, private attributes)))(((private attributes)))It might be helpful to have (class/object) _private_ attributes. These are generally indicated by one or two leading underscores, as the following class definition illustrates:
+
+// code cell start uuid: 8ba30bf1-927d-4f0f-bdff-e52902611f47
+[source, python]
+----
+In [30]: class ExampleSeven(object):
+             def __init__(self, a, b):
+                 self.a = a
+                 self.b = b
+                 self.__sum = a + b
+             multiplication = multiplication
+             def addition(self):
+                 return self.__sum
+----
+
+// code cell end
+
+The behavior is the same as before when it comes to a call of the method ++addition++:
+
+// code cell start uuid: 5789b7e3-eada-4855-a8e7-835d05841f09
+[source, python]
+----
+In [31]: c = ExampleSeven(10, 15)
+----
+
+// code cell end
+
+// code cell start uuid: cffc73ff-1abd-48d7-8d31-110c5688c8cc
+[source, python]
+----
+In [32]: c.addition()
+----
+
+----
+Out[32]: 25
+----
+
+// code cell end
+
+Here, you cannot directly access the private attribute +sum+. However, via the following syntax, it is still possible:
+
+// code cell start uuid: 4d52d700-8969-4461-84f1-024629dc249a
+[source, python]
+----
+In [33]: c._ExampleSeven__sum
+----
+
+----
+Out[33]: 25
+----
+
+// code cell end
+
+As the class +ExampleSeven+ is defined, one must be careful with the inner workings. For example, a change of an attribute value does not change the result of the +addition+ method call:
+
+// code cell start uuid: 351770f1-1e91-4d2f-9069-07a828a7b912
+[source, python]
+----
+In [34]: c.a += 10
+         c.a
+----
+
+----
+Out[34]: 20
+----
+
+// code cell end
+
+// code cell start uuid: afae2e94-1ff5-4e7e-a17d-a178a4b2db4f
+[source, python]
+----
+In [35]: c.addition()
+----
+
+----
+Out[35]: 25
+----
+
+// code cell end
+
+This, of course, is due to the fact that the private attribute is not updated:
+
+// code cell start uuid: facaf795-8f14-438c-ac4b-50182c55968f
+[source, python]
+----
+In [36]: c._ExampleSeven__sum
+----
+
+----
+Out[36]: 25
+----
+
+// code cell end
+
+Calling the +multiplication+ method, however, works as desired:
+
+// code cell start uuid: 0cf66833-d07e-413a-938a-c6f0f8add274
+[source, python]
+----
+In [37]: c.multiplication()
+----
+
+----
+Out[37]: 300
+----
+
+// code cell end
+
+(((classes, iteration over)))(((iter method)))To conclude the introduction into the main concepts of +Python+ classes and objects, we want to pick one other special method of importance: the +iter+ method. It is called whenever an iteration over an instance of a class is asked for. To begin with, define a list of first names as follows:
+
+// code cell start uuid: 4ac60abf-3801-4c85-9a70-5225c067802e
+[source, python]
+----
+In [38]: name_list = ['Sandra', 'Lilli', 'Guido', 'Zorro', 'Henry']
+----
+
+// code cell end
+
+In +Python+ it is usual to iterate over such lists directly—i.e., without the use of integer counters or indexes:
+
+// code cell start uuid: 7a94a261-2baf-4ab4-9f76-8de755e2dde3
+[source, python]
+----
+In [39]: for name in name_list:
+             print name
+----
+
+----
+Out[39]: Sandra
+         Lilli
+         Guido
+         Zorro
+         Henry
+         
+----
+
+// code cell end
+
+We are now going to define a new +Python+ class that also returns values from a list, but the list is sorted before the iterator starts returning values from the list. The class +sorted_list+ contains the following definitions:
+
+++init++::
+    To initialize the attribute +elements+ we expect a +list+ object, which we sort at instantiation.
+++iter++::
+    This special method is called whenever an iteration is desired; it needs a definition of a +next+ method.
+++next++::
+    This method defines what happens per iteration step; it starts at index value +self.position = -1+ and increases the value by 1 per call; it then returns the value of +elements+ at the current index value of +self.position+.
+
+The class definition looks like this:
+
+// code cell start uuid: 8664e0dd-31be-4087-98cd-0631c9f4d156
+[source, python]
+----
+In [40]: class sorted_list(object):
+             def __init__(self, elements):
+                 self.elements = sorted(elements)  # sorted list object
+             def __iter__(self):
+                 self.position = -1
+                 return self
+             def next(self):
+                 if self.position == len(self.elements) - 1:
+                     raise StopIteration
+                 self.position += 1
+                 return self.elements[self.position]
+----
+
+// code cell end
+
+Instantiate the class now with the +name_list+ object:
+
+// code cell start uuid: aac638c0-ded1-4477-8de7-bfe93900d333
+[source, python]
+----
+In [41]: sorted_name_list = sorted_list(name_list)
+----
+
+// code cell end
+
+The outcome is as desired—iterating over the new object returns the elements in alphabetical order:
+
+// code cell start uuid: 13b327b7-234c-4918-b5c7-ca6b28623ee1
+[source, python]
+----
+In [42]: for name in sorted_name_list:
+             print name
+----
+
+----
+Out[42]: Guido
+         Henry
+         Lilli
+         Sandra
+         Zorro
+         
+----
+
+// code cell end
+
+In principle, we have replicated a call of the function +sorted+, which takes as input a +list+ object and returns as output a +list+ object:
+
+// code cell start uuid: 8bd47833-fd11-4487-816f-c2dfef6119cd
+[source, python]
+----
+In [43]: type(sorted(name_list))
+----
+
+----
+Out[43]: list
+----
+
+// code cell end
+
+// code cell start uuid: 9b89f8ca-bbd1-4b5c-a83c-eac95caa7bb3
+[source, python]
+----
+In [44]: for name in sorted(name_list):
+             print name
+----
+
+----
+Out[44]: Guido
+         Henry
+         Lilli
+         Sandra
+         Zorro
+         
+----
+
+// code cell end
+
+Our approach, however, works on a completely new type of object--namely, a ++sorted_list++:
+
+// code cell start uuid: 5a2d466c-eb59-4eb4-a2c9-cd715af13944
+[source, python]
+----
+In [45]: type(sorted_name_list)
+----
+
+----
+Out[45]: __main__.sorted_list
+----
+
+// code cell end
+
+This concludes the rather concise introduction into selected concepts of object orientation in +Python+. In the following discussion, these concepts are illustrated by introductory financial use cases. In addition, <<dx_library>> makes extensive use of object-oriented programming to implement a derivatives analytics library.
+
+
+==== Simple Short Rate Class
+
+(((object orientation, simple short rate class example)))(((discounting)))(((short rates)))(((classes, simple short rate class example)))One of the most fundamental concepts in finance is _discounting_. Since it is so fundamental, it might justify the definition of a _discounting class_. In a constant short rate world with continuous discounting, the factor to discount a future cash flow due at date __t__ > 0 to the present __t__ = 0 is defined by latexmath:[$D_0(t) = e^{-rt}$].
+
+Consider first the following function definition, which returns the discount factor for a given future date and a value for the constant short rate. Note that a +NumPy+ universal function is used in the function definition for the exponential function to allow for vectorization:
+
+// code cell start uuid: d6fcc0d8-6c79-4a31-8e48-78a38311e688
+[source, python]
+----
+In [46]: import numpy as np
+         def discount_factor(r, t):
+             ''' Function to calculate a discount factor.
+         
+             Parameters
+             ==========
+             r : float
+                 positive, constant short rate
+             t : float, array of floats
+                 future date(s), in fraction of years;
+                 e.g. 0.5 means half a year from now
+         
+             Returns
+             =======
+             df : float
+                 discount factor
+             '''
+             df = np.exp(-r * t)
+               # use of NumPy universal function for vectorization
+             return df
+----
+
+// code cell end
+
+<<disc_fact_1>> illustrates how the discount factors behave for different values for the constant short rate over five years. The factors for __t__ = 0 are all equal to 1; i.e., "no discounting" of today's cash flows. However, given a short rate of 10% and a cash flow due in five years, the cash flow would be discounted to a value slightly above 0.6 per currency unit (i.e., to 60%). We generate the plot as follows:
+
+// code cell start uuid: 8d7ae797-3070-4e98-a516-7c03d219885e
+[source, python]
+----
+In [47]: import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: 8febc46f-9d54-4ac9-b4a2-b7b20afd6657
+[source, python]
+----
+In [48]: t = np.linspace(0, 5)
+         for r in [0.01, 0.05, 0.1]:
+             plt.plot(t, discount_factor(r, t), label='r=%4.2f' % r, lw=1.5)
+         plt.xlabel('years')
+         plt.ylabel('discount factor')
+         plt.grid(True)
+         plt.legend(loc=0)
+----
+
+// code cell end
+
+For comparison, now let us look at the class-based implementation approach. We call it +short_rate+ since this is the central entity/object and the derivation of discount factors is accomplished via a method call:
+
+[[disc_fact_1]]
+.Discount factors for different short rates over five years
+image::images/pyfi_1301.png[]
+
+// code cell start uuid: 849b995a-8873-4a42-94c3-c638799d03e2
+[source, python]
+----
+In [49]: class short_rate(object):
+             ''' Class to model a constant short rate object.
+         
+             Parameters
+             ==========
+             name : string
+                 name of the object
+             rate : float
+                 positive, constant short rate
+         
+             Methods
+             =======
+             get_discount_factors :
+                 returns discount factors for given list/array
+                 of dates/times (as year fractions)
+             '''
+             def __init__(self, name, rate):
+                 self.name = name
+                 self.rate = rate
+             def get_discount_factors(self, time_list):
+                 ''' time_list : list/array-like '''
+                 time_list = np.array(time_list)
+                 return np.exp(-self.rate * time_list)
+----
+
+// code cell end
+
+To start with, define +sr+ to be an instance of the class +short_rate+:
+
+// code cell start uuid: 00abadb7-63af-4da6-a4f6-d80cc6ac1f75
+[source, python]
+----
+In [50]: sr = short_rate('r', 0.05)
+----
+
+// code cell end
+
+// code cell start uuid: cb409ce7-30f9-4937-9ac9-85089ca4679f
+[source, python]
+----
+In [51]: sr.name, sr.rate
+----
+
+----
+Out[51]: ('r', 0.05)
+----
+
+// code cell end
+
+To get discount factors from the new object, a time list with year fractions is needed:
+
+// code cell start uuid: 3ac0270c-9950-437c-bb46-65d1cbddf283
+[source, python]
+----
+In [52]: time_list = [0.0, 0.5, 1.0, 1.25, 1.75, 2.0]  # in year fractions
+----
+
+// code cell end
+
+// code cell start uuid: cab9697b-e048-4452-bfb8-1090bb48c293
+[source, python]
+----
+In [53]: sr.get_discount_factors(time_list)
+----
+
+----
+Out[53]: array([ 1.        ,  0.97530991,  0.95122942,  0.93941306,  0.91621887,
+                 0.90483742])
+----
+
+// code cell end
+
+Using this object, it is quite simple to generate a plot as before (see <<disc_fact_2>>). The major difference is that we first update the attribute +rate+ and then provide the time list +t+ to the method +get_discount_factors+:
+
+// code cell start uuid: 0ddbd6e4-8fd9-43e0-a256-5d1b880d3a05
+[source, python]
+----
+In [54]: for r in [0.025, 0.05, 0.1, 0.15]:
+             sr.rate = r
+             plt.plot(t, sr.get_discount_factors(t),
+                      label='r=%4.2f' % sr.rate, lw=1.5)
+         plt.xlabel('years')
+         plt.ylabel('discount factor')
+         plt.grid(True)
+         plt.legend(loc=0)
+----
+
+[[disc_fact_2]]
+.Discount factors for different short rates over five years
+image::images/pyfi_1302.png[]
+
+// code cell end
+
+Generally, discount factors are "only" a means to an end. For example, you might want to use them to discount future cash flows. With our short rate object, this is an easy exercise when we have the cash flows and the dates/times of their occurrence available. Consider the following cash flow example, where there is a negative cash flow today and positive cash flows after one year and two years, respectively. This could be the cash flow profile of an investment opportunity:
+
+// code cell start uuid: 2acc982a-71a8-4505-bb98-61eb4c85d6b0
+[source, python]
+----
+In [55]: sr.rate = 0.05
+         cash_flows = np.array([-100, 50, 75])
+         time_list = [0.0, 1.0, 2.0]
+----
+
+// code cell end
+
+With the +time_list+ object, discount factors are only one method call away:
+
+// code cell start uuid: 1d1c180e-b8d2-41f9-9faf-55dd004a3606
+[source, python]
+----
+In [56]: disc_facts = sr.get_discount_factors(time_list)
+----
+
+// code cell end
+
+// code cell start uuid: 24992872-9aab-47dd-9c39-f8465e9f21fd
+[source, python]
+----
+In [57]: disc_facts
+----
+
+----
+Out[57]: array([ 1.        ,  0.95122942,  0.90483742])
+----
+
+// code cell end
+
+Present values for all cash flows are obtained by multiplying the discount factors by the cash flows:
+
+// code cell start uuid: 95fed5fe-b198-4790-9ba2-9219ce2d0510
+[source, python]
+----
+In [58]: # present values
+         disc_facts * cash_flows
+----
+
+----
+Out[58]: array([-100.        ,   47.56147123,   67.86280635])
+----
+
+// code cell end
+
+A typical decision rule in investment theory says that a decision maker should invest into a project whenever the net present value (NPV), given a certain (short) rate representing the opportunity costs of the investment, is positive. In our case, the NPV is simply the sum of the single present values:
+
+// code cell start uuid: 22d67111-86c5-438b-ac7f-2d746848ee5a
+[source, python]
+----
+In [59]: # net present value
+         np.sum(disc_facts * cash_flows)
+----
+
+----
+Out[59]: 15.424277577732667
+----
+
+// code cell end
+
+Obviously, for a short rate of 5% the investment should be made. What about a rate of 15%? Then the NPV becomes negative, and the investment should not be made:
+
+// code cell start uuid: 25b83999-44c9-4d70-84ea-5ecbca23ade7
+[source, python]
+----
+In [60]: sr.rate = 0.15
+         np.sum(sr.get_discount_factors(time_list) * cash_flows)
+----
+
+----
+Out[60]: -1.4032346276182679
+----
+
+// code cell end
+
+
+==== Cash Flow Series Class
+
+(((object orientation, cash flow series class example)))(((classes, cash flow series example)))(((cash flow series)))With the experience gained through the previous example, the definition of another class to model a cash flow series should be straightforward. This class should provide methods to give back a list/array of present values and also the net present value for a given cash flow series—i.e., cash flow values and dates/times:
+
+// code cell start uuid: 27fec9d5-6849-4ef0-bd69-545e141eb888
+[source, python]
+----
+In [61]: class cash_flow_series(object):
+             ''' Class to model a cash flow series.
+         
+             Attributes
+             ==========
+             name : string
+                 name of the object
+             time_list : list/array-like
+                 list of (positive) year fractions
+             cash_flows : list/array-like
+                 corresponding list of cash flow values
+             short_rate : instance of short_rate class
+                 short rate object used for discounting
+         
+             Methods
+             =======
+             present_value_list :
+                 returns an array with present values
+             net_present_value :
+                 returns NPV for cash flow series
+             '''
+             def __init__(self, name, time_list, cash_flows, short_rate):
+                 self.name = name
+                 self.time_list = time_list
+                 self.cash_flows = cash_flows
+                 self.short_rate = short_rate
+             def present_value_list(self):
+                 df = self.short_rate.get_discount_factors(self.time_list)
+                 return np.array(self.cash_flows) * df
+             def net_present_value(self):
+                 return np.sum(self.present_value_list())
+----
+
+// code cell end
+
+We use all objects from the previous example to instantiate the class:
+
+// code cell start uuid: 50136851-d7f8-467a-a04b-4b88bc6dc630
+[source, python]
+----
+In [62]: sr.rate = 0.05
+         cfs = cash_flow_series('cfs', time_list, cash_flows, sr)
+----
+
+// code cell end
+
+// code cell start uuid: f6245d43-7dde-44b4-9b35-40eea1c6af66
+[source, python]
+----
+In [63]: cfs.cash_flows
+----
+
+----
+Out[63]: array([-100,   50,   75])
+----
+
+// code cell end
+
+// code cell start uuid: 04da2bcd-a388-4830-a152-8ab6cd958e68
+[source, python]
+----
+In [64]: cfs.time_list
+----
+
+----
+Out[64]: [0.0, 1.0, 2.0]
+----
+
+// code cell end
+
+We can now compare the present values and the NPV with the results from before. Fortunately, we get the same results:
+
+// code cell start uuid: 7de29949-494c-4156-bbc9-4165cdb87e47
+[source, python]
+----
+In [65]: cfs.present_value_list()
+----
+
+----
+Out[65]: array([-100.        ,   47.56147123,   67.86280635])
+----
+
+// code cell end
+
+// code cell start uuid: a7822201-d6b3-4715-9911-de550887f5e3
+[source, python]
+----
+In [66]: cfs.net_present_value()
+----
+
+----
+Out[66]: 15.424277577732667
+----
+
+// code cell end
+
+(((sensitivity analysis)))There is further potential to generalize the steps of the previous example. One option is to define a new class that provides a method for calculating the NPV for different short rates—i.e., a _sensitivity analysis_. We use, of course, the +cash_flow_series+ class to inherit from:
+
+// code cell start uuid: 94f0003a-b9f3-4c92-b814-e0a6e6f9977c
+[source, python]
+----
+In [67]: class cfs_sensitivity(cash_flow_series):
+             def npv_sensitivity(self, short_rates):
+                 npvs = []
+                 for rate in short_rates:
+                     sr.rate = rate
+                     npvs.append(self.net_present_value())
+                 return np.array(npvs)
+----
+
+// code cell end
+
+// code cell start uuid: 523386c6-0394-40f2-88af-6dcc23b1f742
+[source, python]
+----
+In [68]: cfs_sens = cfs_sensitivity('cfs', time_list, cash_flows, sr)
+----
+
+// code cell end
+
+For example, defining a list containing different short rates, we can easily compare the resulting NPVs:
+
+// code cell start uuid: 743dbb63-8728-49d5-83b0-f2213c37c4f8
+[source, python]
+----
+In [69]: short_rates = [0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.2]
+----
+
+// code cell end
+
+// code cell start uuid: bbb146fa-1f7a-459b-b89e-8baad84eda8a
+[source, python]
+----
+In [70]: npvs = cfs_sens.npv_sensitivity(short_rates)
+         npvs
+----
+
+----
+Out[70]: array([ 23.01739219,  20.10770244,  15.42427758,  10.94027255,
+                  6.64667738,   2.53490386,  -1.40323463,  -8.78945889])
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_OO")))(((range="endofrange", startref="ix_Pcls")))<<net_present_values>> shows the result graphically. The thicker horizontal line (at 0) shows the cutoff point between a profitable investment and one that should be dismissed given the respective (short) rate:
+
+// code cell start uuid: e96a2807-b45d-4c02-b5b6-6ca80026f340
+[source, python]
+----
+In [71]: plt.plot(short_rates, npvs, 'b')
+         plt.plot(short_rates, npvs, 'ro')
+         plt.plot((0, max(short_rates)), (0, 0), 'r', lw=2)
+         plt.grid(True)
+         plt.xlabel('short rate')
+         plt.ylabel('net present value')
+----
+
+[[net_present_values]]
+.Net present values of cash flow list for different short rates
+image::images/pyfi_1303.png[]
+
+// code cell end
+
+
+=== Graphical User Interfaces
+
+For the majority of computer _users_, as compared to developers or data scientists, a graphical user interface (GUI) is what they are used to. Such a GUI does not only bring along visual appeal and simplicity; it also allows us to guide and control user interaction much better than alternative approaches like interactive scripting, or use of a command line interface or shell. In what follows, we build on the examples of the previous section and build simple GUIs for our short rate and cash flow series classes.
+
+((("graphical user interfaces (GUIs)", "libraries required")))(((traits library)))To build the GUIs we use the +traits+ library, documentation of which you can find at http://code.enthought.com/projects/traits/docs/html/index.html[]. +traits+ is generally used for rapid GUI building on top of existing classes and only seldom for more complex applications. In what follows, we will reimplement the two example classes from before, taking into account that we want to use a GUI for interacting with instances of the respective classes.
+
+
+==== Short Rate Class with GUI
+
+((("graphical user interfaces (GUIs)", "short rate class with")))(((short rates)))To start, we need to import the +traits.api+ sublibrary:
+
+// code cell start uuid: cb3a8b1f-056c-4e11-ac79-a3fb9993b3a6
+[source, python]
+----
+In [72]: import numpy as np
+         import traits.api as trapi
+----
+
+// code cell end
+
+For the definition of our new +short_rate+ class, we use the +HasTraits+ class to inherit from. Also note in the following class definition that +traits+ has its own data types, which are generally closely intertwined with visual elements of a GUI—to put it differently, +traits+ knows which graphical elements (e.g., for a text field) to use to build a GUI (semi)automatically:
+
+// code cell start uuid: fd5b94c8-8e5e-463c-994a-c23dc499967d
+[source, python]
+----
+In [73]: class short_rate(trapi.HasTraits):
+             name = trapi.Str
+             rate = trapi.Float
+             time_list = trapi.Array(dtype=np.float, shape=(5,))
+             def get_discount_factors(self):
+                 return np.exp(-self.rate * self.time_list)
+----
+
+// code cell end
+
+Instantiation of such a +traits+-based class is done as usual:
+
+// code cell start uuid: 7fa7e099-f1b7-4f35-b208-b25329debbb3
+[source, python]
+----
+In [74]: sr = short_rate()
+----
+
+// code cell end
+
+(((configure_traits method)))However, via a call of the method +configure_traits+ (inherited from +HasTraits+) a GUI is automatically generated, and we can use this GUI to input values for the attributes of the new object +sr+:
+
+// code cell start uuid: fbdbfc73-8170-454d-bea1-8a4f74b22787
+[source, python]
+----
+In [75]: sr.configure_traits()
+----
+
+// code cell end
+
+<<traits_1>> shows such a simple GUI, which in this case is still empty (i.e., no input values have been put in the different fields). Note that the lower five fields all belong to &#x201c;Time list&#x201d;—this layout is generated by default.
+
+<<traits_2>> shows the same simple GUI, this time however with values in every single field. Pushing the +OK+ button assigns the values from the input fields to the respective attributes of the object.
+
+[[traits_1]]
+.Screenshot of traits GUI (empty)
+image::images/pyfi_1304.png[]
+
+[[traits_2]]
+.Screenshot of traits GUI (with data)
+image::images/pyfi_1305.png[]
+
+In effect, this gives the same results as the following lines of code:
+
+// code cell start uuid: a1baf3e6-0232-45ae-bac5-7118d656fdcf
+[source, python]
+----
+In [76]: sr.name = 'sr_class'
+         sr.rate = 0.05
+         sr.time_list = [0.0, 0.5, 1.0, 1.5, 2.0]
+----
+
+// code cell end
+
+By providing the +traits+-specific data types, +traits+ is able to generate the correct visual elements to accomplish these operations via a GUI—i.e. a text input field for +sr.name+ and five input elements for the +list+ object +sr.time_list+.
+
+The behavior of the new object after the input operations is the same as with our +short_rate+ from the previous section:
+
+// code cell start uuid: 88ed3e63-db93-450c-a32a-ee0213ca5f6f
+[source, python]
+----
+In [77]: sr.rate
+----
+
+----
+Out[77]: 0.05
+----
+
+// code cell end
+
+// code cell start uuid: 63987530-cb67-4b1b-bd63-aec5390f6a67
+[source, python]
+----
+In [78]: sr.time_list
+----
+
+----
+Out[78]: array([ 0. ,  0.5,  1. ,  1.5,  2. ])
+----
+
+// code cell end
+
+// code cell start uuid: e160a704-8646-46ab-afb9-7f14e1ed682a
+[source, python]
+----
+In [79]: sr.get_discount_factors()
+----
+
+----
+Out[79]: array([ 1.        ,  0.97530991,  0.95122942,  0.92774349,  0.90483742])
+----
+
+// code cell end
+
+
+==== Updating of Values
+
+((("graphical user interfaces (GUIs)", "updating values")))((("values, updating in GUI")))(((traitsui.api library)))So far, the new +short_rate+ class using +traits+ allows us to input data for initializing attributes of an instance of the class. However, a GUI usually is also used to present results. You would generally want to avoid providing input data via a GUI and then making the user access the results via interactive scripting. To this end, we need another sublibrary, ++traitsui.api++:
+
+// code cell start uuid: fc6a69e5-1f01-43fc-8c3a-1b897948e492
+[source, python]
+----
+In [80]: import traits.api as trapi
+         import traitsui.api as trui
+----
+
+// code cell end
+
+This sublibrary allows us to generate different views on the same class/object. It also provides more options for, e.g., labeling and formatting. The key in the following class definition is what happens when the +Update+ button is pushed. In this case, the private method +\_update\_fired+ is called, which updates the +list+ object containing the discount factors. This updated list is then displayed in the GUI window. A prerequisite for this is that all input parameters have been made available by the user:
+
+// code cell start uuid: 507f2a9d-03ca-4ab6-9e53-525dc8590efb
+[source, python]
+----
+In [81]: class short_rate(trapi.HasTraits):
+             name = trapi.Str
+             rate = trapi.Float
+             time_list = trapi.Array(dtype=np.float, shape=(1, 5))
+             disc_list = trapi.Array(dtype=np.float, shape=(1, 5))
+             update = trapi.Button
+             def _update_fired(self):
+                 self.disc_list = np.exp(-self.rate * self.time_list)
+             v = trui.View(trui.Group(trui.Item(name = 'name'),
+                      trui.Item(name='rate'),
+                      trui.Item(name='time_list',
+                                label='Insert Time List Here'),
+                      trui.Item('update', show_label=False),
+                      trui.Item(name='disc_list',
+                                label='Press Update for Factors'),
+                      show_border=True, label='Calculate Discount Factors'),
+                      buttons = [trui.OKButton, trui.CancelButton],
+                      resizable = True)
+----
+
+// code cell end
+
+Again, instantiation and configuration are achieved as before:
+
+// code cell start uuid: a3f92cf2-3a92-4906-8768-13731e327838
+[source, python]
+----
+In [82]: sr = short_rate()
+----
+
+// code cell end
+
+// code cell start uuid: 931cb0eb-943e-4c28-bf91-d3d23b44362f
+[source, python]
+----
+In [83]: sr.configure_traits()
+----
+
+// code cell end
+
+<<traits_3>> shows the new, enhanced GUI, which is still empty. You see the new elements, like the +Update+ button and the output fields for the discount factors.
+
+[[traits_3]]
+.Screenshot of traits GUI with updating (empty)
+image::images/pyfi_1306.png[]
+
+<<traits_4>> illustrates what happens with this new GUI "in action." Providing values for the object attributes and pushing the +Update+ button returns the calculated discount factors--this time within the GUI window.
+
+The following +Python+ code shows step-by-step the equivalent operations without a GUI. First, the assigning of values to the attributes:
+
+// code cell start uuid: 60c1e51d-c4fb-4946-a058-9854ce1c9252
+[source, python]
+----
+In [84]: sr.name = 'sr_class'
+         sr.rate = 0.05
+         sr.time_list = np.array(([0.0, 0.5, 1.0, 1.5, 2.0],), dtype=np.float32)
+----
+
+// code cell end
+
+Second, the update of the +list+ object containing the discount factors:
+
+// code cell start uuid: c11562ae-448b-43c7-b6f0-7e9fff0fd95d
+[source, python]
+----
+In [85]: sr._update_fired()
+----
+
+// code cell end
+
+[[traits_4]]
+.Screenshot of traits GUI with updating (after update)
+image::images/pyfi_1307.png[]
+
+Finally, the output of the calculated/updated +list+ with the discount factors:
+
+// code cell start uuid: 04c84d43-f7f4-49c3-86c7-4ae1cc500151
+[source, python]
+----
+In [86]: sr.disc_list
+----
+
+----
+Out[86]: array([[ 1.        ,  0.97530991,  0.95122942,  0.92774349,  0.90483742
+         ]])
+----
+
+// code cell end
+
+
+==== Cash Flow Series Class with GUI
+
+((("graphical user interfaces (GUIs)", "cash flow series with")))(((cash flow series)))The last example in this section is about the +cash_flow_series+ class. In principle, we have seen in the previous example the basic workings of +traits+ when it comes to presenting results within a GUI window. Here, we only want to add some twists to the story: for example, a slider to easily change the value for the short rate. In the class definition that follows, this is accomplished by using the +Range+ function, where we provide a minimum, a maximum, and a default value. There are also more output fields to account for the calculation of the present values and the net present value:
+
+// code cell start uuid: eb8db6ef-0933-40bd-b00e-1086cf8bcb59
+[source, python]
+----
+In [87]: class cash_flow_series(trapi.HasTraits):
+             name = trapi.Str
+             short_rate = trapi.Range(0.0, 0.5, 0.05)
+             time_list = trapi.Array(dtype=np.float, shape=(1, 6))
+             cash_flows = trapi.Array(dtype=np.float, shape=(1, 6))
+             disc_values = trapi.Array(dtype=np.float, shape=(1, 6))
+             present_values = trapi.Array(dtype=np.float, shape=(1, 6))
+             net_present_value = trapi.Float
+             update = trapi.Button
+             def _update_fired(self):
+                 self.disc_values = np.exp(-self.short_rate * self.time_list)
+                 self.present_values = self.disc_values * self.cash_flows
+                 self.net_present_value = np.sum(self.present_values)
+             v = trui.View(trui.Group(trui.Item(name = 'name'),
+                      trui.Item(name='short_rate'),
+                      trui.Item(name='time_list', label='Time List'),
+                      trui.Item(name='cash_flows', label='Cash Flows'),
+                      trui.Item('update', show_label=False),
+                      trui.Item(name='disc_values',
+                                label='Discount Factors'),
+                      trui.Item(name='present_values',
+                                label='Present Values'),
+                      trui.Item(name='net_present_value',
+                                label='Net Present Value'),
+                      show_border=True, label='Calculate Present Values'),
+                      buttons = [trui.OKButton, trui.CancelButton],
+                      resizable = True)
+----
+
+// code cell end
+
+Apart from the slightly more complex class definition, the usage is still the same:
+
+// code cell start uuid: 8f9ec09a-1014-4e67-a9c4-f3ebae833e79
+[source, python]
+----
+In [88]: cfs = cash_flow_series()
+----
+
+// code cell end
+
+// code cell start uuid: 49f79623-3c0c-46f7-b426-c70a99e0f0da
+[source, python]
+----
+In [89]: cfs.configure_traits()
+----
+
+// code cell end
+
+<<traits_5>> shows the new GUI without any actions taken so far (i.e., empty). Notice the slider and all the new fields for the cash flow values, the present values, and the net present value.
+
+<<traits_6>> shows a version of the GUI where input data has been typed in already, but no other action has taken place.
+
+Finally, <<traits_7>> presents the GUI with both input data and results data—i.e., after pushing the +Update+ button. Although this is still quite a simple example, the result can almost be considered an _application_. We have:
+
+Input:: 
+    The GUI allows for inputting data to initialize all object attributes.
+Logic:: 
+    There is application logic that calculates discount factors, present 
+    values, and pass:[<phrase role="keep-together">an NPV</phrase>].
+Output:: 
+    The GUI presents the results of applying the logic to the input data.
+
+[[traits_5]]
+.Screenshot of traits GUI for Cash Flow Series (empty)
+image::images/pyfi_1308.png[]
+
+[[traits_6]]
+.Screenshot of traits GUI for Cash Flow Series (with input data)
+image::images/pyfi_1309.png[]
+
+[[traits_7]]
+.Screenshot of traits GUI for Cash Flow Series (with results)
+image::images/pyfi_1310.png[]
+
+
+=== Conclusions
+
+Object-oriented paradigms are an indispensible tool for modern application development. +Python+ provides a rather flexible framework for the definition of customer-defined classes and for working with instances of these classes. This chapter provides only the fundamentals of +Python+ class definitions—<<dx_library>> of the book illustrates the use of (financial) +Python+ classes in a more complex and realistic application scenario.
+
+Modern application design generally builds on _graphical_ user interfaces. The efficient building of GUIs therefore is generally quite important, even in a rapid application development scenario. This chapter uses the +traits+ library, which allows simple and efficient building of GUIs based on a +Pythonic+, object-oriented approach. The pass:[<phrase role="keep-together">subsequent</phrase>] chapter shows how to build GUIs based on web technologies, a technical alternative nowadays even used for in-house applications in financial institutions.
+
+
+=== Further Reading
+
+The following web resources are good starting points for +Python+ classes and object orientation, and for ++traits++:
+
+* The +Python+ class documentation: https://docs.python.org/2/tutorial/classes.html
+* The +traits+ documentation: http://code.enthought.com/projects/traits/docs/html/index.html
+
+Helpful resources in book form are:
+
+* Downey, Allen (2012): pass:[<ulink url="http://shop.oreilly.com/product/0636920025696.do" role="orm:hideurl"><emphasis>Think Python</emphasis></ulink>]. O'Reilly, Sebastopol, CA.
+* Goodrich, Michael et al. (2013): _Data Structures and Algorithms in Python._ John Wiley & Sons, Hoboken, NJ.
+* Langtangen, Hans Petter (2009): _A Primer on Scientific Programming with Python_. Springer Verlag, Berlin, Heidelberg.
+

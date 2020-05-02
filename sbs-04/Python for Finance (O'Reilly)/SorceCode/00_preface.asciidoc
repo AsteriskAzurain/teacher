@@ -1,0 +1,110 @@
+[preface]
+== Preface
+
+Not too long ago, +Python+ as a programming language and platform technology was considered exotic—if not completely irrelevant—in the financial industry. By contrast, in 2014 there are many examples of large financial institutions—like Bank of America Merrill Lynch with its Quartz project, or JP Morgan Chase with the Athena project—that strategically use +Python+ alongside other established technologies to build, enhance, and maintain some of their core IT systems. There is also a multitude of larger and smaller hedge funds that make heavy use of +Python+'s capabilities when it comes to efficient financial application development and productive financial analytics efforts.
+
+Similarly, many of today's Master of Financial Engineering programs (or programs awarding similar degrees) use +Python+ as one of the core languages for teaching the translation of quantitative finance theory into executable computer code. Educational programs and trainings targeted to finance professionals are also increasingly incorporating +Python+ into their curricula. Some now teach it as the main implementation language.
+
+There are many reasons why +Python+ has had such recent success and why it seems it will continue to do so in the future. Among these reasons are its syntax, the ecosystem of scientific and data analytics libraries available to developers using Python, its ease of integration with almost any other technology, and its status as open source. (See <<why_python_for_finance>> for a few more insights in this regard.)
+
+For that reason, there is an abundance of good books available that teach +Python+ from different angles and with different focuses. This book is one of the first to introduce and teach +Python+ for finance—in particular, for quantitative finance and for financial analytics. The approach is a practical one, in that implementation and illustration come before theoretical details, and the big picture is generally more focused on than the most arcane parameterization options of a certain class or function.
+
+Most of this book has been written in the powerful, interactive, browser-based +IPython Notebook+ environment (explained in more detail in <<infrastructure>>). This makes it possible to provide the reader with executable, interactive versions of almost all examples used in this book.
+
+Those who want to immediately get started with a full-fledged, interactive financial analytics environment for +Python+ (and, for instance, +R+ and +Julia+) should go to http://oreilly.quant-platform.com and try out the Python Quant Platform (in combination with the +IPython Notebook+ files and code that come with this book). You should also have a look at http://dx-analytics.com[+DX+ analytics], a +Python+-based financial analytics library. My other book, _Derivatives Analytics with Python_ (Wiley Finance), presents more details on the theory and numerical methods for advanced derivatives analytics. It also provides a wealth of readily usable +Python+ code. Further material, and, in particular, slide decks and videos of talks about +Python+ for Quant Finance can be found on my http://hilpisch.com[private website].
+
+If you want to get involved in +Python+ for Quant Finance community events, there are opportunities in the financial centers of the world. For example, I myself (co)organize meetup groups with this focus in London (cf. http://www.meetup.com/Python-for-Quant-Finance-London/) and New York City (cf. http://www.meetup.com/Python-for-Quant-Finance-NYC/). There are also For Python Quants conferences and workshops several times a year (cf. http://forpythonquants.com and http://pythonquants.com).
+
+I am really excited that +Python+ has established itself as an important technology in the financial industry. I am also sure that it will play an even more important role there in the future, in fields like derivatives and risk analytics or high performance computing. My hope is that this book will help professionals, researchers, and students alike make the most of +Python+ when facing the challenges of this fascinating field.
+
+=== Conventions Used in This Book
+
+The following typographical conventions are used in this book:
+
+_Italic_:: Indicates new terms, URLs, and email addresses.
+
++Constant width+:: Used for program listings, as well as within paragraphs to refer to software packages, programming languages, file extensions, filenames, program elements such as variable or function names, databases, data types, environment variables, statements, and keywords.
+
+_++Constant width italic++_:: Shows text that should be replaced with user-supplied values or by values determined by context.
+
+
+[TIP]
+====
+This element signifies a tip or suggestion.
+====
+
+[WARNING]
+====
+This element indicates a warning or caution.
+====
+
+=== Using Code Examples
+++++
+<remark>PROD: Please reach out to author to find out if they will be uploading code examples to oreilly.com or their own site (e.g., GitHub). If there is no code download, delete this whole section. If there is, when you email digidist with the link, let them know what you filled in for title_title (should be as close to book title as possible, i.e., learning_python_2e). This info will determine where digidist loads the files.</remark>
+++++
+
+Supplemental material (in particular, IPython Notebooks and Python scripts/modules) is available for download at link:$$http://oreilly.quant-platform.com$$[].
+
+This book is here to help you get your job done. In general, if example code is offered with this book, you may use it in your programs and documentation. You do not need to contact us for permission unless you’re reproducing a significant portion of the code. For example, writing a program that uses several chunks of code from this book does not require permission. Selling or distributing a CD-ROM of examples from O’Reilly books does require permission. Answering a question by citing this book and quoting example code does not require permission. Incorporating a significant amount of example code from this book into your product’s documentation does require permission.
+
+We appreciate, but do not require, attribution. An attribution usually includes the title, author, publisher, and ISBN. For example: “_Python for Finance_ by Yves Hilpisch (O’Reilly). Copyright 2015 Yves Hilpisch, 978-1-491-94528-5.”
+
+If you feel your use of code examples falls outside fair use or the permission given above, feel free to contact us at pass:[<email>permissions@oreilly.com</email>].
+
+=== Safari® Books Online
+
+[role = "safarienabled"]
+[NOTE]
+====
+pass:[<ulink role="orm:hideurl:ital" url="http://safaribooksonline.com">Safari Books Online</ulink>] is an on-demand digital library that delivers expert pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/explore/">content</ulink>] in both book and video form from the world&#8217;s leading authors in technology and business.
+====
+
+Technology professionals, software developers, web designers, and business and pass:[<phrase role="keep-together">creative</phrase>] professionals use Safari Books Online as their primary resource for research, problem solving, learning, and certification training.
+
+Safari Books Online offers a range of pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/pricing/">plans and pricing</ulink>] for pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/enterprise/">enterprise</ulink>], pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/government/">government</ulink>], pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/academic-public-library/">education</ulink>], and individuals. 
+
+Members have access to thousands of books, training videos, and prepublication manuscripts in one fully searchable database from publishers like O’Reilly Media, Prentice Hall Professional, Addison-Wesley Professional, Microsoft Press, Sams, Que, Peachpit Press, Focal Press, Cisco Press, John Wiley & Sons, Syngress, Morgan Kaufmann, IBM Redbooks, Packt, Adobe Press, FT Press, Apress, Manning, New Riders, McGraw-Hill, Jones & Bartlett, Course Technology, and hundreds pass:[<ulink role="orm:hideurl" url="https://www.safaribooksonline.com/our-library/">more</ulink>]. For more information about Safari Books Online, please visit us pass:[<ulink role="orm:hideurl" url="http://safaribooksonline.com/">online</ulink>].
+
+=== How to Contact Us
+
+Please address comments and questions concerning this book to the publisher:
+
+++++
+<simplelist>
+<member>O’Reilly Media, Inc.</member>
+<member>1005 Gravenstein Highway North</member>
+<member>Sebastopol, CA 95472</member>
+<member>800-998-9938 (in the United States or Canada)</member>
+<member>707-829-0515 (international or local)</member>
+<member>707-829-0104 (fax)</member>
+</simplelist>
+++++
+
+We have a web page for this book, where we list errata, examples, and any additional information. You can access this page at link:$$http://bit.ly/python-finance$$[].
+
+++++
+<remark>Don't forget to update the link above.</remark>
+++++
+
+To comment or ask technical questions about this book, send email to pass:[<email>bookquestions@oreilly.com</email>].
+
+For more information about our books, courses, conferences, and news, see our website at link:$$http://www.oreilly.com$$[].
+
+Find us on Facebook: link:$$http://facebook.com/oreilly$$[]
+
+Follow us on Twitter: link:$$http://twitter.com/oreillymedia$$[]
+
+Watch us on YouTube: link:$$http://www.youtube.com/oreillymedia$$[]
+
+=== Acknowledgments
+
+I want to thank all those who helped to make this book a reality, in particular those who have provided honest feedback or even completely worked out examples, like Ben Lerner, James Powell, Michael Schwed, Thomas Wiecki or Felix Zumstein. Similarly, I would like to thank reviewers Hugh Brown, Jennifer Pierce, Kevin Sheppard, and Galen Wilkerson. The book benefited from their valuable feedback and the many suggestions.
+
+The book has also benefited significantly as a result of feedback I received from the participants of the many conferences and workshops I was able to present at in 2013 and 2014: PyData, For Python Quants, Big Data in Quant Finance, EuroPython, EuroScipy, PyCon DE, PyCon Ireland, Parallel Data Analysis, Budapest BI Forum and pass:[<phrase role="keep-together">CodeJam</phrase>]. I also got valuable feedback during my many presentations at +Python+ meetups in Berlin, London, and New York City. 
+
+Last but not least, I want to thank my family, which fully accepts that I do what I love doing most and this, in general, rather intensively. Writing and finishing a book of this length over the course of a year requires a large time commitment—on top of my usually heavy workload and packed travel schedule—and makes it necessary to sit sometimes more hours in solitude in front the computer than expected. Therefore, thank you Sandra, Lilli, and Henry for your understanding and support. I dedicate this book to my lovely wife Sandra, who is the heart of our family.
+
+
+[role="align_me_right"]
+Yves
+pass:[<?linebreak?>]Saarland, November 2014

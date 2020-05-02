@@ -1,0 +1,2362 @@
+[[techniques]]
+= Financial Analytics and Development
+
+[partintro]
+--
+This part of the book represents its core. It introduces the most important +Python+ libraries, techniques, and approaches for financial analytics and application development. The sheer number of topics covered in this part makes it necessary to focus mainly on selected, and partly rather specific, examples and use cases.
+
+The chapters are organized according to certain topics such that this part can be used as a reference to which the reader can come to look up examples and details related to a topic of interest. This core part of the book consists of the following chapters:
+
+* <<data_structures>> on +Python+ data types and structures
+* <<visualization>> on 2D and 3D visualization with +matplotlib+
+* <<fin_time_series>> on the handling of financial time series data
+* <<input_output>> on (performant) input/output operations
+* <<performance_python>> on performance techniques and libraries
+* <<math_tools>> on several mathematical tools needed in finance
+* <<stochastics>> on random number generation and simulation of stochastic processes
+* <<statistics>> on statistical applications with +Python+
+* <<excel_integration>> on the integration of +Python+ and +Excel+
+* <<objects_guis>> on object-oriented programming with +Python+ and the development of (simple) graphical user interfaces (GUIs)
+* <<web_integration>> on the integration of +Python+ with web technologies as well as the development of web-based applications and web services
+
+--
+
+[[data_structures]]
+
+
+== Data Types and Structures
+
+[quote, Linus Torvalds]
+____
+[role="align_me_right"]
+Bad programmers worry about the code. Good programmers pass:[<phrase role='keep-together'>worry about data structures and their relationships.</phrase>]
+____
+
+This chapter introduces basic data types and data structures of +Python+. Although the +Python+ interpreter itself already brings a rich variety of data structures with it, +NumPy+ and other libraries add to these in a valuable fashion.
+
+The chapter is organized as follows:
+
+Basic data types:: 
+The first section introduces basic data types such as +int+, +float+, and +string+.
+Basic data structures:: 
+The next section introduces the fundamental data structures of Python (e.g., +list+ objects) and illustrates control structures, functional programming paradigms, and anonymous functions.
+NumPy data structures:: 
+The following section is devoted to the characteristics and capabilities of the +NumPy+ +ndarray+ class and illustrates some of the benefits of this class for scientific and financial applications.
+Vectorization of code:: 
+As the final section illustrates, thanks to +NumPy+'s array class vectorized code is easily implemented, leading to more compact and also better-performing code.
+
+The spirit of this chapter is to provide a general introduction to +Python+ specifics when it comes to data types and structures. If you are equipped with a background from another programing language, say +C+ or +Matlab+, you should be able to easily grasp the differences that +Python+ usage might bring along. The topics introduced here are all important and fundamental for the chapters to come.
+
+
+=== Basic Data Types
+
+(((dynamically typed languages)))(((compiled languages)))(((statically typed languages)))(((Cython library)))(((libraries, Cython library)))((("data", "basic data types", id="ix_Dbdt", range="startofrange")))+Python+ is a _dynamically typed_ language, which means that the +Python+ interpreter infers the type of an object at runtime. In comparison, compiled languages like +C+ are generally _statically typed_. In these cases, the type of an object has to be attached to the object before compile time.footnote:[The http://www.cython.org[+Cython+ library] brings static typing and compiling features to +Python+ that are comparable to those in +C+. In fact, +Cython+ is a hybrid language of +Python+ and +C+.]
+
+
+==== Integers
+
+(((integers)))One of the most fundamental data types is the integer, or ++int++:
+
+// code cell start uuid: 16aa85ac-ab50-480b-bf7c-d49343bbe65a
+[source, python]
+----
+In [1]: a = 10
+        type(a)
+----
+
+----
+Out[1]: int
+----
+
+// code cell end
+
+The built-in function +type+ provides type information for all objects with standard and built-in types as well as for newly created classes and objects. In the latter case, the information provided depends on the description the programmer has stored with the class. There is a saying that "everything in +Python+ is an object." This means, for example, that even simple objects like the +int+ object we just defined have built-in methods. For example, you can get the number of bits needed to represent the +int+ object in-memory by calling the method +bit_length+:
+
+// code cell start uuid: 2128044d-a150-4ea6-9aa3-6d6efb93bcf8
+[source, python]
+----
+In [2]: a.bit_length()
+----
+
+----
+Out[2]: 4
+----
+
+// code cell end
+
+You will see that the number of bits needed increases the higher the integer value is that we assign to the object:
+
+// code cell start uuid: 19c4eea7-f4b6-48ac-a265-a5b5d61a838f
+[source, python]
+----
+In [3]: a = 100000
+        a.bit_length()
+----
+
+----
+Out[3]: 17
+----
+
+// code cell end
+
+In general, there are so many different methods that it is hard to memorize all methods of all classes and objects. Advanced +Python+ environments, like +IPython+, provide tab completion capabilities that show all methods attached to an object. You simply type the object name followed by a dot (e.g., ++a.++) and then press the Tab key, e.g., +a.'tab'+. This then provides a collection of methods you can call on the object. Alternatively, the +Python+ built-in function +dir+ gives a complete list of attributes and methods of any object.
+
+A specialty of +Python+ is that integers can be arbitrarily large. Consider, for example, the googol number 10^100^. +Python+ has no problem with such large numbers, which are technically +long+ objects:
+
+// code cell start uuid: 34c9348e-fc24-4cb3-9f1e-538b517d16b7
+[source, python]
+----
+In [4]: googol = 10 ** 100
+        googol
+----
+
+----
+Out[4]: 100000000000000000000000000000000000000000000000000000000000000000000000
+        00000000000000000000000000000L
+----
+
+// code cell end
+
+// code cell start uuid: 55230cf3-5d00-4958-8ae9-2407ae6c968f
+[source, python]
+----
+In [5]: googol.bit_length()
+----
+
+----
+Out[5]: 333
+----
+
+// code cell end
+
+.Large Integers
+[TIP]
+====
+(((large integers)))+Python+ integers can be arbitrarily large. The interpreter simply uses as many bits/bytes as needed to represent the numbers.
+====
+
+It is important to note that mathematical operations on +int+ objects return +int+ objects. This can sometimes lead to confusion and/or hard-to-detect errors in mathematical routines. The following expression yields the expected result:
+
+// code cell start uuid: 4f0ff5d0-e5aa-4825-8a0c-9db8297d8414
+[source, python]
+----
+In [6]: 1 + 4
+----
+
+----
+Out[6]: 5
+----
+
+// code cell end
+
+However, the next case may return a somewhat surprising result:
+
+// code cell start uuid: 3b44359c-ea14-4273-b275-f38b946955cb
+[source, python]
+----
+In [7]: 1 / 4
+----
+
+----
+Out[7]: 0
+----
+
+// code cell end
+
+// code cell start uuid: 1ee18247-5627-481a-8180-ba4ce158ebaf
+[source, python]
+----
+In [8]: type(1 / 4)
+----
+
+----
+Out[8]: int
+----
+
+// code cell end
+
+
+==== Floats
+
+((("floats", id="ix_float", range="startofrange")))For the last expression to return the generally 'desired' result of 0.25, we must operate on +float+ objects, which brings us naturally to the next basic data type. Adding a dot to an integer value, like in +1.+ or +1.0+, causes +Python+ to interpret the object as a +float+. Expressions involving a +float+ also return a +float+ object in general:footnote:[Here and in the following discussion, terms like _float_, _float object_, etc. are used interchangeably, acknowledging that every _float_ is also an _object_. The same holds true for other object types.]
+
+// code cell start uuid: 3ba6e56a-a026-4eb7-ad01-0b7593ef5692
+[source, python]
+----
+In [9]: 1. / 4
+----
+
+----
+Out[9]: 0.25
+----
+
+// code cell end
+
+// code cell start uuid: 37a1e7ff-5949-4f0e-b4de-6ac28ee69e31
+[source, python]
+----
+In [10]: type (1. / 4)
+----
+
+----
+Out[10]: float
+----
+
+// code cell end
+
+A +float+ is a bit more involved in that the computerized representation of rational or real numbers is in general not exact and depends on the specific technical approach taken. To illustrate what this implies, let us define another +float+ object:
+
+// code cell start uuid: 82d6e596-d9ec-49d9-85c4-6a8cb33b2a79
+[source, python]
+----
+In [11]: b = 0.35
+         type(b)
+----
+
+----
+Out[11]: float
+----
+
+// code cell end
+
++float+ objects like this one are always represented internally up to a certain degree of accuracy only. This becomes evident when adding 0.1 to +b+:
+
+// code cell start uuid: a3f371c1-9a9a-4d19-bfac-3dc119486abb
+[source, python]
+----
+In [12]: b + 0.1
+----
+
+----
+Out[12]: 0.44999999999999996
+----
+
+// code cell end
+
+The reason for this is that ++float++s are internally represented in binary format; that is, a decimal number 0 < __n__ < 1 is represented by a series of the form latexmath:[$n = \frac{x}{2} + \frac{y}{4} + \frac{z}{8} + ...$]. For certain floating-point numbers the binary representation might involve a large number of elements or might even be an infinite series. However, given a fixed number of bits used to represent such a number--i.e., a fixed number of terms in the representation series--inaccuracies are the consequence. Other numbers can be represented _perfectly_ and are therefore stored exactly even with a finite number of bits available. Consider the following example:
+
+// code cell start uuid: 4cf2a3ed-6231-4672-9df1-03c60e3dfe7b
+[source, python]
+----
+In [13]: c = 0.5
+         c.as_integer_ratio()
+----
+
+----
+Out[13]: (1, 2)
+----
+
+// code cell end
+
+One half, i.e., 0.5, is stored exactly because it has an exact (finite) binary representation as latexmath:[$0.5 = \frac{1}{2}$]. However, for +b = 0.35+ we get something different than the expected rational number latexmath:[$0.35 = \frac{7}{20}$]:
+
+// code cell start uuid: af99f61f-afdb-41f8-bbf8-5abd0e7c9890
+[source, python]
+----
+In [14]: b.as_integer_ratio()
+----
+
+----
+Out[14]: (3152519739159347, 9007199254740992)
+----
+
+// code cell end
+
+The precision is dependent on the number of bits used to represent the number. In general, all platforms that +Python+ runs on use the IEEE 754 double-precision standard (i.e., 64 bits), for internal representation.footnote:[Cf. http://en.wikipedia.org/wiki/Double-precision_floating-point_format.] This translates into a 15-digit relative accuracy.
+
+Since this topic is of high importance for several application areas in finance, it is sometimes necessary to ensure the exact, or at least best possible, representation of numbers. For example, the issue can be of importance when summing over a large set of numbers. In such a situation, a certain kind and/or magnitude of representation error might, in aggregate, lead to significant deviations from a benchmark value.
+
+The module +decimal+ provides an arbitrary-precision object for floating-point numbers and several options to address precision issues when working with such numbers:
+
+// code cell start uuid: 5584d3cc-2cdb-4ce9-9ac7-25541dc6e9b8
+[source, python]
+----
+In [15]: import decimal
+         from decimal import Decimal
+----
+
+// code cell end
+
+// code cell start uuid: 40822f81-0da3-4d62-9e31-713d0068de2f
+[source, python]
+----
+In [16]: decimal.getcontext()
+----
+
+----
+Out[16]: Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999999, Emax=999999
+         999, capitals=1, flags=[], traps=[Overflow, InvalidOperation, DivisionB
+         yZero])
+----
+
+// code cell end
+
+// code cell start uuid: 775a8fc7-380f-4444-b394-ccdb6d8e6ea9
+[source, python]
+----
+In [17]: d = Decimal(1) / Decimal (11)
+         d
+----
+
+----
+Out[17]: Decimal('0.09090909090909090909090909091')
+----
+
+// code cell end
+
+You can change the precision of the representation by changing the respective attribute value of the +Context+ object:
+
+// code cell start uuid: 2a184e95-cc99-4b25-9905-b6d9becb2670
+[source, python]
+----
+In [18]: decimal.getcontext().prec = 4  # lower precision than default
+----
+
+// code cell end
+
+// code cell start uuid: 66cc3ae7-9a70-4612-b64c-a86fd481ef9d
+[source, python]
+----
+In [19]: e = Decimal(1) / Decimal (11)
+         e
+----
+
+----
+Out[19]: Decimal('0.09091')
+----
+
+// code cell end
+
+// code cell start uuid: 6fa10fc7-4d21-4490-95a1-4a1be00f2c19
+[source, python]
+----
+In [20]: decimal.getcontext().prec = 50  # higher precision than default
+----
+
+// code cell end
+
+// code cell start uuid: a3515ac1-4029-4645-ade9-094b6e3e87cf
+[source, python]
+----
+In [21]: f = Decimal(1) / Decimal (11)
+         f
+----
+
+----
+Out[21]: Decimal('0.090909090909090909090909090909090909090909090909091')
+----
+
+// code cell end
+
+If needed, the precision can in this way be adjusted to the exact problem at hand and one can operate with floating-point objects that exhibit different degrees of accuracy:
+
+// code cell start uuid: 17a5e733-475b-4a49-a320-9b67bd45ce2e
+[source, python]
+----
+In [22]: g = d + e + f
+         g
+----
+
+----
+Out[22]: Decimal('0.27272818181818181818181818181909090909090909090909')
+----
+
+// code cell end
+
+.Arbitrary-Precision Floats
+[TIP]
+====
+(((range="endofrange", startref="ix_float")))(((arbitrary precision floats)))(((precision floats)))(((64-bit double precision standard)))The module +decimal+ provides an arbitrary-precision floating-point number object. In finance, it might sometimes be necessary to ensure high precision and to go beyond the 64-bit double-precision standard.
+====
+
+
+==== Strings
+
+((("strings", "Python string class", id="ix_Spystrcls", range="startofrange")))(((strings, string objects)))(((text, representation with strings)))Now that we can represent natural and floating-point numbers, we turn to text. The basic data type to represent text in +Python+ is the +string+. The ++string++ object has a number of really helpful built-in methods. In fact, +Python+ is generally considered to be a good choice when it comes to working with text files of any kind and any size. A +string+ object is generally defined by single or double quotation marks or by converting another object using the +str+ function (i.e., using the object's standard or user-defined +string+ pass:[<phrase role="keep-together">representation</phrase>]):
+
+// code cell start uuid: 01840910-c872-4f80-8e26-37d537aae1c5
+[source, python]
+----
+In [23]: t = 'this is a string object'
+----
+
+// code cell end
+
+With regard to the built-in methods, you can, for example, capitalize the first word in this object:
+
+// code cell start uuid: d961e3c3-59ca-4e85-949d-553727b39477
+[source, python]
+----
+In [24]: t.capitalize()
+----
+
+----
+Out[24]: 'This is a string object'
+----
+
+// code cell end
+
+Or you can split it into its single-word components to get a +list+ object of all the words (more on +list+ objects later):
+
+// code cell start uuid: 443fd868-860a-4ea7-a26c-85ad658a2fb7
+[source, python]
+----
+In [25]: t.split()
+----
+
+----
+Out[25]: ['this', 'is', 'a', 'string', 'object']
+----
+
+// code cell end
+
+You can also search for a word and get the position (i.e., index value) of the first letter of the word back in a successful case:
+
+// code cell start uuid: 7ba8fdc2-a567-42a8-b363-847be15d5073
+[source, python]
+----
+In [26]: t.find('string')
+----
+
+----
+Out[26]: 10
+----
+
+// code cell end
+
+If the word is not in the +string+ object, the method returns -1:
+
+// code cell start uuid: 8cc71c8c-e447-4272-8b82-74da5f504404
+[source, python]
+----
+In [27]: t.find('Python')
+----
+
+----
+Out[27]: -1
+----
+
+// code cell end
+
+Replacing characters in a string is a typical task that is easily accomplished with the +replace+ method:
+
+// code cell start uuid: ce57da4c-b95a-417f-a8bd-44f81b28d162
+[source, python]
+----
+In [28]: t.replace(' ', '|')
+----
+
+----
+Out[28]: 'this|is|a|string|object'
+----
+
+// code cell end
+
+The stripping of strings--i.e., deletion of certain leading/lagging characters--is also often necessary:
+
+// code cell start uuid: 4a115a34-774e-4544-95eb-95e9ebec36ea
+[source, python]
+----
+In [29]: 'http://www.python.org'.strip('htp:/')
+----
+
+----
+Out[29]: 'www.python.org'
+----
+
+// code cell end
+
+(((strings, selected string methods)))<<string_methods>> lists a number of helpful methods of the +string+ object.
+
+[[string_methods]]
+.Selected string methods
+[options="header, unbreakable"]
+|=======
+|Method       |Arguments              | Returns/result
+|+capitalize+ |++()++                     | Copy of the string with first letter capitalized
+|+count+      |++(++__++sub++__++[,++ __++start++__++[,++ __++end++__++]])++  | Count of the number of occurrences of substring
+|+decode+     |++([++__++encoding++__++[,++ __++errors++__++]])++ | Decoded version of the string, using _++encoding++_ (e.g., UTF-8)
+|+encode+     |++([++__++encoding++__++[,++ __++errors++__++]])++ | Encoded version of the string
+|+find+       |++(++__++sub++__++[,++ __++start++__++[,++ __++end++__++]])++  | (Lowest) index where substring is found
+|+join+       |++(++__++seq++__++)++                  | Concatenation of strings in sequence _++seq++_
+|+replace+    |++(++__++old++__++,++ __++new++__++[,++ __++count++__++])++    | Replaces _++old++_ by _++new++_ the first _++count++_ times
+|+split+      |++([++__++sep++__++[,++ __++maxsplit++__++]])++    | List of words in string with _++sep++_ as separator
+|+splitlines+ |++([++__++keepends++__++])++           | Separated lines with line ends/breaks if _++keepends++_ is _++True++_
+|+strip+      |++(++__++chars++__++)++                | Copy of string with leading/lagging characters in _++chars++_ removed
+|+upper+      |++()++                     | Copy with all letters capitalized
+|=======
+
+A powerful tool when working with +string+ objects is _regular expressions_. +Python+ provides such functionality in the module +re+:
+
+// code cell start uuid: 8295f915-ee30-44df-896a-539aa6e5287d
+[source, python]
+----
+In [30]: import re
+----
+
+// code cell end
+
+(((regular expressions)))(((dates and times, described by regular expressions)))((("comma-separated value (CSV) files", "regular expressions and")))Suppose you are faced with a large text file, such as a comma-separated value (+CSV+) file, which contains certain time series and respective date-time information. More often than not, the date-time information is delivered in a format that +Python+ cannot interpret directly. However, the date-time information can generally be described by a regular expression. Consider the following +string+ object, containing three date-time elements, three integers, and three strings. Note that triple quotation marks allow the definition of strings over multiple rows:
+
+// code cell start uuid: 31a001d3-195c-42d3-823b-643eb2be3981
+[source, python]
+----
+In [31]: series = """
+         '01/18/2014 13:00:00', 100, '1st';
+         '01/18/2014 13:30:00', 110, '2nd';
+         '01/18/2014 14:00:00', 120, '3rd'
+         """
+----
+
+// code cell end
+
+The following regular expression describes the format of the date-time information provided in the +string+ object:footnote:[It is not possible to go into details here, but there is a wealth of information available on the Internet about regular expressions in general and for +Python+ in particular. For an introduction to this topic, refer to Fitzgerald, Michael (2012): _Introducing Regular Expressions_. O'Reilly, Sebastopol, CA.]
+
+// code cell start uuid: b62df3db-51da-4bd5-8abe-f536296c756e
+[source, python]
+----
+In [32]: dt = re.compile("'[0-9/:\s]+'")  # datetime
+----
+
+// code cell end
+
+Equipped with this regular expression, we can go on and find all the date-time elements. In general, applying regular expressions to +string+ objects also leads to performance improvements for typical parsing tasks:
+
+// code cell start uuid: 02dd3264-3090-4607-a0d9-568d12093158
+[source, python]
+----
+In [33]: result = dt.findall(series)
+         result
+----
+
+----
+Out[33]: ["'01/18/2014 13:00:00'", "'01/18/2014 13:30:00'", "'01/18/2014 14:00:0
+         0'"]
+----
+
+// code cell end
+
+.Regular Expressions
+[TIP]
+====
+When parsing +string+ objects, consider using regular expressions, which can bring both convenience and performance to such pass:[<phrase role='keep-together'>operations.</phrase>]
+====
+
+The resulting +string+ objects can then be parsed to generate +Python datetime+ objects (cf. <<dates_times>> for an overview of handling date and time data with +Python+). To parse the +string+ objects containing the date-time information, we need to provide information of how to parse--again as a +string+ object:
+
+// code cell start uuid: ec54f07e-c507-437e-b5ec-6bd4f6d1e9f8
+[source, python]
+----
+In [34]: from datetime import datetime
+         pydt = datetime.strptime(result[0].replace("'", ""),
+                                  '%m/%d/%Y %H:%M:%S')
+         pydt
+----
+
+----
+Out[34]: datetime.datetime(2014, 1, 18, 13, 0)
+----
+
+// code cell end
+
+// code cell start uuid: 28c72cd0-7efb-43b6-8dae-c48f034c154e
+[source, python]
+----
+In [35]: print pydt
+----
+
+----
+Out[35]: 2014-01-18 13:00:00
+         
+----
+
+// code cell end
+
+// code cell start uuid: d166e305-a9ab-4d28-ac04-ee6016035b88
+[source, python]
+----
+In [36]: print type(pydt)
+----
+
+----
+Out[36]: <type 'datetime.datetime'>
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_Dbdt")))(((range="endofrange", startref="ix_Spystrcls")))Later chapters provide more information on date-time data, the handling of such data, and +datetime+ objects and their methods. This is just meant to be a teaser for this important topic in finance.
+
+
+=== Basic Data Structures
+
+((("data", "basic data structures", id="ix_Dbds", range="startofrange")))As a general rule, data structures are objects that contain a possibly large number of other objects. Among those that +Python+ provides as built-in structures are:
+
+ +tuple+:: 
+ A collection of arbitrary objects; only a few methods available
+ +list+:: 
+ A collection of arbitrary objects; many methods available
+ +dict+:: 
+ A key-value store object
+ +set+:: 
+ An unordered collection object for other _unique_ objects
+
+
+==== Tuples
+
+(((tuples)))A +tuple+ is an advanced data structure, yet it's still quite simple and limited in its applications. It is defined by providing objects in parentheses:
+
+// code cell start uuid: a84deee3-7f60-459a-bb91-d0cd9c8031aa
+[source, python]
+----
+In [37]: t = (1, 2.5, 'data')
+         type(t)
+----
+
+----
+Out[37]: tuple
+----
+
+// code cell end
+
+You can even drop the parentheses and provide multiple objects separated by commas:
+
+// code cell start uuid: 9c63a354-9fde-4ded-92f2-bb8ed08ea185
+[source, python]
+----
+In [38]: t = 1, 2.5, 'data'
+         type(t)
+----
+
+----
+Out[38]: tuple
+----
+
+// code cell end
+
+Like almost all data structures in +Python+ the ++tuple++ has a built-in index, with the help of which you can retrieve single or multiple elements of the +tuple+. It is important to remember that +Python+ uses _zero-based numbering_, such that the third element of a +tuple+ is at index position 2:
+
+// code cell start uuid: 0c6923a3-efab-4cb1-baf7-f31ce725f520
+[source, python]
+----
+In [39]: t[2]
+----
+
+----
+Out[39]: 'data'
+----
+
+// code cell end
+
+// code cell start uuid: d36fef13-3878-4512-a458-9f5c2dda2cc6
+[source, python]
+----
+In [40]: type(t[2])
+----
+
+----
+Out[40]: str
+----
+
+// code cell end
+
+.Zero-Based Numbering
+[TIP]
+====
+(((zero-based numbering schemes)))(((Python, zero-based numbering in)))In contrast to some other programming languages like +Matlab+, +Python+ uses zero-based numbering schemes. For example, the first element of a +tuple+ object has index value 0.
+====
+
+There are only two special methods that this object type provides: +count+ and +index+. The first counts the number of occurrences of a certain object and the second gives the index value of the first appearance of it:
+
+++++
+<?hard-pagebreak?>
+++++
+
+// code cell start uuid: d306c24a-5ae0-4395-9fb7-27bf0bb3d1a5
+[source, python]
+----
+In [41]: t.count('data')
+----
+
+----
+Out[41]: 1
+----
+
+// code cell end
+
+// code cell start uuid: 10a2d29d-b83d-45bf-aa6b-7d7d028e0fcf
+[source, python]
+----
+In [42]: t.index(1)
+----
+
+----
+Out[42]: 0
+----
+
+// code cell end
+
++tuple+ objects are not very flexible since, once defined, they cannot be changed easily.
+
+
+==== Lists
+
+(((lists)))Objects of type +list+ are much more flexible and powerful in comparison to +tuple+ objects. From a finance point of view, you can achieve a lot working only with +list+ objects, such as storing stock price quotes and appending new data. A +list+ object is defined through brackets and the basic capabilities and behavior are similar to those of +tuple+ objects:
+
+// code cell start uuid: 434dd023-faaf-4b7f-953a-69ec45eec4aa
+[source, python]
+----
+In [43]: l = [1, 2.5, 'data']
+         l[2]
+----
+
+----
+Out[43]: 'data'
+----
+
+// code cell end
+
++list+ objects can also be defined or converted by using the function +list+. The following code generates a new +list+ object by converting the +tuple+ object from the previous example:
+
+// code cell start uuid: 51232410-3f94-4df5-b982-ffcb8438c437
+[source, python]
+----
+In [44]: l = list(t)
+         l
+----
+
+----
+Out[44]: [1, 2.5, 'data']
+----
+
+// code cell end
+
+// code cell start uuid: 7fab351f-6bb8-492f-a4be-314dfab9d13b
+[source, python]
+----
+In [45]: type(l)
+----
+
+----
+Out[45]: list
+----
+
+// code cell end
+
+(((immutability)))(((mutability)))In addition to the characteristics of +tuple+ objects, ++list++ objects are also expandable and reducible via different methods. In other words, whereas +string+ and +tuple+ objects are _immutable_ sequence objects (with indexes) that cannot be changed once created, +list+ objects are _mutable_ and can be changed via different operations. You can append +list+ objects to an existing +list+ object, and more:
+
+// code cell start uuid: 5f409ddb-67a5-42cc-949c-7b1cc7fb7489
+[source, python]
+----
+In [46]: l.append([4, 3])  # append list at the end
+         l
+----
+
+----
+Out[46]: [1, 2.5, 'data', [4, 3]]
+----
+
+// code cell end
+
+// code cell start uuid: 4e108298-4370-4371-9794-066aff49bfa3
+[source, python]
+----
+In [47]: l.extend([1.0, 1.5, 2.0])  # append elements of list
+         l
+----
+
+----
+Out[47]: [1, 2.5, 'data', [4, 3], 1.0, 1.5, 2.0]
+----
+
+// code cell end
+
+// code cell start uuid: 9076e4d2-518a-4554-b400-ffc06918a11a
+[source, python]
+----
+In [48]: l.insert(1, 'insert')  # insert object before index position
+         l
+----
+
+----
+Out[48]: [1, 'insert', 2.5, 'data', [4, 3], 1.0, 1.5, 2.0]
+----
+
+// code cell end
+
+// code cell start uuid: 7049a3a2-3d79-4584-bc57-3f91feb1e941
+[source, python]
+----
+In [49]: l.remove('data')  # remove first occurrence of object
+         l
+----
+
+----
+Out[49]: [1, 'insert', 2.5, [4, 3], 1.0, 1.5, 2.0]
+----
+
+// code cell end
+
+// code cell start uuid: 23bf5c19-5dc8-404a-bb5c-bda07c752d89
+[source, python]
+----
+In [50]: p = l.pop(3)  # removes and returns object at index
+         print l, p
+----
+
+----
+Out[50]: [1, 'insert', 2.5, 1.0, 1.5, 2.0] [4, 3]
+         
+----
+
+// code cell end
+
+Slicing is also easily accomplished. Here, _slicing_ refers to an operation that breaks down a data set into smaller parts (of interest):
+
+// code cell start uuid: df15c54e-7500-40d8-9563-ecb305993e6b
+[source, python]
+----
+In [51]: l[2:5]  # 3rd to 5th elements
+----
+
+----
+Out[51]: [2.5, 1.0, 1.5]
+----
+
+// code cell end
+
+<<list_methods>> provides a summary of selected operations and methods of the +list+ object.
+
+[[list_methods]]
+.Selected operations and methods of list objects
+[options="header, unbreakable"]
+|=======
+|Method       |Arguments              | Returns/result
+|+l[i] = x+   |++[++__++i++__++]++                    | Replaces __++i++__th element by _++x++_
+|+l[i:j:k] = s+ |++[++__++i++__++:++__++j++__++:++__++k++__++]++              | Replaces every __++k++__th element from _++i++_ to _++j++_ - 1 by _++s++_
+|+append+     |++(++__++x++__++)++                    | Appends _++x++_ to object
+|+count+      |++(++__++x++__++)++                    | Number of occurrences of object _++x++_
+|+del l[i:j:k]+ |++[++__++i++__++:++__++j++__++:++__++k++__++]++              | Deletes elements with index values _++i++_ to _++j++_ – 1
+|+extend+     |++(++__++s++__++)++                    | Appends all elements of _++s++_ to object
+|+index+      |++(++__++x++__++[,++ __++i++__++[,++ __++j++__++]])++          | First index of _++x++_ between elements _++i++_ and _++j++_ – 1
+|+insert+     |++(++__++i++__++,++ __++x++__)++                 | Inserts _++x++_ at/before index _++i++_
+|+remove+     |++(++__++i++__++)++                    | Removes element with index _++i++_
+|+pop+        |++(++__++i++__++)++                    | Removes element with index _++i++_ and return it
+|+reverse+    |++()++                     | Reverses all items in place
+|+sort+       |++([++__++cmp++__++[,++ __++key++__++[,++ __++reverse++__++]]])++ | Sorts all items in place
+|=======
+
+
+==== Excursion: Control Structures
+
+(((excursion, control structures)))(((control structures)))Although a topic in itself, _control structures_ like +for+ loops are maybe best introduced in +Python+ based on +list+ objects. This is due to the fact that looping in general takes place over +list+ objects, which is quite different to what is often the standard in other languages. Take the following example. The +for+ loop loops over the elements of the +list+ object +l+ with index values 2 to 4 and prints the square of the respective elements. Note the importance of the indentation (whitespace) in the second line:
+
+// code cell start uuid: 4661533f-3ff0-4699-a17b-cf061e860d8a
+[source, python]
+----
+In [52]: for element in l[2:5]:
+             print element ** 2
+----
+
+----
+Out[52]: 6.25
+         1.0
+         2.25
+         
+----
+
+// code cell end
+
+This provides a really high degree of flexibility in comparison to the typical counter-based looping. Counter-based looping is also an option with +Python+, but is accomplished based on the (standard) +list+ object +range+:
+
+// code cell start uuid: c5d97e03-6106-46a9-abb3-0c71cf0b7767
+[source, python]
+----
+In [53]: r = range(0, 8, 1)  # start, end, step width
+         r
+----
+
+----
+Out[53]: [0, 1, 2, 3, 4, 5, 6, 7]
+----
+
+// code cell end
+
+// code cell start uuid: 0ef58c5e-a1d8-438a-bf2f-db598b963187
+[source, python]
+----
+In [54]: type(r)
+----
+
+----
+Out[54]: list
+----
+
+// code cell end
+
+For comparison, the same loop is implemented using +range+ as follows:
+
+// code cell start uuid: c1621dce-d184-4331-bd1d-6b6008286c99
+[source, python]
+----
+In [55]: for i in range(2, 5):
+             print l[i] ** 2
+----
+
+----
+Out[55]: 6.25
+         1.0
+         2.25
+         
+----
+
+// code cell end
+
+.Looping over Lists
+[TIP]
+====
+In +Python+ you can loop over arbitrary +list+ objects, no matter what the content of the object is. This often avoids the introduction of a counter.
+====
+
++Python+ also provides the typical (conditional) control elements +if+, +elif+, and +else+. Their use is comparable in other languages:
+
+// code cell start uuid: 474dd7ff-5fdd-429c-a574-48d698919e98
+[source, python]
+----
+In [56]: for i in range(1, 10):
+             if i % 2 == 0:  # % is for modulo
+                 print "%d is even" % i
+             elif i % 3 == 0:
+                 print "%d is multiple of 3" % i
+             else:
+                 print "%d is odd" % i
+----
+
+----
+Out[56]: 1 is odd
+         2 is even
+         3 is multiple of 3
+         4 is even
+         5 is odd
+         6 is even
+         7 is odd
+         8 is even
+         9 is multiple of 3
+         
+----
+
+// code cell end
+
+Similarly, +while+ provides another means to control the flow:
+
+// code cell start uuid: d15a40d3-e0c5-444c-83b8-68a08b1066de
+[source, python]
+----
+In [57]: total = 0
+         while total < 100:
+             total += 1
+         print total
+----
+
+----
+Out[57]: 100
+         
+----
+
+// code cell end
+
+(((list comprehensions)))A specialty of +Python+ is so-called +list+ _comprehensions_. Instead of looping over existing +list+ objects, this approach generates +list+ objects via loops in a rather compact fashion:
+
+// code cell start uuid: bcfe427d-ea2c-485a-aace-f2927afefbdd
+[source, python]
+----
+In [58]: m = [i ** 2 for i in range(5)]
+         m
+----
+
+----
+Out[58]: [0, 1, 4, 9, 16]
+----
+
+// code cell end
+
+In a certain sense, this already provides a first means to generate "something like" vectorized code in that loops are rather more implicit than explicit (vectorization of code is discussed in more detail later in this chapter).
+
+
+==== Excursion: Functional Programming
+
+(((excursion, functional programming)))(((functional programming)))+Python+ provides a number of tools for functional programming support as well--i.e., the application of a function to a whole set of inputs (in our case +list+ objects). Among these tools are +filter+, +map+, and +reduce+. However, we need a function definition first. To start with something really simple, consider a function +f+ that returns the square of the input +x+:
+
+// code cell start uuid: 73fe24f8-e852-4b29-a488-901145b88120
+[source, python]
+----
+In [59]: def f(x):
+             return x ** 2
+         f(2)
+----
+
+----
+Out[59]: 4
+----
+
+// code cell end
+
+Of course, functions can be arbitrarily complex, with multiple input/parameter objects and even multiple outputs, (return objects). However, consider the following function:
+
+// code cell start uuid: af1c90bc-8688-4b64-a269-11b81e53b7f2
+[source, python]
+----
+In [60]: def even(x):
+             return x % 2 == 0
+         even(3)
+----
+
+----
+Out[60]: False
+----
+
+// code cell end
+
+The return object is a Boolean. Such a function can be applied to a whole +list+ object by using +map+:
+
+// code cell start uuid: 6b9746e8-1717-4f33-a9d8-46fbb8d6d114
+[source, python]
+----
+In [61]: map(even, range(10))
+----
+
+----
+Out[61]: [True, False, True, False, True, False, True, False, True, False]
+----
+
+// code cell end
+
+To this end, we can also provide a function definition directly as an argument to +map+, by using +lambda+ or _anonymous_ functions:
+
+// code cell start uuid: b8e6e5a8-704f-4d72-b92c-0c42f15b53e8
+[source, python]
+----
+In [62]: map(lambda x: x ** 2, range(10))
+----
+
+----
+Out[62]: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+----
+
+// code cell end
+
+Functions can also be used to filter a +list+ object. In the following example, the filter returns elements of a +list+ object that match the Boolean condition as defined by the +even+ function:
+
+// code cell start uuid: 3354de29-f946-4076-a794-ba07969bf3b7
+[source, python]
+----
+In [63]: filter(even, range(15)) 
+----
+
+----
+Out[63]: [0, 2, 4, 6, 8, 10, 12, 14]
+----
+
+// code cell end
+
+Finally, +reduce+ helps when we want to apply a function to all elements of a +list+ object that returns a single value only. An example is the cumulative sum of all elements in a +list+ object (assuming that summation is defined for the objects contained in the list):
+
+// code cell start uuid: 5f490736-4c46-422f-8a6d-5e0c85104994
+[source, python]
+----
+In [64]: reduce(lambda x, y: x + y, range(10))
+----
+
+----
+Out[64]: 45
+----
+
+// code cell end
+
+An alternative, _nonfunctional_ implementation could look like the following:
+
+// code cell start uuid: 730dcd47-03f2-4c50-be10-196aed33d6a3
+[source, python]
+----
+In [65]: def cumsum(l):
+             total = 0
+             for elem in l:
+                 total += elem
+             return total
+         cumsum(range(10))
+----
+
+----
+Out[65]: 45
+----
+
+// code cell end
+
+.List Comprehensions, Functional Programming, Anonymous Functions
+[TIP]
+====
+(((best practices, functional programming tools)))It can be considered _good practice_ to avoid loops on the +Python+ level as far as possible. +list+ comprehensions and functional programming tools like +map+, +filter+, and +reduce+ provide means to write code without loops that is both compact and in general more readable. +lambda+ or anonymous functions are also powerful tools in this pass:[<phrase role='keep-together'>context.</phrase>]
+====
+
+
+==== Dicts
+
+(((dicts)))+dict+ objects are dictionaries, and also mutable sequences, that allow data retrieval by keys that can, for example, be +string+ objects. They are so-called _key-value stores_. While +list+ objects are ordered and sortable, +dict+ objects are unordered and unsortable. An example best illustrates further differences to +list+ objects. Curly brackets are what define +dict+ objects:
+
+// code cell start uuid: 14981fb1-5636-4c73-93c9-f8e18930cc6b
+[source, python]
+----
+In [66]: d = {
+              'Name' : 'Angela Merkel',
+              'Country' : 'Germany',
+              'Profession' : 'Chancelor',
+              'Age' : 60
+              }
+         type(d)
+----
+
+----
+Out[66]: dict
+----
+
+// code cell end
+
+// code cell start uuid: 786249fd-c888-4aa2-9157-973147ff2c2b
+[source, python]
+----
+In [67]: print d['Name'], d['Age']
+----
+
+----
+Out[67]: Angela Merkel 60
+         
+----
+
+// code cell end
+
+Again, this class of objects has a number of built-in methods:
+
+// code cell start uuid: 33182240-3b00-4e43-922c-8189296791aa
+[source, python]
+----
+In [68]: d.keys()
+----
+
+----
+Out[68]: ['Country', 'Age', 'Profession', 'Name']
+----
+
+// code cell end
+
+// code cell start uuid: 98b8e7a4-bac0-4299-9c47-c223269e24d7
+[source, python]
+----
+In [69]: d.values()
+----
+
+----
+Out[69]: ['Germany', 60, 'Chancelor', 'Angela Merkel']
+----
+
+// code cell end
+
+// code cell start uuid: 48545763-dfe7-4bb2-ade3-d0598498726e
+[source, python]
+----
+In [70]: d.items()
+----
+
+----
+Out[70]: [('Country', 'Germany'),
+          ('Age', 60),
+          ('Profession', 'Chancelor'),
+          ('Name', 'Angela Merkel')]
+----
+
+// code cell end
+
+// code cell start uuid: 9ed881cc-0eef-4307-b93b-0a728d98d647
+[source, python]
+----
+In [71]: birthday = True
+         if birthday is True:
+             d['Age'] += 1
+         print d['Age']
+----
+
+----
+Out[71]: 61
+         
+----
+
+// code cell end
+
+There are several methods to get +iterator+ objects from the +dict+ object. The objects behave like +list+ objects when iterated over:
+
+// code cell start uuid: a2f40c35-348f-4727-87b6-df2e1c5f6f15
+[source, python]
+----
+In [72]: for item in d.iteritems():
+             print item
+----
+
+----
+Out[72]: ('Country', 'Germany')
+         ('Age', 61)
+         ('Profession', 'Chancelor')
+         ('Name', 'Angela Merkel')
+         
+----
+
+// code cell end
+
+// code cell start uuid: 2dc61967-ece2-48cd-af60-fcf58eb68270
+[source, python]
+----
+In [73]: for value in d.itervalues():
+             print type(value)
+----
+
+----
+Out[73]: <type 'str'>
+         <type 'int'>
+         <type 'str'>
+         <type 'str'>
+         
+----
+
+// code cell end
+
+<<dict_methods>> provides a summary of selected operations and methods of the +dict+ object.
+
+++++
+<?hard-pagebreak?>
+++++
+
+[[dict_methods]]
+.Selected operations and methods of dict objects
+[options="header, unbreakable"]
+|=======
+|Method       |Arguments              | Returns/result
+|+d[k]+       |++[__k__]++                    | Item of _++d++_ with key _++k++_
+|+d[k] = x+   |++[__k__]++                    | Sets item key _++k++_ to _++x++_
+|+del d[k]+   |++[__k__]++                    | Deletes item with key _++k++_
+|+clear+      |++()++                     | Removes all items
+|+copy+       |++()++                     | Makes a copy
+|+has_key+    |++(__k__)++                    | +True+ if _++k++_ is a key
+|+items+      |++()++                     | Copy of all key-value pairs
+|+iteritems+  |++()++                     | Iterator over all items
+|+iterkeys+   |++()++                     | Iterator over all keys
+|+itervalues+  |++()++                    | Iterator over all values
+|+keys+       |++()++                     | Copy of all keys
+|+poptiem+    |++(__k__)++                    | Returns and removes item with key _++k++_
+|+update+     |++([__e__])++                  | Updates items with items from _++e++_
+|+values+     |++()++                     | Copy of all values
+|=======
+
+
+==== Sets
+
+(((sets)))The last data structure we will consider is the +set+ object. Although set theory is a cornerstone of mathematics and also finance theory, there are not too many practical applications for +set+ objects. The objects are unordered collections of other objects, pass:[<phrase role='keep-together'>containing</phrase>] every element only once:
+
+// code cell start uuid: 7037930a-6fda-493e-8922-2095f50c76e5
+[source, python]
+----
+In [74]: s = set(['u', 'd', 'ud', 'du', 'd', 'du'])
+         s
+----
+
+----
+Out[74]: {'d', 'du', 'u', 'ud'}
+----
+
+// code cell end
+
+// code cell start uuid: c649fb45-81fd-4d46-9ea0-4462203fde81
+[source, python]
+----
+In [75]: t = set(['d', 'dd', 'uu', 'u'])
+----
+
+// code cell end
+
+With +set+ objects, you can implement operations as you are used to in mathematical set theory. For example, you can generate unions, intersections, and differences:
+
+// code cell start uuid: d592a20e-c8bd-4db4-b0db-f4f30b3ddb9a
+[source, python]
+----
+In [76]: s.union(t)  # all of s and t
+----
+
+----
+Out[76]: {'d', 'dd', 'du', 'u', 'ud', 'uu'}
+----
+
+// code cell end
+
+// code cell start uuid: 0c60085c-d1e9-4023-9909-8f8623f1620e
+[source, python]
+----
+In [77]: s.intersection(t)  # both in s and t
+----
+
+----
+Out[77]: {'d', 'u'}
+----
+
+// code cell end
+
+// code cell start uuid: c2efb482-02dc-41f6-ba00-4bbdccbfa905
+[source, python]
+----
+In [78]: s.difference(t)  # in s but not t
+----
+
+----
+Out[78]: {'du', 'ud'}
+----
+
+// code cell end
+
+// code cell start uuid: ad2a4b31-8cea-41ef-af26-164ba264dd08
+[source, python]
+----
+In [79]: t.difference(s)  # in t but not s
+----
+
+----
+Out[79]: {'dd', 'uu'}
+----
+
+// code cell end
+
+// code cell start uuid: 1a040fc4-58d0-454d-b21a-59ce4325914d
+[source, python]
+----
+In [80]: s.symmetric_difference(t)  # in either one but not both
+----
+
+----
+Out[80]: {'dd', 'du', 'ud', 'uu'}
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_Dbds")))One application of +set+ objects is to get rid of duplicates in a +list+ object. For example:
+
+// code cell start uuid: a9173c67-0fff-4313-a1c6-c9f52f911b00
+[source, python]
+----
+In [81]: from random import randint
+         l = [randint(0, 10) for i in range(1000)]
+             # 1,000 random integers between 0 and 10
+         len(l)  # number of elements in l
+----
+
+----
+Out[81]: 1000
+----
+
+// code cell end
+
+// code cell start uuid: b79db3dd-9264-49c1-8163-ca5ac1dca35d
+[source, python]
+----
+In [82]: l[:20]
+----
+
+----
+Out[82]: [8, 3, 4, 9, 1, 7, 5, 5, 6, 7, 4, 4, 7, 1, 8, 5, 0, 7, 1, 9]
+----
+
+// code cell end
+
+// code cell start uuid: 918b67ef-4b7e-456c-8133-60de3ae680f6
+[source, python]
+----
+In [83]: s = set(l)
+         s
+----
+
+----
+Out[83]: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+----
+
+// code cell end
+
+
+=== NumPy Data Structures
+
+((("data", "NumPy data structures", id="ix_Dnumpy", range="startofrange")))((("NumPy", "data structures", id="ix_NPYds", range="startofrange")))(((arrays, structure of)))The previous section shows that +Python+ provides some quite useful and flexible general data structures. In particular, +list+ objects can be considered a real workhorse with many convenient characteristics and application areas. However, scientific and financial applications generally have a need for high-performing operations on special data structures. One of the most important data structures in this regard is the _array_. Arrays generally structure other (fundamental) objects in rows and columns.
+
+Assume for the moment that we work with numbers only, although the concept generalizes to other types of data as well. In the simplest case, a one-dimensional array then represents, mathematically speaking, a _vector_ of, in general, real numbers, internally represented by +float+ objects. It then consists of a _single_ row or column of elements only. In a more common case, an array represents an __i__ &#xd7; __j__ _matrix_ of elements. This concept generalizes to __i__ &#xd7; __j__ &#xd7; __k__ _cubes_ of elements in three dimensions as well as to general __n__-dimensional arrays of shape __i__ &#xd7; __j__ &#xd7; __k__ &#xd7; __l__ &#xd7; ... .
+
+Mathematical disciplines like linear algebra and vector space theory illustrate that such mathematical structures are of high importance in a number of disciplines and fields. It can therefore prove fruitful to have available a specialized class of data structures explicitly designed to handle arrays conveniently and efficiently. This is where the +Python+ library +NumPy+ comes into play, with its +ndarray+ class.
+
+
+==== Arrays with Python Lists
+
+(((lists)))(((arrays, with Python lists)))Before we turn to +NumPy+, let us first construct arrays with the built-in data structures presented in the previous section. +list+ objects are particularly suited to accomplishing this task. A simple +list+ can already be considered a one-dimensional array:
+
+// code cell start uuid: be5428db-f5f0-48d1-9cb3-46ab122778e7
+[source, python]
+----
+In [84]: v = [0.5, 0.75, 1.0, 1.5, 2.0]  # vector of numbers
+----
+
+// code cell end
+
+Since +list+ objects can contain arbitrary other objects, they can also contain other +list+ objects. In that way, two- and higher-dimensional arrays are easily constructed by nested +list+ objects:
+
+// code cell start uuid: 01678cdc-dfe0-481e-b9bc-b735b15c76c0
+[source, python]
+----
+In [85]: m = [v, v, v]  # matrix of numbers
+         m
+----
+
+----
+Out[85]: [[0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0]]
+----
+
+// code cell end
+
+We can also easily select rows via simple indexing or single elements via double indexing (whole columns, however, are not so easy to select):
+
+// code cell start uuid: e2d1473a-4970-4085-9e8a-de65ed22f986
+[source, python]
+----
+In [86]: m[1]
+----
+
+----
+Out[86]: [0.5, 0.75, 1.0, 1.5, 2.0]
+----
+
+// code cell end
+
+// code cell start uuid: e33ea433-6716-4d17-9ed3-04a68af6b489
+[source, python]
+----
+In [87]: m[1][0]
+----
+
+----
+Out[87]: 0.5
+----
+
+// code cell end
+
+Nesting can be pushed further for even more general structures:
+
+// code cell start uuid: d905bfcc-e325-468e-829e-bb5c59def934
+[source, python]
+----
+In [88]: v1 = [0.5, 1.5]
+         v2 = [1, 2]
+         m = [v1, v2]
+         c = [m, m]  # cube of numbers
+         c
+----
+
+----
+Out[88]: [[[0.5, 1.5], [1, 2]], [[0.5, 1.5], [1, 2]]]
+----
+
+// code cell end
+
+// code cell start uuid: be03ed03-1e4a-428e-ac94-e451ceeaa745
+[source, python]
+----
+In [89]: c[1][1][0]
+----
+
+----
+Out[89]: 1
+----
+
+// code cell end
+
+Note that combining objects in the way just presented generally works with reference pointers to the original objects. What does that mean in practice? Let us have a look at the following operations:
+
+// code cell start uuid: 015e5dd4-fda4-4572-9a23-06ff178ff2be
+[source, python]
+----
+In [90]: v = [0.5, 0.75, 1.0, 1.5, 2.0]
+         m = [v, v, v]
+         m
+----
+
+----
+Out[90]: [[0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0]]
+----
+
+// code cell end
+
+Now change the value of the first element of the +v+ object and see what happens to the +m+ object:
+
+// code cell start uuid: fd8ebed9-f11c-455a-a660-f4fe8d12d8f4
+[source, python]
+----
+In [91]: v[0] = 'Python'
+         m
+----
+
+----
+Out[91]: [['Python', 0.75, 1.0, 1.5, 2.0],
+          ['Python', 0.75, 1.0, 1.5, 2.0],
+          ['Python', 0.75, 1.0, 1.5, 2.0]]
+----
+
+// code cell end
+
+This can be avoided by using the +deepcopy+ function of the +copy+ module:
+
+// code cell start uuid: eacab892-e5a6-49be-9ef2-ef2972b313c3
+[source, python]
+----
+In [92]: from copy import deepcopy
+         v = [0.5, 0.75, 1.0, 1.5, 2.0]
+         m = 3 * [deepcopy(v), ]
+         m
+----
+
+----
+Out[92]: [[0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0]]
+----
+
+// code cell end
+
+// code cell start uuid: 10ed3e78-fdc4-4adf-8f80-75eac48629a1
+[source, python]
+----
+In [93]: v[0] = 'Python'
+         m
+----
+
+----
+Out[93]: [[0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0],
+          [0.5, 0.75, 1.0, 1.5, 2.0]]
+----
+
+// code cell end
+
+
+==== Regular NumPy Arrays
+
+((("arrays", "regular NumPy arrays", id="ix_Anumpy", range="startofrange")))Obviously, composing array structures with +list+ objects works, somewhat. But it is not really convenient, and the +list+ class has not been built with this specific goal in mind. It has rather been built with a much broader and more general scope. From this point of view, some kind of specialized class could therefore be really beneficial to handle array-type structures.
+
+Such a specialized class is +numpy.ndarray+, which has been built with the specific goal of handling __n__-dimensional arrays both conveniently and efficiently--i.e., in a highly performing manner. The basic handling of instances of this class is again best illustrated by examples:
+
+// code cell start uuid: 434dc849-a224-49f3-af1c-466dc48c9258
+[source, python]
+----
+In [94]: import numpy as np
+----
+
+// code cell end
+
+// code cell start uuid: a58df3ba-f18e-459d-ac4d-6be84714a2a3
+[source, python]
+----
+In [95]: a = np.array([0, 0.5, 1.0, 1.5, 2.0])
+         type(a)
+----
+
+----
+Out[95]: numpy.ndarray
+----
+
+// code cell end
+
+// code cell start uuid: c6c73402-ed3b-4ea1-b62e-06dca996e713
+[source, python]
+----
+In [96]: a[:2]  # indexing as with list objects in 1 dimension
+----
+
+----
+Out[96]: array([ 0. ,  0.5])
+----
+
+// code cell end
+
+A major feature of the +numpy.ndarray+ class is the _multitude of built-in methods_. For instance:
+
+// code cell start uuid: f167bdb8-6673-4520-bd34-e2428ede6ad7
+[source, python]
+----
+In [97]: a.sum()  # sum of all elements
+----
+
+----
+Out[97]: 5.0
+----
+
+// code cell end
+
+// code cell start uuid: 0eafbb03-0cc4-4dd7-a177-9d8f2f8a32be
+[source, python]
+----
+In [98]: a.std()  # standard deviation
+----
+
+----
+Out[98]: 0.70710678118654757
+----
+
+// code cell end
+
+// code cell start uuid: 9eda9efe-4e85-4bc2-8df3-edd8ab40c7f2
+[source, python]
+----
+In [99]: a.cumsum()  # running cumulative sum
+----
+
+----
+Out[99]: array([ 0. ,  0.5,  1.5,  3. ,  5. ])
+----
+
+// code cell end
+
+Another major feature is the (vectorized) _mathematical operations_ defined on +ndarray+ objects:
+
+// code cell start uuid: 94ddb4ba-eb2b-4565-80cf-247db6dc5846
+[source, python]
+----
+In [100]: a * 2
+----
+
+----
+Out[100]: array([ 0.,  1.,  2.,  3.,  4.])
+----
+
+// code cell end
+
+// code cell start uuid: 5c5f7bd8-b48b-4e8e-b6c8-95b67c9deed0
+[source, python]
+----
+In [101]: a ** 2
+----
+
+----
+Out[101]: array([ 0.  ,  0.25,  1.  ,  2.25,  4.  ])
+----
+
+// code cell end
+
+// code cell start uuid: eccae4a8-18fc-4362-8089-faed41fe558a
+[source, python]
+----
+In [102]: np.sqrt(a)
+----
+
+----
+Out[102]: array([ 0.        ,  0.70710678,  1.        ,  1.22474487,  1.41421356
+          ])
+----
+
+// code cell end
+
+The transition to more than one dimension is seamless, and all features presented so far carry over to the more general cases. In particular, the indexing system is made consistent across all dimensions:
+
+// code cell start uuid: 3d05357c-109d-45c7-b10b-fe6c958fd33d
+[source, python]
+----
+In [103]: b = np.array([a, a * 2])
+          b
+----
+
+----
+Out[103]: array([[ 0. ,  0.5,  1. ,  1.5,  2. ],
+                 [ 0. ,  1. ,  2. ,  3. ,  4. ]])
+----
+
+// code cell end
+
+// code cell start uuid: e536d513-ddb7-469d-9ad4-3abbc5cbf006
+[source, python]
+----
+In [104]: b[0]  # first row
+----
+
+----
+Out[104]: array([ 0. ,  0.5,  1. ,  1.5,  2. ])
+----
+
+// code cell end
+
+// code cell start uuid: d1d0c7dd-aadb-4217-b3ea-927f28f51300
+[source, python]
+----
+In [105]: b[0, 2]  # third element of first row
+----
+
+----
+Out[105]: 1.0
+----
+
+// code cell end
+
+// code cell start uuid: 41b3d64b-6121-4578-b33c-f9bef4d23ddb
+[source, python]
+----
+In [106]: b.sum()
+----
+
+----
+Out[106]: 15.0
+----
+
+// code cell end
+
+In contrast to our +list+ object-based approach to constructing arrays, the +numpy.ndarray+ class knows axes explicitly. Selecting either rows or columns from a matrix is essentially the same:
+
+// code cell start uuid: ba56b01a-cf24-4bee-be04-cdadd59a6cb5
+[source, python]
+----
+In [107]: b.sum(axis=0)
+            # sum along axis 0, i.e. column-wise sum
+----
+
+----
+Out[107]: array([ 0. ,  1.5,  3. ,  4.5,  6. ])
+----
+
+// code cell end
+
+// code cell start uuid: 898c4a09-4488-4041-94a3-ea25cbd86637
+[source, python]
+----
+In [108]: b.sum(axis=1)
+            # sum along axis 1, i.e. row-wise sum
+----
+
+----
+Out[108]: array([  5.,  10.])
+----
+
+// code cell end
+
+There are a number of ways to initialize (instantiate) a +numpy.ndarray+ object. One is as presented before, via +np.array+. However, this assumes that all elements of the array are already available. In contrast, one would maybe like to have the +numpy.ndarray+ objects instantiated first to populate them later with results generated during the execution of code. To this end, we can use the following functions:
+
+// code cell start uuid: 6d7362b7-dda8-4961-8be1-96da9b1718cf
+[source, python]
+----
+In [109]: c = np.zeros((2, 3, 4), dtype='i', order='C')  # also: np.ones()
+          c
+----
+
+----
+Out[109]: array([[[0, 0, 0, 0],
+                  [0, 0, 0, 0],
+                  [0, 0, 0, 0]],
+          
+                 [[0, 0, 0, 0],
+                  [0, 0, 0, 0],
+                  [0, 0, 0, 0]]], dtype=int32)
+----
+
+// code cell end
+
+// code cell start uuid: 0d4862fd-4847-4dd7-b8cd-e6966bbd5913
+[source, python]
+----
+In [110]: d = np.ones_like(c, dtype='f16', order='C')  # also: np.zeros_like()
+          d
+----
+
+----
+Out[110]: array([[[ 1.0,  1.0,  1.0,  1.0],
+                  [ 1.0,  1.0,  1.0,  1.0],
+                  [ 1.0,  1.0,  1.0,  1.0]],
+          
+                 [[ 1.0,  1.0,  1.0,  1.0],
+                  [ 1.0,  1.0,  1.0,  1.0],
+                  [ 1.0,  1.0,  1.0,  1.0]]], dtype=float128)
+----
+
+// code cell end
+
+With all these functions we provide the following information:
+
+_++shape++_:: 
+Either an +int+, a sequence of ++int++s, or a reference to another +numpy.ndarray+
++dtype+ (optional):: 
+A ++numpy.dtype++—these are +NumPy+-specific data types for +numpy.ndarray+ objects
++order+ (optional):: 
+The order in which to store elements in memory: +C+ for +C+-like (i.e., row-wise) or +F+ for +Fortran+-like (i.e., column-wise)
+
+Here, it becomes obvious how +NumPy+ specializes the construction of arrays with the +numpy.ndarray+ class, in comparison to the +list+-based approach:
+
+ * The shape/length/size of the array is _homogenous_ across any given dimension.
+ * It only allows for a _single data type_ (+numpy.dtype+) for the whole array.
+
+
+The role of the +order+ parameter is discussed later in the chapter. <<numpy_dtypes>> provides an overview of +numpy.dtype+ objects (i.e., the basic data types +NumPy+ allows).
+
+[[numpy_dtypes]]
+.NumPy dtype objects
+[options="header, unbreakable"]
+|=======
+|dtype        |Description           | Example
+|+t+ |	Bit field                    | +t4+ (4 bits)
+|+b+ |	Boolean                      | +b+ (true or false)
+|+i+ |	Integer                      | +i8+ (64 bit)
+|+u+ |	Unsigned integer             | +u8+ (64 bit)
+|+f+ |	Floating point               | +f8+ (64 bit)
+|+c+ |	Complex floating point       | +c16+ (128 bit)
+|+O+ |	Object                       | +0+ (pointer to object)
+|+S+, +a+ |	String                       | +S24+ (24 characters)
+|+U+ |	Unicode                      | +U24+ (24 Unicode characters)
+|+V+ |	Other                        | +V12+ (12-byte data block)
+|=======
+
++NumPy+ provides a generalization of regular arrays that loosens at least the +dtype+ restriction, but let us stick with regular arrays for a moment and see what the specialization brings in terms of performance.
+
+As a simple exercise, suppose we want to generate a matrix/array of shape 5,000 &#xd7; 5,000 elements, populated with (pseudo)random, standard normally distributed numbers. We then want to calculate the sum of all elements. First, the pure +Python+ approach, where we make heavy use of +list+ comprehensions and functional programming methods as well as +lambda+ functions:
+
+// code cell start uuid: cec48eba-20fa-45f0-8cb1-621efd2ce89b
+[source, python]
+----
+In [111]: import random
+          I = 5000 
+----
+
+// code cell end
+
+// code cell start uuid: 7da2200d-66ff-4442-be83-8879cb48fbcd
+[source, python]
+----
+In [112]: %time mat = [[random.gauss(0, 1) for j in range(I)] for i in range(I)]
+            # a nested list comprehension
+----
+
+----
+Out[112]: CPU times: user 36.5 s, sys: 408 ms, total: 36.9 s
+          Wall time: 36.4 s
+          
+----
+
+// code cell end
+
+// code cell start uuid: 49ee3b79-8619-4ed3-a38b-2f2554f6434f
+[source, python]
+----
+In [113]: %time reduce(lambda x, y: x + y,      \
+               [reduce(lambda x, y: x + y, row) \
+                       for row in mat])
+----
+
+----
+Out[113]: CPU times: user 4.3 s, sys: 52 ms, total: 4.35 s
+          Wall time: 4.07 s
+          
+          678.5908519876674
+----
+
+// code cell end
+
+Let us now turn to +NumPy+ and see how the same problem is solved there. For convenience, the +NumPy+ sublibrary +random+ offers a multitude of functions to initialize a +numpy.ndarray+ object and populate it at the same time with (pseudo)random numbers:
+
+++++
+<?hard-pagebreak?>
+++++
+
+// code cell start uuid: 54eee40d-6dc6-490a-964a-9a7b2e0c8fd0
+[source, python]
+----
+In [114]: %time mat = np.random.standard_normal((I, I))
+----
+
+----
+Out[114]: CPU times: user 1.83 s, sys: 40 ms, total: 1.87 s
+          Wall time: 1.87 s
+          
+----
+
+// code cell end
+
+// code cell start uuid: 911c099e-6fc5-4c1e-bba2-e4eda476c808
+[source, python]
+----
+In [115]: %time mat.sum()
+----
+
+----
+Out[115]: CPU times: user 36 ms, sys: 0 ns, total: 36 ms
+          Wall time: 34.6 ms
+          
+          349.49777911439384
+----
+
+// code cell end
+
+We observe the following:
+
+Syntax:: Although we use several approaches to compact the pure +Python+ code, the +NumPy+ version is even more compact and readable.
+Performance:: The generation of the +numpy.ndarray+ object is roughly 20 times faster and the calculation of the sum is roughly 100 times faster than the respective operations in pure +Python+.
+
+.Using NumPy Arrays
+[TIP]
+====
+(((range="endofrange", startref="ix_Anumpy")))The use of +NumPy+ for array-based operations and algorithms generally results in compact, easily readable code and significant performance improvements over pure +Python+ code.
+====
+
+
+==== Structured Arrays
+
+(((arrays, structured arrays)))(((structured arrays)))The specialization of the +numpy.ndarray+ class obviously brings a number of really valuable benefits with it. However, a too-narrow specialization might turn out to be too large a burden to carry for the majority of array-based algorithms and applications. Therefore, +NumPy+ provides structured arrays that allow us to have different +NumPy+ data types _per column_, at least. What does "per column" mean? Consider the following initialization of a structured array object:
+
+// code cell start uuid: 15905219-d8fd-46f0-a1d9-2c2735d98b29
+[source, python]
+----
+In [116]: dt = np.dtype([('Name', 'S10'), ('Age', 'i4'),
+                         ('Height', 'f'), ('Children/Pets', 'i4', 2)])
+          s = np.array([('Smith', 45, 1.83, (0, 1)),
+                        ('Jones', 53, 1.72, (2, 2))], dtype=dt)
+          s
+----
+
+----
+Out[116]: array([('Smith', 45, 1.8300000429153442, [0, 1]),
+                 ('Jones', 53, 1.7200000286102295, [2, 2])], 
+                dtype=[('Name', 'S10'), ('Age', '<i4'), ('Height', '<f4'), ('Chi
+          ldren/Pets', '<i4', (2,))])
+----
+
+// code cell end
+
+In a sense, this construction comes quite close to the operation for initializing tables in a +SQL+ database. We have column names and column data types, with maybe some pass:[<phrase role="keep-together">additional</phrase>] information (e.g., maximum number of characters per +string+ object). The single columns can now be easily accessed by their names:
+
+// code cell start uuid: 9932654e-a73d-4cd6-a18e-5199f29efe44
+[source, python]
+----
+In [117]: s['Name']
+----
+
+----
+Out[117]: array(['Smith', 'Jones'], 
+                dtype='|S10')
+----
+
+// code cell end
+
+// code cell start uuid: 10dc3d78-b6dc-4bf0-a4f1-1a4315bf0f2f
+[source, python]
+----
+In [118]: s['Height'].mean()
+----
+
+----
+Out[118]: 1.7750001
+----
+
+// code cell end
+
+Having selected a specific row and record, respectively, the resulting objects mainly behave like +dict+ objects, where one can retrieve values via keys:
+
+// code cell start uuid: 1385e680-2a16-440d-a674-2ea5757fb41b
+[source, python]
+----
+In [119]: s[1]['Age']
+----
+
+----
+Out[119]: 53
+----
+
+// code cell end
+
+In summary, structured arrays are a generalization of the regular +numpy.ndarray+ object types in that the data type only has to be the same _per column_, as one is used to in the context of tables in +SQL+ databases. One advantage of structured arrays is that a single element of a column can be another multidimensional object and does not have to conform to the basic +NumPy+ data types.
+
+.Structured Arrays
+[TIP]
+====
+(((range="endofrange", startref="ix_Dnumpy")))(((range="endofrange", startref="ix_NPYds")))+NumPy+ provides, in addition to regular arrays, structured arrays that allow the description and handling of rather complex array-oriented data structures with a variety of different data types and even structures per (named) column. They bring +SQL+ table-like data structures to +Python+, with all the benefits of regular +numpy.ndarray+ objects (syntax, methods, performance).
+====
+
+
+=== Vectorization of Code
+
+(((vectorization, fundamental idea of)))Vectorization of code is a strategy to get more compact code that is possibly executed faster. The fundamental idea is to conduct an operation on or to apply a function to a complex object "at once" and not by iterating over the single elements of the object. In +Python+, the functional programming tools +map+, +filter+, and +reduce+ provide means for vectorization. In a sense, +NumPy+ has vectorization built in deep down in its core.
+
+
+==== Basic Vectorization
+
+(((vectorization, basic)))As we learned in the previous section, simple mathematical operations can be implemented on +numpy.ndarray+ objects directly. For example, we can add two ++NumPy++ arrays element-wise as follows:
+
+// code cell start uuid: 28bac5ac-be5d-4f60-acc6-f844259c5a22
+[source, python]
+----
+In [120]: r = np.random.standard_normal((4, 3))
+          s = np.random.standard_normal((4, 3))
+----
+
+// code cell end
+
+// code cell start uuid: 91d91253-168a-4ff2-8452-67e2cfd5c2f8
+[source, python]
+----
+In [121]: r + s
+----
+
+----
+Out[121]: array([[-1.94801686, -0.6855251 ,  2.28954806],
+                 [ 0.33847593, -1.97109602,  1.30071653],
+                 [-1.12066585,  0.22234207, -2.73940339],
+                 [ 0.43787363,  0.52938941, -1.38467623]])
+----
+
+// code cell end
+
+(((broadcasting)))+NumPy+ also supports what is called _broadcasting_. This allows us to combine objects of different shape within a single operation. We have already made use of this before. Consider the following example:
+
+// code cell start uuid: 305b5877-2410-48e0-b5d3-d7f2f384e953
+[source, python]
+----
+In [122]: 2 * r + 3
+----
+
+----
+Out[122]: array([[ 2.54691692,  1.65823523,  8.14636725],
+                 [ 4.94758114,  0.25648128,  1.89566919],
+                 [ 0.41775907,  0.58038395,  2.06567484],
+                 [ 0.67600205,  3.41004636,  1.07282384]])
+----
+
+// code cell end
+
+In this case, the +r+ object is multiplied by 2 element-wise and then 3 is added element-wise--the 3 is _broadcasted_ or _stretched_ to the shape of the +r+ object. It works with differently shaped arrays as well, up to a certain point:
+
+// code cell start uuid: dd5f63cb-da0f-4397-8d86-315d115d4029
+[source, python]
+----
+In [123]: s = np.random.standard_normal(3)
+          r + s
+----
+
+----
+Out[123]: array([[ 0.23324118, -1.09764268,  1.90412565],
+                 [ 1.43357329, -1.79851966, -1.22122338],
+                 [-0.83133775, -1.63656832, -1.13622055],
+                 [-0.70221625, -0.22173711, -1.63264605]])
+----
+
+// code cell end
+
+This broadcasts the one-dimensional array of size 3 to a shape of (4, 3). The same does not work, for example, with a one-dimensional array of size 4:
+
+// code cell start uuid: cc58e76c-c3b1-495b-9cbe-8fb3fa92a59d
+[source, python]
+----
+In [124]: s = np.random.standard_normal(4)
+          r + s
+----
+
+----
+Out[124]: ValueError
+          operands could not be broadcast together with shapes (4,3) (4,) 
+----
+
+// code cell end
+
+However, transposing the +r+ object makes the operation work again. In the following code, the +transpose+ method transforms the +ndarray+ object with shape (4, 3) into an object of the same type with shape (3, 4):
+
+// code cell start uuid: 011f4087-a2d6-4731-ac27-07f31d11f017
+[source, python]
+----
+In [125]: r.transpose() + s
+----
+
+----
+Out[125]: array([[-0.63380522,  0.5964174 ,  0.88641996, -0.86931849],
+                 [-1.07814606, -1.74913253,  0.9677324 ,  0.49770367],
+                 [ 2.16591995, -0.92953858,  1.71037785, -0.67090759]])
+----
+
+// code cell end
+
+// code cell start uuid: 88cab956-ec56-474e-8f2b-6c526da7d48c
+[source, python]
+----
+In [126]: np.shape(r.T)
+----
+
+----
+Out[126]: (3, 4)
+----
+
+// code cell end
+
+As a general rule, custom-defined +Python+ functions work with ++numpy.ndarray++s as well. If the implementation allows, arrays can be used with functions just as +int+ or +float+ objects can. Consider the following function:
+
+// code cell start uuid: 0f3b5cad-0146-4203-b158-238203ef5764
+[source, python]
+----
+In [127]: def f(x):
+              return 3 * x + 5
+----
+
+// code cell end
+
+We can pass standard +Python+ objects as well as +numpy.ndarray+ objects (for which the operations in the function have to be defined, of course):
+
+// code cell start uuid: 08b395e9-13fc-43c1-8bba-28c63a216366
+[source, python]
+----
+In [128]: f(0.5)  # float object
+----
+
+----
+Out[128]: 6.5
+----
+
+// code cell end
+
+// code cell start uuid: 1895e566-c5ee-4856-bca5-37fef37df0c5
+[source, python]
+----
+In [129]: f(r)  # NumPy array
+----
+
+----
+Out[129]: array([[  4.32037538,   2.98735285,  12.71955087],
+                 [  7.9213717 ,   0.88472192,   3.34350378],
+                 [  1.1266386 ,   1.37057593,   3.59851226],
+                 [  1.51400308,   5.61506954,   2.10923576]])
+----
+
+// code cell end
+
+What +NumPy+ does is to simply apply the function +f+ to the object element-wise. In that sense, by using this kind of operation we do _not_ avoid loops; we only avoid them on the +Python+ level and delegate the looping to +NumPy+. On the +NumPy+ level, looping over the +numpy.ndarray+ object is taken care of by highly optimized code, most of it written in +C+ and therefore generally much faster than pure +Python+. This explains the "secret" behind the performance benefits of using +NumPy+ for array-based use cases.
+
+When working with arrays, one has to take care to call the right functions on the respective objects. For example, the +sin+ function from the standard +math+ module of +Python+ does not work with +NumPy+ arrays:
+
+// code cell start uuid: 4087e02e-2fce-4656-8526-e13fa4fa2d96
+[source, python]
+----
+In [130]: import math
+          math.sin(r)
+----
+
+----
+Out[130]: TypeError
+          only length-1 arrays can be converted to Python scalars
+----
+
+// code cell end
+
+(((universal functions)))The function is designed to handle, for example, +float+ objects--i.e., single numbers, not arrays. +NumPy+ provides the respective counterparts as so-called _ufuncs_, or _universal functions_:
+
+// code cell start uuid: 11747287-8311-406e-afbe-6528f9aa94f1
+[source, python]
+----
+In [131]: np.sin(r)  # array as input
+----
+
+----
+Out[131]: array([[-0.22460878, -0.62167738,  0.53829193],
+                 [ 0.82702259, -0.98025745, -0.52453206],
+                 [-0.96114497, -0.93554821, -0.45035471],
+                 [-0.91759955,  0.20358986, -0.82124413]])
+----
+
+// code cell end
+
+// code cell start uuid: 0427534f-5b12-4de3-aee3-6bc5fba2051d
+[source, python]
+----
+In [132]: np.sin(np.pi)  # float as input
+----
+
+----
+Out[132]: 1.2246467991473532e-16
+----
+
+// code cell end
+
++NumPy+ provides a large number of such ufuncs that generalize typical mathematical functions to +numpy.ndarray+ objects.footnote:[Cf. http://docs.scipy.org/doc/numpy/reference/ufuncs.html for an overview.]
+
+.Universal Functions
+[CAUTION]
+====
+(((star import)))(((libraries, importing)))Be careful when using the +from library import *+ approach to importing. Such an approach can cause the +NumPy+ reference to the _ufunc_ +numpy.sin+ to be replaced by the reference to the +math+ function +math.sin+. You should, as a rule, import both libraries by name to avoid confusion: +import numpy as np; import math+. Then you can use +math.sin+ alongside +np.sin+.
+====
+
+
+==== Memory Layout
+
+(((vectorization, memory layout)))(((memory layout)))(((arrays, memory layout and)))When we first initialized +numpy.ndarray+ objects by using +numpy.zero+, we provided an optional argument for the memory layout. This argument specifies, roughly speaking, which elements of an array get stored in memory next to each other. When working with small arrays, this has hardly any measurable impact on the performance of array operations. However, when arrays get large the story is somewhat different, depending on the operations to be implemented on the arrays.
+
+To illustrate this important point for memory-wise handling of arrays in science and finance, consider the following construction of multidimensional +numpy.ndarray+ pass:[<phrase role='keep-together'>objects:</phrase>]
+
+// code cell start uuid: f34c0c3d-112d-4ac4-bd48-21df98096047
+[source, python]
+----
+In [133]: x = np.random.standard_normal((5, 10000000))
+          y = 2 * x + 3  # linear equation y = a * x + b
+          C = np.array((x, y), order='C')
+          F = np.array((x, y), order='F')
+          x = 0.0; y = 0.0  # memory cleanup
+----
+
+// code cell end
+
+// code cell start uuid: f3fb83da-569c-423b-911e-9a2078d385b8
+[source, python]
+----
+In [134]: C[:2].round(2)
+----
+
+----
+Out[134]: array([[[-0.51, -1.14, -1.07, ...,  0.2 , -0.18,  0.1 ],
+                  [-1.22,  0.68,  1.83, ...,  1.23, -0.27, -0.16],
+                  [ 0.45,  0.15,  0.01, ..., -0.75,  0.91, -1.12],
+                  [-0.16,  1.4 , -0.79, ..., -0.33,  0.54,  1.81],
+                  [ 1.07, -1.07, -0.37, ..., -0.76,  0.71,  0.34]],
+          
+                 [[ 1.98,  0.72,  0.86, ...,  3.4 ,  2.64,  3.21],
+                  [ 0.55,  4.37,  6.66, ...,  5.47,  2.47,  2.68],
+                  [ 3.9 ,  3.29,  3.03, ...,  1.5 ,  4.82,  0.76],
+                  [ 2.67,  5.8 ,  1.42, ...,  2.34,  4.09,  6.63],
+                  [ 5.14,  0.87,  2.27, ...,  1.48,  4.43,  3.67]]])
+----
+
+// code cell end
+
+Let's look at some really fundamental examples and use cases for both types of +ndarray+ objects:
+
+// code cell start uuid: a1a2af02-b1a0-4a41-a2e8-dd77b02ba796
+[source, python]
+----
+In [135]: %timeit C.sum()
+----
+
+----
+Out[135]: 10 loops, best of 3: 123 ms per loop
+          
+----
+
+// code cell end
+
+// code cell start uuid: 34e089f9-2877-48d5-b980-3a22949cb5e2
+[source, python]
+----
+In [136]: %timeit F.sum()
+----
+
+----
+Out[136]: 10 loops, best of 3: 123 ms per loop
+          
+----
+
+// code cell end
+
+When summing up all elements of the arrays, there is no performance difference between the two memory layouts. However, consider the following example with the C-like memory layout:
+
+// code cell start uuid: 9ccbdca7-b257-432b-b609-c2f31ff181e1
+[source, python]
+----
+In [137]: %timeit C[0].sum(axis=0)
+----
+
+----
+Out[137]: 10 loops, best of 3: 102 ms per loop
+          
+----
+
+// code cell end
+
+// code cell start uuid: c681dab3-43d5-4247-bca5-7bb7ae41d821
+[source, python]
+----
+In [138]: %timeit C[0].sum(axis=1)
+----
+
+----
+Out[138]: 10 loops, best of 3: 61.9 ms per loop
+          
+----
+
+// code cell end
+
+Summing five large vectors and getting back a single large results vector obviously is slower in this case than summing 10,000,000 small ones and getting back an equal number of results. This is due to the fact that the single elements of the small vectors--i.e., the __rows__—are stored next to each other. With the +Fortran+-like memory layout, the relative performance changes considerably:
+
+// code cell start uuid: da5381da-b137-4da9-93f4-47d94f27b81d
+[source, python]
+----
+In [139]: %timeit F.sum(axis=0)
+----
+
+----
+Out[139]: 1 loops, best of 3: 801 ms per loop
+          
+----
+
+// code cell end
+
+// code cell start uuid: b31c6c3e-d720-4641-a6f9-8591b51b712e
+[source, python]
+----
+In [140]: %timeit F.sum(axis=1)
+----
+
+----
+Out[140]: 1 loops, best of 3: 2.23 s per loop
+          
+----
+
+// code cell end
+
+// code cell start uuid: 89201348-9a27-4883-b6b9-5f1caf291b61
+[source, python]
+----
+In [141]: F = 0.0; C = 0.0  # memory cleanup
+----
+
+// code cell end
+
+In this case, operating on a few large vectors performs better than operating on a large number of small ones. The elements of the few large vectors are stored in memory next to each other, which explains the relative performance advantage. However, overall the operations are absolutely much slower when compared to the +C+-like variant.
+
+
+=== Conclusions
+
++Python+ provides, in combination with +NumPy+, a rich set of flexible data structures. From a finance point of view, the following can be considered the most important ones:
+
+++++
+<?hard-pagebreak?>
+++++
+
+Basic data types:: 
+In finance, the classes +int+, +float+, and +string+ provide the atomic data types.
+Standard data structures:: 
+The classes +tuple+, +list+, +dict+, and +set+ have many application areas in finance, with +list+ being the most flexible workhorse in general.
+Arrays:: 
+A large class of finance-related problems and algorithms can be cast to an array setting; +NumPy+ provides the specialized class +numpy.ndarray+, which provides both convenience and compactness of code as well as high performance.
+
+This chapter shows that both the basic data structures and the +NumPy+ ones allow for highly vectorized implementation of algorithms. Depending on the specific shape of the data structures, care should be taken with regard to the memory layout of arrays. Choosing the right approach here can speed up code execution by a factor of two pass:[<phrase role='keep-together'>or more.</phrase>]
+
+
+=== Further Reading
+
+This chapter focuses on those issues that might be of particular importance for finance algorithms and applications. However, it can only represent a starting point for the exploration of data structures and data modeling in +Python+. There are a number of valuable resources available to go deeper from here.
+
+Here are some Internet resources to consult:
+
+ * The +Python+ documentation is always a good starting point: http://www.python.org/doc/[].
+ * For details on +NumPy+ arrays as well as related methods and functions, see http://docs.scipy.org/doc/[].
+ * The +SciPy+ lecture notes are also a good source to get started: http://scipy-lectures.github.io/[].
+
+Good references in book form are:
+
+ * Goodrich, Michael et al. (2013): _Data Structures and Algorithms in Python._ John Wiley & Sons, Hoboken, NJ.
+ * Langtangen, Hans Petter (2009): _A Primer on Scientific Programming with Python_. Springer Verlag, Berlin, Heidelberg.
+

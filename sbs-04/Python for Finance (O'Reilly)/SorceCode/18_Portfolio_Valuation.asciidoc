@@ -1,0 +1,719 @@
+[[portfolio_valuation]]
+== Portfolio Valuation
+
+[quote, Warren Buffet]
+____
+[role="align_me_right"]
+Price is what you pay. Value is what you get.
+____
+
+((("derivatives analytics library", "portfolio valuation", id="ix_DALport", range="startofrange")))(((derivatives analytics library, modularization offered by)))(((portfolio valuation, benefits of analytics library for)))((("analytics", "derivatives analytics library", "portfolio valuation", id="ix_ALport", range="startofrange")))(((analytics, derivatives analytics library, modularization offered by)))By now, the whole approach for building the +DX+ derivatives analytics library--and its associated benefits--should be rather clear. By strictly relying on Monte Carlo simulation as the only numerical method, we accomplish an almost complete modularization of the analytics library:
+
+Discounting:: 
+    The relevant risk-neutral discounting is taken 
+    care of by an instance of the 
+    +constant_short_rate+ class.
+Relevant data:: 
+    Relevant data, parameters, and other input are 
+    stored in (several) instances of the 
+    +market_environment+ class.
+Simulation objects:: 
+    Relevant risk factors (underlyings) are modeled as 
+    instances of one of three simulation classes:
+** +geometric_brownian_motion+
+** +jump_diffusion+
+** +square_root_diffusion+
+Valuation objects:: 
+    Options and derivatives to be valued are modeled 
+    as instances of one of two valuation classes:
+** +valuation_mcs_european+
+** +valuation_mcs_american+
+
+(((portfolio valuation, requirements for complex portfolios)))One last step is missing: the valuation of possibly complex _portfolios_ of options and derivatives. To this end, we require the following:
+
+Nonredundancy:: 
+    Every risk factor (underlying) is modeled only 
+    once and potentially used by multiple valuation 
+    objects.
+Correlations:: 
+    Correlations between risk factors have to be 
+    accounted for.
+Positions:: 
+    An options position, for example, can consist of 
+    certain multiples of an options contract.
+
+However, although we have in principle allowed (and even required) providing a currency for both simulation and valuation objects, we assume that we value portfolios denominated in a _single currency_ only. This simplifies the aggregation of values within a portfolio significantly, because we can abstract from exchange rates and currency risks.
+
+The chapter presents two new classes: a simple one to model a _derivatives position_, and a more complex one to model and value a _derivatives portfolio_.
+
+=== Derivatives Positions
+
+((("portfolio valuation", "derivatives positions", id="ix_PVder", range="startofrange")))(((derivatives positions, definition of)))In principle, a _derivatives position_ is nothing more than a combination of a valuation object and a quantity for the instrument modeled.
+
+==== The Class
+
+(((derivatives positions, modeling class)))(((get_info method)))(((classes, to model derivatives positions)))<<derivatives_position>> presents the class to model a derivatives position. It is mainly a container for other data and objects. In addition, it provides a +get_info+ method, printing the data and object information stored in an instance of the class.
+
+[[derivatives_position]]
+.A simple class to model a derivatives position
+====
+[source, python]
+----
+include::python/dx/derivatives_position.py[]
+----
+====
+
+To define a derivatives position we need to provide the following information, which is almost the same as for the instantiation of a valuation class:
+
++name+:: 
+Name of the position as a +string+ object
++quantity+:: 
+Quantity of options/derivatives
++underlying+:: 
+Instance of simulation object as a risk factor
++mar_env+:: 
+Instance of +market_environment+
++otype+:: 
++string+, either "European" or "American"
++payoff_func+:: 
+Payoff as a +Python+ +string+ object
+
+==== A Use Case
+
+(((derivatives positions, use case)))The following interactive session illustrates the use of the class. However, we need to first define a simulation object--but not in full; only the most important, object-specific information is needed. Here, we basically stick to the numerical examples from the previous two chapters:
+
+// code cell start uuid: 0720284c-d9fc-4a76-bff3-7373420ca55f
+[source, python]
+----
+In [1]: from dx import *
+----
+
+// code cell end
+
+For the definition of the derivatives position, we do not need a "full" +market_environment+ object. Missing information is provided later (during the portfolio valuation), when the simulation object is instantiated:
+
+// code cell start uuid: e8dd1dab-4016-42e2-902d-768893a8326a
+[source, python]
+----
+In [2]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: b4701539-0f48-46c2-92c4-e53ce76c1709
+[source, python]
+----
+In [3]: me_gbm.add_constant('initial_value', 36.)
+        me_gbm.add_constant('volatility', 0.2)
+        me_gbm.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+However, for the portfolio valuation, one additional constant is needed--namely, for the _model_ to be used. This will become clear in the subsequent section:
+
+// code cell start uuid: c0d5b784-2f9a-4555-bfa8-e1b493b0ea55
+[source, python]
+----
+In [4]: me_gbm.add_constant('model', 'gbm')
+----
+
+// code cell end
+
+With the simulation object available, we can proceed to define a derivatives position as follows:
+
+// code cell start uuid: 3e019369-eabf-4eda-9ce1-cced53811195
+[source, python]
+----
+In [5]: from derivatives_position import derivatives_position
+----
+
+// code cell end
+
+// code cell start uuid: fef74c23-8b96-4a73-b85e-7912deff4988
+[source, python]
+----
+In [6]: me_am_put = market_environment('me_am_put', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: ddae5c18-69a0-449b-9c5f-029e077efdd7
+[source, python]
+----
+In [7]: me_am_put.add_constant('maturity', dt.datetime(2015, 12, 31))
+        me_am_put.add_constant('strike', 40.)
+        me_am_put.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+// code cell start uuid: 54ca0404-f5e1-41de-8b17-a98b65e3414c
+[source, python]
+----
+In [8]: payoff_func = 'np.maximum(strike - instrument_values, 0)'
+----
+
+// code cell end
+
+// code cell start uuid: 0db2d4a1-fa79-4dfc-a464-38763d1fc107
+[source, python]
+----
+In [9]: am_put_pos = derivatives_position(
+                     name='am_put_pos',
+                     quantity=3,
+                     underlying='gbm',
+                     mar_env=me_am_put,
+                     otype='American',
+                     payoff_func=payoff_func)
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_PVder")))Information about such an object is provided by the +get_info+ method:
+
+// code cell start uuid: 39c28a56-0ed1-47d2-8cab-077796b514da
+[source, python]
+----
+In [10]: am_put_pos.get_info()
+----
+
+----
+Out[10]: NAME
+         am_put_pos 
+         
+         QUANTITY
+         3 
+         
+         UNDERLYING
+         gbm 
+         
+         MARKET ENVIRONMENT
+         
+         **Constants**
+         strike 40.0
+         maturity 2015-12-31 00:00:00
+         currency EUR
+         
+         **Lists**
+         
+         **Curves**
+         
+         OPTION TYPE
+         American 
+         
+         PAYOFF FUNCTION
+         np.maximum(strike - instrument_values, 0)
+         
+----
+
+// code cell end
+
+
+=== Derivatives Portfolios
+
+
+((("portfolio valuation", "derivatives portfolios", id="ix_PVport", range="startofrange")))(((derivatives portfolios, relevant market for)))(((general market model)))(((Fundamental Theorem of Asset Pricing)))From a portfolio perspective, a "relevant market" is mainly composed of the relevant risk factors (underlyings) and their correlations, as well as the derivatives and derivatives positions, respectively, to be valued. Theoretically, we are now dealing with a general market model &#x2133; as defined in <<valuation_framework>>, and applying the Fundamental Theorem of Asset Pricing (with its corollaries) to it.footnote:[In practice, the approach we choose here is sometimes called _global valuation_ instead of _instrument-specific valuation_. Cf. the article by Albanese, Gimonet, and White (2010a) in _Risk Magazine_.]
+
+==== The Class
+
+(((derivatives portfolios, class for valuation)))(((classes, to model derivatives portfolios)))A somewhat complex +Python+ class implementing a _portfolio valuation_ based on the Fundamental Theorem of Asset Pricing--taking into account multiple relevant risk factors and multiple derivatives positions--is presented as <<derivatives_portfolio>>. The class is rather comprehensively documented inline, especially during passages that implement functionality specific to the purpose at hand.
+
+
+[[derivatives_portfolio]]
+.A class to value a derivatives portfolio
+====
+[source, python]
+----
+include::python/dx/derivatives_portfolio.py[]
+----
+====
+
+==== A Use Case
+
+((("derivatives portfolios", "use case", id="ix_DPuse", range="startofrange")))In terms of the +DX+ analytics library, the modeling capabilities are, on a high level, restricted to a combination of a simulation and a valuation class. There are a total of six possible combinations:
+
+[source, python]
+----
+models = {'gbm' : geometric_brownian_motion,
+          'jd' : jump_diffusion
+          'srd': square_root_diffusion}
+
+otypes = {'European' : valuation_mcs_european,
+          'American' : valuation_mcs_american}
+----
+
+
+
+In the interactive use case that follows, we combine selected elements to define two different derivatives positions that we then combine into a portfolio.
+
+We build on the use case for the +derivatives_position+ class with the +gbm+ and +am_put_pos+ objects from the previous section. To illustrate the use of the +derivatives_portfolio+ class, let us define both an additional underlying and an additional options position. First, a +jump_diffusion+ object:
+
+// code cell start uuid: a7f7a55f-cf66-457a-ba2f-9c9f15697d98
+[source, python]
+----
+In [11]: me_jd = market_environment('me_jd', me_gbm.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 4c2da9df-820c-49bb-9da0-fa212aa8ac40
+[source, python]
+----
+In [12]: # add jump diffusion-specific parameters
+         me_jd.add_constant('lambda', 0.3)
+         me_jd.add_constant('mu', -0.75)
+         me_jd.add_constant('delta', 0.1)
+         # add other parameters from gbm
+         me_jd.add_environment(me_gbm)
+----
+
+// code cell end
+
+// code cell start uuid: 6f93e1aa-7ccb-4434-b79e-2357bb056fc9
+[source, python]
+----
+In [13]: # needed for portfolio valuation
+         me_jd.add_constant('model', 'jd')
+----
+
+// code cell end
+
+Second, a European call option based on this new simulation object:
+
+// code cell start uuid: 178e550a-e040-4ac8-9ad8-e3bbf4fdc50d
+[source, python]
+----
+In [14]: me_eur_call = market_environment('me_eur_call', me_jd.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 08c13651-9fbf-44bf-b9a9-e94409a6e891
+[source, python]
+----
+In [15]: me_eur_call.add_constant('maturity', dt.datetime(2015, 6, 30))
+         me_eur_call.add_constant('strike', 38.)
+         me_eur_call.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+// code cell start uuid: c62a77e4-a502-4ceb-a5a3-9b3ec2be7d72
+[source, python]
+----
+In [16]: payoff_func = 'np.maximum(maturity_value - strike, 0)'
+----
+
+// code cell end
+
+// code cell start uuid: f1cb96fa-385a-41d6-b68d-1f80c9590370
+[source, python]
+----
+In [17]: eur_call_pos = derivatives_position(
+                      name='eur_call_pos',
+                      quantity=5,
+                      underlying='jd',
+                      mar_env=me_eur_call,
+                      otype='European',
+                      payoff_func=payoff_func)
+----
+
+// code cell end
+
+From a portfolio perspective, the relevant market now is:
+
+// code cell start uuid: e8df55ac-a860-4dd6-88f2-c4aa15e323f9
+[source, python]
+----
+In [18]: underlyings = {'gbm': me_gbm, 'jd' : me_jd}
+         positions = {'am_put_pos' : am_put_pos, 'eur_call_pos' : eur_call_pos}
+----
+
+// code cell end
+
+For the moment we abstract from correlations between the underlyings. Compiling a +market_environment+ for the portfolio valuation is the last step before we can instantiate a +derivatives_portfolio+ class:
+
+// code cell start uuid: 38a7b06d-9923-4729-bbaf-184b55930d69
+[source, python]
+----
+In [19]: # discounting object for the valuation
+         csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: d8ecc803-4ea8-45b4-975f-88e716a171e6
+[source, python]
+----
+In [20]: val_env = market_environment('general', me_gbm.pricing_date)
+         val_env.add_constant('frequency', 'W')
+           # monthly frequency
+         val_env.add_constant('paths', 25000)
+         val_env.add_constant('starting_date', val_env.pricing_date)
+         val_env.add_constant('final_date', val_env.pricing_date)
+           # not yet known; take pricing_date temporarily
+         val_env.add_curve('discount_curve', csr)
+           # select single discount_curve for whole portfolio
+----
+
+// code cell end
+
+// code cell start uuid: 1f533a99-c881-4628-befe-ce63bbfdaafd
+[source, python]
+----
+In [21]: from derivatives_portfolio import derivatives_portfolio
+----
+
+// code cell end
+
+// code cell start uuid: 7a231d26-ec5f-4b0f-8c2e-d5ee4b93f0c4
+[source, python]
+----
+In [22]: portfolio = derivatives_portfolio(
+                         name='portfolio',
+                         positions=positions,
+                         val_env=val_env,
+                         assets=underlyings,
+                         fixed_seed=True)
+----
+
+// code cell end
+
+Now we can harness the power of the valuation class and get a bunch of different statistics for the +derivatives_portfolio+ object just defined:
+
+// code cell start uuid: ec163641-6908-4fc8-bb75-95483021f1b4
+[source, python]
+----
+In [23]: portfolio.get_statistics()
+----
+
+----
+Out[23]:             
+            name    quant.     value   curr.   pos_value   pos_delta   pos_vega
+0   eur_call_pos        5   2.814638     EUR   14.073190      3.3605    42.7900
+1     am_put_pos        3   4.472021     EUR   13.416063     -2.0895    30.5181
+----
+
+// code cell end
+
+The _sum_ of the position values, Deltas, and Vegas is also easily calculated. This portfolio is slightly long Delta (almost neutral) and long Vega:
+
+// code cell start uuid: 97aebfec-ec91-4d6b-af5f-ff36c5300122
+[source, python]
+----
+In [24]: portfolio.get_statistics()[['pos_value', 'pos_delta', 'pos_vega']].sum()
+           # aggregate over all positions
+----
+
+----
+Out[24]: pos_value    27.489253
+         pos_delta     1.271000
+         pos_vega     73.308100
+         dtype: float64
+----
+
+// code cell end
+
+A complete overview of all positions is conveniently obtained by the +get_positions+ method--such output can, for example, be used for reporting purposes (but is omitted here due to reasons of space):
+
+// code cell start uuid: 2448b331-3d97-4358-a07b-453dc15659f8
+[source, python]
+----
+In [25]: portfolio.get_positions()
+----
+
+// code cell end
+
+Of course, you can also access and use all (simulation, valuation, etc.) objects of the +derivatives_portfolio+ object in direct fashion:
+
+// code cell start uuid: aa0c765f-2e15-4e74-a46e-ed8e7c43e825
+[source, python]
+----
+In [26]: portfolio.valuation_objects['am_put_pos'].present_value()
+----
+
+----
+Out[26]: 4.450573
+----
+
+// code cell end
+
+// code cell start uuid: ea398cfa-fb40-4ed8-b9bf-c067d135fe11
+[source, python]
+----
+In [27]: portfolio.valuation_objects['eur_call_pos'].delta()
+----
+
+----
+Out[27]: 0.6498
+----
+
+// code cell end
+
+This derivatives portfolio valuation is conducted based on the assumption that the risk factors are _not_ correlated. This is easily verified by inspecting two simulated paths, one for each simulation object:
+
+// code cell start uuid: f8a828ff-4fc9-40b4-8dee-f3b27035978b
+[source, python]
+----
+In [28]: path_no = 777
+         path_gbm = portfolio.underlying_objects['gbm'].get_instrument_values()[
+                                                                     :, path_no]
+         path_jd = portfolio.underlying_objects['jd'].get_instrument_values()[
+                                                                     :, path_no]
+----
+
+// code cell end
+
+<<dx_portfolio_1>> shows the selected paths in direct comparison--no jump occurs for the jump diffusion:
+
+// code cell start uuid: 01f6d3d3-3459-4d94-abfc-ac6fbf887671
+[source, python]
+----
+In [29]: import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: 9cd814c6-2762-489a-b926-883a078f0142
+[source, python]
+----
+In [30]: plt.figure(figsize=(7, 4))
+         plt.plot(portfolio.time_grid, path_gbm, 'r', label='gbm')
+         plt.plot(portfolio.time_grid, path_jd, 'b', label='jd')
+         plt.xticks(rotation=30)
+         plt.legend(loc=0); plt.grid(True)
+----
+
+[[dx_portfolio_1]]
+.Noncorrelated risk factors
+image::images/pyfi_1801.png[]
+
+// code cell end
+
+Now consider the case where the two risk factors are highly positively correlated:
+
+// code cell start uuid: 873e0a44-470b-4fc6-ab12-956de039b21e
+[source, python]
+----
+In [31]: correlations = [['gbm', 'jd', 0.9]]
+----
+
+// code cell end
+
+With this additional information, a new +derivatives_portfolio+ object is to be pass:[<phrase role="keep-together">instantiated</phrase>]:
+
+// code cell start uuid: 3f517f85-6cd4-431f-9a86-51956d712576
+[source, python]
+----
+In [32]: port_corr = derivatives_portfolio(
+                         name='portfolio',
+                         positions=positions,
+                         val_env=val_env,
+                         assets=underlyings,
+                         correlations=correlations,
+                         fixed_seed=True)
+----
+
+// code cell end
+
+In this case, there is no direct influence on the values of the positions in the portfolio:
+
+// code cell start uuid: be0fe6c4-3f67-4091-aabb-110043f3b2b2
+[source, python]
+----
+In [33]: port_corr.get_statistics()
+----
+
+----
+Out[33]:             
+            name   quant.      value   curr.    pos_value   pos_delta   pos_vega
+0   eur_call_pos        5   2.804464    EUR     14.022320      3.3760    42.3500
+1     am_put_pos        3   4.458565    EUR     13.375695     -2.0313    30.1416
+----
+
+// code cell end
+
+However, the correlation takes place behind the scenes. For the graphical illustration, we take the same two paths as before:
+
+// code cell start uuid: c3f911fc-b3f5-4fd2-bf53-d45cbb78e67b
+[source, python]
+----
+In [34]: path_gbm = port_corr.underlying_objects['gbm'].\
+                     get_instrument_values()[:, path_no]
+         path_jd = port_corr.underlying_objects['jd'].\
+                     get_instrument_values()[:, path_no]
+----
+
+// code cell end
+
+<<dx_portfolio_2>> now shows a development almost in perfect parallelism between the two risk factors:
+
+// code cell start uuid: e2b1e218-8908-42e9-a9c7-8dc0c58a95c1
+[source, python]
+----
+In [35]: plt.figure(figsize=(7, 4))
+         plt.plot(portfolio.time_grid, path_gbm, 'r', label='gbm')
+         plt.plot(portfolio.time_grid, path_jd, 'b', label='jd')
+         plt.xticks(rotation=30)
+         plt.legend(loc=0); plt.grid(True)
+----
+
+[[dx_portfolio_2]]
+.Highly correlated risk factors
+image::images/pyfi_1802.png[]
+
+// code cell end
+
+(((frequency distribution)))As a last numerical and conceptual example, consider the _frequency distribution of the portfolio present value_. This is something impossible to generate in general with other approaches, like the application of analytical formulae or the binomial option pricing model. We get the complete set of present values per option position by calculating a present value and passing the parameter flag +full=True+:
+
+// code cell start uuid: b63e4652-8346-4869-b914-d24eb0dc2859
+[source, python]
+----
+In [36]: pv1 = 5 * port_corr.valuation_objects['eur_call_pos'].\
+                     present_value(full=True)[1]
+         pv1
+----
+
+----
+Out[36]: array([  0.        ,  22.55857473,   8.2552922 , ...,   0.        ,
+                  0.        ,   0.        ])
+----
+
+// code cell end
+
+// code cell start uuid: 576bfd63-e355-4357-b065-6118a4ed443c
+[source, python]
+----
+In [37]: pv2 = 3 * port_corr.valuation_objects['am_put_pos'].\
+                     present_value(full=True)[1]
+         pv2
+----
+
+----
+Out[37]: array([ 22.04450095,  10.90940926,  20.25092898, ...,  21.68232889,
+                 17.7583897 ,   0.        ])
+----
+
+// code cell end
+
+First, we compare the frequency distribution of the two positions. The payoff profiles of the two positions, as displayed in <<dx_portfolio_3>>, are quite different. Note that we limit both the x- and y-axes for better readability:
+
+// code cell start uuid: 360ae17d-f0af-466e-8777-ed91c10ea9c0
+[source, python]
+----
+In [38]: plt.hist([pv1, pv2], bins=25,
+                  label=['European call', 'American put']);
+         plt.axvline(pv1.mean(), color='r', ls='dashed',
+                     lw=1.5, label='call mean = %4.2f' % pv1.mean())
+         plt.axvline(pv2.mean(), color='r', ls='dotted',
+                     lw=1.5, label='put mean = %4.2f' % pv2.mean())
+         plt.xlim(0, 80); plt.ylim(0, 10000)
+         plt.grid(); plt.legend()
+----
+
+[[dx_portfolio_3]]
+.Portfolio frequency distribution of present values
+image::images/pyfi_1803.png[]
+
+// code cell end
+
+The following figure finally shows the full frequency distribution of the portfolio present values. You can clearly see in <<dx_portfolio_4>> the offsetting diversification effects of combining a call with a put option:
+
+// code cell start uuid: 2a8e9d9b-9ca0-4712-85e9-c60f7ccfedda
+[source, python]
+----
+In [39]: pvs = pv1 + pv2
+         plt.hist(pvs, bins=50, label='portfolio');
+         plt.axvline(pvs.mean(), color='r', ls='dashed',
+                     lw=1.5, label='mean = %4.2f' % pvs.mean())
+         plt.xlim(0, 80); plt.ylim(0, 7000)
+         plt.grid(); plt.legend()
+----
+
+[[dx_portfolio_4]]
+.Portfolio frequency distribution of present values
+image::images/pyfi_1804.png[]
+
+// code cell end
+
+What impact does the correlation between the two risk factors have on the risk of the portfolio, measured in the standard deviation of the present values? The statistics for the portfolio with correlation are easily calculated as follows:
+
+// code cell start uuid: efe62b9f-d697-4df6-b24d-72e10aace480
+[source, python]
+----
+In [40]: # portfolio with correlation
+         pvs.std()
+----
+
+----
+Out[40]: 16.736290069957963
+----
+
+// code cell end
+
+Similarly, for the portfolio without correlation, we have:
+
+// code cell start uuid: ab3fca10-4a3e-4f1b-9d07-379edf9409e9
+[source, python]
+----
+In [41]: # portfolio without correlation
+         pv1 = 5 * portfolio.valuation_objects['eur_call_pos'].\
+                     present_value(full=True)[1]
+         pv2 = 3 * portfolio.valuation_objects['am_put_pos'].\
+                     present_value(full=True)[1]
+         (pv1 + pv2).std()
+----
+
+----
+Out[41]: 21.71542409437863
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DALport")))(((range="endofrange", startref="ix_PVport")))(((range="endofrange", startref="ix_DPuse")))(((range="endofrange", startref="ix_ALport")))Although the mean value stays constant (ignoring numerical deviations), correlation obviously significantly decreases the portfolio risk when measured in this way. Again, this is an insight that it is not really possible to gain when using alternative numerical methods or valuation approaches.
+
+=== Conclusions
+
+This chapter addresses the valuation and risk management of a portfolio of multiple derivatives positions dependent on multiple, possibly correlated, risk factors. To this end, a new class called +derivatives_position+ is introduced to model an options/derivatives position. The main focus, however, lies on the +derivatives_portfolio+ class, which implements some rather complex tasks. For example, the class takes pass:[<phrase role="keep-together">care of</phrase>]:
+
+* __Correlations__ between risk factors (the class generates a single, consistent set of random numbers for the simulation of all risk factors)
+* __Instantiation of simulation objects__ given the single market environments and the general valuation environment, as well as the derivatives positions
+* __Generation of portfolio statistics__ based on all the assumptions, the risk factors involved, and the terms of the derivatives positions
+
+(((derivatives analytics library, extensions to)))(((analytics, derivatives analytics library, extensions to)))The examples presented in this chapter can only show some simple versions of derivatives portfolios that can be managed and valued with the +DX+ library and the +derivatives_portfolio+ class. Natural extensions to the +DX+ library would be the addition of more _sophisticated financial models_, like a stochastic volatility model, and the addition of _multirisk valuation classes_ to model and value derivatives dependent on multiple risk factors, like a European basket option or an American maximum call option, to name just two. At this stage, the modular modeling and the application of a valuation framework as general as the Fundamental Theorem of Asset Pricing (or "Global Valuation") plays out its strengths: the nonredundant modeling of the risk factors and the accounting for the correlations between them will then also have a direct influence on the values and Greeks of multirisk derivatives.
+
+<<dx_modules>> is a final, brief wrapper module bringing all components of the +DX+ analytics library together for a single +import+ statement.
+
+[[dx_modules]]
+.The final wrapper module bringing all DX components together
+====
+[source, python]
+----
+include::python/dx/dx_library.py[]
+----
+====
+
+Also, the now-complete +init+ file for the +dx+ directory is in <<dx_lib_4>>.
+
+[[dx_lib_4]]
+.Final Python packaging file
+====
+[source, python]
+----
+include::python/dx/__init__.py[]
+----
+====
+
+=== Further Reading
+
+As for the preceding chapters on the +DX+ derivatives analytics library, Glasserman (2004) is a comprehensive resource for Monte Carlo simulation in the context of financial engineering and applications. Hilpisch (2015) also provides +Python+-based implementations of the most important Monte Carlo algorithms:
+
+* Glasserman, Paul (2004): _Monte Carlo Methods in Financial Engineering_. Springer, New York.
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://derivatives-analytics-with-python.com[].
+
+However, there is hardly any research available when it comes to the valuation of (complex) portfolios of derivatives in a consistent, nonredundant fashion by Monte Carlo simulation. A notable exception, at least from a conceptual point of view, is the brief article by Albanese, Gimonet, and White (2010a). A bit more detailed is the white paper by the same team of authors:
+
+* Albanese, Claudio, Guillaume Gimonet, and Steve White (2010a): "Towards a Global Valuation Model." _Risk Magazine_, May issue. http://bit.ly/risk_may_2010.
+* Albanese, Claudio, Guillaume Gimonet, and Steve White (2010b): "Global Valuation and Dynamic Risk Management." http://www.albanese.co.uk/Global_Valuation_and_Dynamic_Risk_Management.pdf[].

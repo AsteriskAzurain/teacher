@@ -1,0 +1,1945 @@
+[[performance_python]]
+
+
+==  
+
+[quote, Ralph Marston]
+____
+[role="align_me_right"]
+Don't lower your expectations to meet your performance. pass:[<phrase role='keep-together'>Raise your level of performance to meet your expectations.</phrase>]
+____
+
+When it comes to performance-critical applications two things should always be checked: are we using the right _implementation paradigm_ and are we using the right _performance libraries_? A number of performance libraries can be used to speed up the execution of +Python+ code. Among others, you will find the following libraries useful, all of which are presented in this chapter (although in a different order):
+
+* ++Cython++, for merging +Python+ with +C+ paradigms for static compilation
+* ++IPython.parallel++, for the parallel execution of code/functions locally or over a cluster
+* ++numexpr++, for fast numerical operations
+* ++multiprocessing++, ++Python++'s built-in module for (local) parallel processing
+* ++Numba++, for dynamically compiling +Python+ code for the CPU
+* ++NumbaPro++, for dynamically compiling +Python+ code for multicore CPUs and GPUs
+
+Throughout this chapter, we compare the performance of different implementations of the same algorithms. To make the comparison a bit easier, we define a convenience function that allows us to systematically compare the performance of different functions executed on the same or different data sets:
+
+// code cell start uuid: 0e214dc5-2294-4526-847b-02d2b0b8ecf3
+[source, python]
+----
+In [1]: def perf_comp_data(func_list, data_list, rep=3, number=1):
+            ''' Function to compare the performance of different functions.
+        
+            Parameters
+            ==========
+            func_list : list
+                list with function names as strings
+            data_list : list
+                list with data set names as strings
+            rep : int
+                number of repetitions of the whole comparison
+            number : int
+                number of executions for every function
+            '''
+            from timeit import repeat
+            res_list = {}
+            for name in enumerate(func_list):
+                stmt = name[1] + '(' + data_list[name[0]] + ')'
+                setup = "from __main__ import " + name[1] + ', ' \
+                                            + data_list[name[0]]
+                results = repeat(stmt=stmt, setup=setup,
+                                 repeat=rep, number=number)
+                res_list[name[1]] = sum(results) / rep
+            res_sort = sorted(res_list.iteritems(),
+                              key=lambda (k, v): (v, k))
+            for item in res_sort:
+                rel = item[1] / res_sort[0][1]
+                print 'function: ' + item[0] + \
+                      ', av. time sec: %9.5f, ' % item[1] \
+                    + 'relative: %6.1f' % rel
+----
+
+// code cell end
+
+
+=== Python Paradigms and Performance
+
+(((performance computing, Python paradigms and)))In finance, like in other scientific and data-intensive disciplines, numerical computations on large data sets can be quite time-consuming. As an example, we want to evaluate a somewhat complex mathematical expression on an array with 500,000 numbers. We choose the expression in <<num_expr>>, which leads to some computational burden per calculation. Apart from that, it does not have any specific meaning.
+
+[[num_expr]]
+[latexmath]
+.Example mathematical expression
+++++
+\begin{equation}
+y = \sqrt{|\cos(x)|} + \sin(2 + 3x)
+\end{equation}
+++++
+
+<<num_expr>> is easily translated into a +Python+ function:
+
+// code cell start uuid: b3334105-e18d-4510-a9c6-e879b8fb2484
+[source, python]
+----
+In [2]: from math import *
+        def f(x):
+            return abs(cos(x)) ** 0.5 + sin(2 + 3 * x)
+----
+
+// code cell end
+
+Using the +range+ function we can generate efficiently a +list+ object with 500,000 numbers that we can work with:
+
+// code cell start uuid: 06bd686b-de54-43e3-bd1f-4ef5fe006036
+[source, python]
+----
+In [3]: I = 500000
+        a_py = range(I)
+----
+
+// code cell end
+
+As the first implementation, consider function +f1+, which loops over the whole data set and appends the single results of the function evaluations to a results +list+ object:
+
+// code cell start uuid: 887f94a7-954e-4a22-ad08-529686619217
+[source, python]
+----
+In [4]: def f1(a):
+            res = []
+            for x in a:
+                res.append(f(x))
+            return res
+----
+
+// code cell end
+
+This is not the only way to implement this. One can also use different +Python+ paradigms, like _iterators_ or the +eval+ function, to get functions of the form +f2+ and +f3+:
+
+// code cell start uuid: 50d65fdf-ba74-4c09-910e-19560b3e2b78
+[source, python]
+----
+In [5]: def f2(a):
+            return [f(x) for x in a]
+----
+
+// code cell end
+
+// code cell start uuid: c2dd4ea6-d303-4392-af37-a83411085463
+[source, python]
+----
+In [6]: def f3(a):
+            ex = 'abs(cos(x)) ** 0.5 + sin(2 + 3 * x)'
+            return [eval(ex) for x in a]
+----
+
+// code cell end
+
+Of course, the same algorithm can be implemented by the use of +NumPy+ vectorization techniques. In this case, the array of data is an +ndarray+ object instead of a +list+ object. The function implementation +f4+ shows no loops whatsoever; all looping takes place on the +NumPy+ level and not on the +Python+ level:
+
+// code cell start uuid: f3bd9b18-bab2-433f-ab3c-4d7ffed24107
+[source, python]
+----
+In [7]: import numpy as np
+----
+
+// code cell end
+
+// code cell start uuid: e53390a4-d6ff-4083-bab3-c47955becc67
+[source, python]
+----
+In [8]: a_np = np.arange(I)
+----
+
+// code cell end
+
+// code cell start uuid: 701d5d58-e35c-4440-aa57-7bf96bcd546f
+[source, python]
+----
+In [9]: def f4(a):
+            return (np.abs(np.cos(a)) ** 0.5 +
+                    np.sin(2 + 3 * a))
+----
+
+// code cell end
+
+(((numexpr library)))Then, we can use a specialized library called +numexpr+ to evaluate the numerical expression. This library has built-in support for multithreaded execution. Therefore, to compare the performance of the single with the multithreaded approach, we define two different functions, +f5+ (single thread) and +f6+ (multiple threads):
+
+// code cell start uuid: 0df68c60-ab06-4024-b7f8-cf3dacb67668
+[source, python]
+----
+In [10]: import numexpr as ne
+----
+
+// code cell end
+
+// code cell start uuid: ff4cbc78-b7c7-4a45-ab60-d143e59aa9f5
+[source, python]
+----
+In [11]: def f5(a):
+             ex = 'abs(cos(a)) ** 0.5 + sin(2 + 3 * a)'
+             ne.set_num_threads(1)
+             return ne.evaluate(ex)
+----
+
+// code cell end
+
+// code cell start uuid: c4732030-2cf0-4fc2-923c-d341d7e70c09
+[source, python]
+----
+In [12]: def f6(a):
+             ex = 'abs(cos(a)) ** 0.5 + sin(2 + 3 * a)'
+             ne.set_num_threads(16)
+             return ne.evaluate(ex)
+----
+
+// code cell end
+
+In total, the same task—i.e., the evaluation of the numerical expression in <<num_expr>> on an array of size 500,000—is implemented in six different ways:
+
+++++
+<?hard-pagebreak?>
+++++
+
+* Standard +Python+ function with explicit looping
+* Iterator approach with implicit looping
+* Iterator approach with implicit looping and using +eval+
+* +NumPy+ vectorized implementation
+* Single-threaded implementation using +numexpr+
+* Multithreaded implementation using +numexpr+
+
+First, let us check whether the implementations deliver the same results. We use the +IPython+ cell magic command +%%time+ to record the total execution time:
+
+// code cell start uuid: cf287924-ddbc-4d2d-a1cc-5302da462211
+[source, python]
+----
+In [13]: %%time
+         r1 = f1(a_py)
+         r2 = f2(a_py)
+         r3 = f3(a_py)
+         r4 = f4(a_np)
+         r5 = f5(a_np)
+         r6 = f6(a_np)
+----
+
+----
+Out[13]: CPU times: user 16 s, sys: 125 ms, total: 16.1 s
+         Wall time: 16 s
+         
+----
+
+// code cell end
+
+The +NumPy+ function +allclose+ allows for easy checking of whether two +ndarray+(-like) objects contain the same data:
+
+// code cell start uuid: 77a761b5-8ba4-4377-8b97-36d4453cc3a5
+[source, python]
+----
+In [14]: np.allclose(r1, r2)
+----
+
+----
+Out[14]: True
+----
+
+// code cell end
+
+// code cell start uuid: 00b7a34b-224c-494b-8479-17e4f778e56b
+[source, python]
+----
+In [15]: np.allclose(r1, r3)
+----
+
+----
+Out[15]: True
+----
+
+// code cell end
+
+// code cell start uuid: 6b48a086-0d1c-46ca-9560-57c4f22373f2
+[source, python]
+----
+In [16]: np.allclose(r1, r4)
+----
+
+----
+Out[16]: True
+----
+
+// code cell end
+
+// code cell start uuid: 3513b09a-7f41-413a-a3d2-5dc58487f5fa
+[source, python]
+----
+In [17]: np.allclose(r1, r5)
+----
+
+----
+Out[17]: True
+----
+
+// code cell end
+
+// code cell start uuid: fe9798c0-3fc6-4a3e-94a9-65cbbe588709
+[source, python]
+----
+In [18]: np.allclose(r1, r6)
+----
+
+----
+Out[18]: True
+----
+
+// code cell end
+
+This obviously is the case. The more interesting question, of course, is how the different implementations compare with respect to execution speed. To this end, we use the +perf_comp_data+ function and provide all the function and data set names to it:
+
+// code cell start uuid: 2239301d-cf3c-4be3-b310-9001e5d346f2
+[source, python]
+----
+In [19]: func_list = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6']
+         data_list = ['a_py', 'a_py', 'a_py', 'a_np', 'a_np', 'a_np']
+----
+
+// code cell end
+
+We now have everything together to initiate the competition:
+
+// code cell start uuid: fd4bad14-de4c-4767-8f80-4ce8754a8531
+[source, python]
+----
+In [20]: perf_comp_data(func_list, data_list)
+----
+
+----
+Out[20]: function: f6, av. time sec:   0.00583, relative:    1.0
+         function: f5, av. time sec:   0.02711, relative:    4.6
+         function: f4, av. time sec:   0.06331, relative:   10.9
+         function: f2, av. time sec:   0.46864, relative:   80.3
+         function: f1, av. time sec:   0.59660, relative:  102.3
+         function: f3, av. time sec:  15.15156, relative: 2597.2
+         
+----
+
+// code cell end
+
+There is a clear winner: the multithreaded +numexpr+ implementation +f6+. Its speed advantage, of course, depends on the number of cores available. The vectorized +NumPy+ version +f4+ is slower than +f5+. The pure +Python+ implementations +f1+ and +f2+ are more than 80 times slower than the winner. +f3+ is the slowest version, since the use of the +eval+ function for such a large number of evaluations generates a huge overhead. In the case of +numexpr+, the string-based expression is evaluated once and then compiled for later use; with the +Python+ +eval+ function this evaluation takes place 500,000 times.
+
+
+=== Memory Layout and Performance
+
+(((performance computing, memory layout and)))+NumPy+ allows the specification of a so-called +dtype+ per +ndarray+ object: for example, +np.int32+ or +f8+. +NumPy+ also allows us to choose from two different _memory layouts_ when initializing an +ndarray+ object. Depending on the structure of the object, one layout can have advantages compared to the other. This is illustrated in the following:
+
+// code cell start uuid: eae4309a-435c-4b76-a7cb-3d493ceb16a5
+[source, python]
+----
+In [21]: import numpy as np
+----
+
+// code cell end
+
+// code cell start uuid: db307e1f-15f5-44ab-a35b-9f587e86f89f
+[source, python]
+----
+In [22]: np.zeros((3, 3), dtype=np.float64, order='C')
+----
+
+----
+Out[22]: array([[ 0.,  0.,  0.],
+                [ 0.,  0.,  0.],
+                [ 0.,  0.,  0.]])
+----
+
+// code cell end
+
+The way you initialize a +NumPy+ +ndarray+ object can have a significant influence on the performance of operations on these arrays (given a certain size of array). In summary, the initialization of an +ndarray+ object (e.g., via +np.zeros+ or +np.array+) takes as input:
+
++shape+:: Either an +int+, a sequence of ++int++s, or a reference to another +numpy.ndarray+
++dtype+ (optional):: A ++numpy.dtype++—these are +NumPy+-specific basic data types for +numpy.ndarray+ objects
++order+ (optional):: The order in which to store elements in memory: +C+ for +C+-like (i.e., row-wise) or +F+ for +Fortran+-like (i.e., column-wise)
+
+Consider the +C+-like (i.e., row-wise), storage:
+
+// code cell start uuid: ef951c18-ade7-4525-ae8f-6d1286aaa261
+[source, python]
+----
+In [23]: c = np.array([[ 1.,  1.,  1.],
+                       [ 2.,  2.,  2.],
+                       [ 3.,  3.,  3.]], order='C')
+----
+
+// code cell end
+
+In this case, the 1s, the 2s, and the 3s are stored next to each other. By contrast, consider the +Fortran+-like (i.e., column-wise) storage:
+
+// code cell start uuid: dd75848c-cbaf-4ff3-a023-b444fbaa2324
+[source, python]
+----
+In [24]: f = np.array([[ 1.,  1.,  1.],
+                       [ 2.,  2.,  2.],
+                       [ 3.,  3.,  3.]], order='F')
+----
+
+// code cell end
+
+Now, the data is stored in such a way that 1, 2, and 3 are next to each other in each column.
+Let's see whether the memory layout makes a difference in some way when the array is large:
+
+// code cell start uuid: 10424fde-31e8-4781-a7d8-eb8ec4469c10
+[source, python]
+----
+In [25]: x = np.random.standard_normal((3, 1500000))
+         C = np.array(x, order='C')
+         F = np.array(x, order='F')
+         x = 0.0
+----
+
+// code cell end
+
+Now let's implement some standard operations on the +C+-like layout array. First, calculating sums:
+
+// code cell start uuid: 82dda14d-3d8e-4953-a33b-ffece16a9de5
+[source, python]
+----
+In [26]: %timeit C.sum(axis=0)
+----
+
+----
+Out[26]: 100 loops, best of 3: 11.3 ms per loop
+         
+----
+
+// code cell end
+
+// code cell start uuid: 8e042104-1930-4a07-9467-6569f583414e
+[source, python]
+----
+In [27]: %timeit C.sum(axis=1)
+----
+
+----
+Out[27]: 100 loops, best of 3: 5.84 ms per loop
+         
+----
+
+// code cell end
+
+Calculating sums over the first axis is roughly two times slower than over the second axis. One gets similar results for calculating standard deviations:
+
+// code cell start uuid: 311be903-c939-4c1d-a8f7-22803299bd1d
+[source, python]
+----
+In [28]: %timeit C.std(axis=0)
+----
+
+----
+Out[28]: 10 loops, best of 3: 70.6 ms per loop
+         
+----
+
+// code cell end
+
+// code cell start uuid: c032c8a5-c0af-4b75-a4a4-28d8b867738e
+[source, python]
+----
+In [29]: %timeit C.std(axis=1)
+----
+
+----
+Out[29]: 10 loops, best of 3: 32.6 ms per loop
+         
+----
+
+// code cell end
+
+For comparison, consider the +Fortran+-like layout. Sums first:
+
+// code cell start uuid: 65225c7d-e0ce-41f8-801d-16157e7725d4
+[source, python]
+----
+In [30]: %timeit F.sum(axis=0)
+----
+
+----
+Out[30]: 10 loops, best of 3: 29.2 ms per loop
+         
+----
+
+// code cell end
+
+// code cell start uuid: 11ce9f40-204a-4271-83b5-2f68c1a66415
+[source, python]
+----
+In [31]: %timeit F.sum(axis=1)
+----
+
+----
+Out[31]: 10 loops, best of 3: 37 ms per loop
+         
+----
+
+// code cell end
+
+Although absolutely slower compared to the other layout, there is hardly a relative difference for the two axes.
+Now, standard deviations:
+
+// code cell start uuid: 9d9b7754-f8db-4477-a31b-38776c94ba03
+[source, python]
+----
+In [32]: %timeit F.std(axis=0)
+----
+
+----
+Out[32]: 10 loops, best of 3: 107 ms per loop
+         
+----
+
+// code cell end
+
+// code cell start uuid: 1ce86c04-2304-424d-b82c-409972b3f876
+[source, python]
+----
+In [33]: %timeit F.std(axis=1)
+----
+
+----
+Out[33]: 10 loops, best of 3: 98.8 ms per loop
+         
+----
+
+// code cell end
+
+Again, this layout option leads to worse performance compared to the +C+-like layout. There is a small difference between the two axes, but again it is not as pronounced as with the other layout. The results indicate that in general the +C+-like option will perform better--which is also the reason why +NumPy+ +ndarray+ objects default to this memory layout if not otherwise specified:
+
+// code cell start uuid: 5e25ec32-9655-4413-bc54-75adfa36daae
+[source, python]
+----
+In [34]: C = 0.0; F = 0.0
+----
+
+// code cell end
+
+
+=== Parallel Computing
+
+((("performance computing", "parallel computing", id="ix_PCparcomp", range="startofrange")))((("IPython", "IPython.parallel library", id="ix_IPpara", range="startofrange")))((("parallel computing", id="ix_parcomp", range="startofrange")))Nowadays, even the most compact notebooks have mainboards with processors that have multiple cores. Moreover, modern cloud-based computing offerings, like Amazon's EC2 or Microsoft's Azure, allow for highly scalable, parallel architectures at rather low, variable costs. This brings large-scale computing to the small business, the researcher, and even the ambitious amateur. However, to harness the power of such offerings, appropriate tools are necessary. One such tool is the +IPython.parallel+ library.
+
+
+==== The Monte Carlo Algorithm
+
+(((parallel computing, Monte Carlo algorithm)))A financial algorithm that leads to a high computational burden is the Monte Carlo valuation of options. As a specific example, we pick the _Monte Carlo estimator for a European call option value_ in the Black-Scholes-Merton setup (see also <<introductory_examples>> for the same example). In this setup, the underlying of the option to be valued follows the stochastic differential equation (SDE), as in <<bsm_sde>>. __S~t~__ is the value of the underlying at time __t__; __r__ is the constant, riskless short rate; &#x1d70e; is the constant instantaneous volatility; and __Z~t~__ is a Brownian motion.
+
+[[bsm_sde]]
+[latexmath]
+.Black-Scholes-Merton SDE
+++++
+\begin{equation}
+dS_t = r S_t dt + \sigma S_t dZ_t
+\end{equation}
+++++
+
+The Monte Carlo estimator for a European call option is given by <<mcs_call>>, where __S~T~__(__i__) is the __i__th simulated value of the underlying at maturity __T__.
+
+[[mcs_call]]
+[latexmath]
+.Monte Carlo estimator for European call option
+++++
+\begin{equation}
+C_0 = e^{-rT} \frac{1}{I} \sum_I \max(S_T(i) - K, 0)
+\end{equation}
+++++
+
+A function implementing the Monte Carlo valuation for the Black-Scholes-Merton set-up could look like the following, if we only allow the strike of the European call option to vary:
+
+// code cell start uuid: 19106d2b-e618-45a1-85d3-978beb9f478e
+[source, python]
+----
+In [35]: def bsm_mcs_valuation(strike):
+             ''' Dynamic Black-Scholes-Merton Monte Carlo estimator
+             for European calls.
+         
+             Parameters
+             ==========
+             strike : float
+                 strike price of the option
+         
+             Results
+             =======
+             value : float
+                 estimate for present value of call option
+             '''
+             import numpy as np
+             S0 = 100.; T = 1.0; r = 0.05; vola = 0.2
+             M = 50; I = 20000
+             dt = T / M
+             rand = np.random.standard_normal((M + 1, I))
+             S = np.zeros((M + 1, I)); S[0] = S0
+             for t in range(1, M + 1):
+                 S[t] = S[t-1] * np.exp((r - 0.5 * vola ** 2) * dt
+                                        + vola * np.sqrt(dt) * rand[t])
+             value = (np.exp(-r * T)
+                              * np.sum(np.maximum(S[-1] - strike, 0)) / I)
+             return value
+----
+
+// code cell end
+
+
+==== The Sequential Calculation
+
+(((parallel computing, sequential calculation)))As the benchmark case we take the valuation of 100 options with different strike prices. The function +seq_value+ calculates the Monte Carlo estimators and returns +list+ objects containing strikes and valuation results:
+
+// code cell start uuid: 49a43195-200a-4cd4-a666-42fe73d00be6
+[source, python]
+----
+In [36]: def seq_value(n):
+             ''' Sequential option valuation.
+         
+             Parameters
+             ==========
+             n : int
+                 number of option valuations/strikes
+             '''
+             strikes = np.linspace(80, 120, n)
+             option_values = []
+             for strike in strikes:
+                 option_values.append(bsm_mcs_valuation(strike))
+             return strikes, option_values
+----
+
+// code cell end
+
+// code cell start uuid: e15d7947-5a25-4a31-b0ff-83459837fe81
+[source, python]
+----
+In [37]: n = 100  # number of options to be valued
+         %time strikes, option_values_seq = seq_value(n)
+----
+
+----
+Out[37]: CPU times: user 11.7 s, sys: 1e+03 µs, total: 11.7 s
+Wall time: 11.7 s
+         
+----
+
+// code cell end
+
+The productivity is roughly 8.5 options per second. <<option_values>> shows the valuation pass:[<phrase role='keep-together'>results:</phrase>]
+
+// code cell start uuid: ce05a4cd-9d5c-4a18-82cc-8deab6418467
+[source, python]
+----
+In [38]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         plt.figure(figsize=(8, 4))
+         plt.plot(strikes, option_values_seq, 'b')
+         plt.plot(strikes, option_values_seq, 'r.')
+         plt.grid(True)
+         plt.xlabel('strikes')
+         plt.ylabel('European call option values')
+----
+
+[[option_values]]
+.European call option values by Monte Carlo simulation
+image::images/pyfi_0801.png[]
+
+// code cell end
+
+
+==== The Parallel Calculation
+
+(((parallel computing, parallel calculation)))For the parallel calculation of the 100 option values, we use +IPython.parallel+ and a local "cluster." A local cluster is most easily started via the +Clusters+ tab in the +IPython+ Notebook dashboard. The number of threads to be used of course depends on the machine and the processor you are running your code on. <<ipython_cluster>> shows the +IPython+ page for starting a cluster.
+
+[[ipython_cluster]]
+.Screenshot of IPython cluster page
+image::images/pyfi_0802.png[]
+
++IPython.parallel+ needs the information on which cluster to use for the parallel execution of code. In this case, the cluster profile is stored in the "default" profile. In addition, we need to generate a view on the cluster:
+
+// code cell start uuid: 624b0820-7879-45f3-9b7e-9df111ba2ab0
+[source, python]
+----
+In [39]: from IPython.parallel import Client
+         c = Client(profile="default")
+         view = c.load_balanced_view()
+----
+
+// code cell end
+
+The function implementing the parallel valuation of the options looks rather similar to the sequential implementation:
+
+// code cell start uuid: e6a46c36-aadb-4450-bb33-f046cac16b36
+[source, python]
+----
+In [40]: def par_value(n):
+             ''' Parallel option valuation.
+         
+             Parameters
+             ==========
+             n : int
+                 number of option valuations/strikes
+             '''
+             strikes = np.linspace(80, 120, n)
+             option_values = []
+             for strike in strikes:
+                 value = view.apply_async(bsm_mcs_valuation, strike)
+                 option_values.append(value)
+             c.wait(option_values)
+             return strikes, option_values
+----
+
+// code cell end
+
+There are two major differences to note. The first is that the valuation function is applied asynchronously via +view.apply_sync+ to our cluster view, which in effect initiates the parallel valuation of all options at once. Of course, not all options can be valued in parallel because there are (generally) not enough cores/threads available. Therefore, we have to wait until the queue is completely finished; this is accomplished by the +wait+ method of the +Client+ object +c+. When all results are available, the function returns, as before, +list+ objects containing the strike prices and the valuation results, respectively.
+
+Execution of the parallel valuation function yields a productivity that ideally scales linearly with the number of cores (threads) available. For example, having _eight_ cores (threads) available reduces the execution time to maximally _one-eighth_ of the time needed for the sequential pass:[<phrase role='keep-together'>calculation:</phrase>]
+
+// code cell start uuid: 9b34b0b0-5461-4f56-bff8-8dd61ffa4a16
+[source, python]
+----
+In [41]: %time strikes, option_values_obj = par_value(n)
+----
+
+----
+Out[41]: CPU times: user 415 ms, sys: 30 ms, total: 445 ms
+         Wall time: 1.88 s
+         
+----
+
+// code cell end
+
+The parallel execution does not return option values directly; it rather returns more complex result objects:
+
+// code cell start uuid: 7482c419-1f0e-40c2-80fc-8e62ebe24421
+[source, python]
+----
+In [42]: option_values_obj[0].metadata
+----
+
+----
+Out[42]: {'after': [],
+          'completed': datetime.datetime(2014, 9, 28, 16, 6, 54, 93979),
+          'data': {},
+          'engine_id': 5,
+          'engine_uuid': u'6b64aebb-39d5-49aa-9466-e6ab37d3b2c9',
+          'follow': [],
+          'msg_id': u'c7a44c22-b4bd-46d7-ba5e-34690f178fa9',
+          'outputs': [],
+          'outputs_ready': True,
+          'pyerr': None,
+          'pyin': None,
+          'pyout': None,
+          'received': datetime.datetime(2014, 9, 28, 16, 6, 54, 97195),
+          'started': datetime.datetime(2014, 9, 28, 16, 6, 53, 921633),
+          'status': u'ok',
+          'stderr': '',
+          'stdout': '',
+          'submitted': datetime.datetime(2014, 9, 28, 16, 6, 53, 917290)}
+----
+
+// code cell end
+
+The valuation result itself is stored in the +result+ attribute of the object:
+
+// code cell start uuid: 9911cc43-347c-4d87-bd9a-31349116245f
+[source, python]
+----
+In [43]: option_values_obj[0].result
+----
+
+----
+Out[43]: 24.436651486350289
+----
+
+// code cell end
+
+To arrive at a results list as with the sequential calculation, we need to read the single results out from the returned objects:
+
+// code cell start uuid: de764249-8b40-4bf4-afc6-25442011a656
+[source, python]
+----
+In [44]: option_values_par = []
+         for res in option_values_obj:
+             option_values_par.append(res.result)
+----
+
+// code cell end
+
+This could have been done, of course, in the parallel valuation loop directly. <<option_comp>> compares the valuation results of the sequential calculation with those of the parallel calculation. Differences are due to numerical issues concerning the Monte Carlo pass:[<phrase role='keep-together'>valuation:</phrase>]
+
+// code cell start uuid: 9bb28d37-52b5-4325-ab92-461a1952aebc
+[source, python]
+----
+In [45]: plt.figure(figsize=(8, 4))
+         plt.plot(strikes, option_values_seq, 'b', label='Sequential')
+         plt.plot(strikes, option_values_par, 'r.', label='Parallel')
+         plt.grid(True); plt.legend(loc=0)
+         plt.xlabel('strikes')
+         plt.ylabel('European call option values')
+----
+
+[[option_comp]]
+.Comparison of European call option values
+image::images/pyfi_0803.png[]
+
+// code cell end
+
+
+==== Performance Comparison
+
+(((parallel computing, performance comparison)))With the help of the +perf_comp_func+ function, we can compare the performance a bit more rigorously:
+
+// code cell start uuid: 44fcd9c8-e4f1-4718-97dc-bdd3586f97d0
+[source, python]
+----
+In [46]: n = 50  # number of option valuations
+         func_list = ['seq_value', 'par_value']
+         data_list = 2 * ['n']
+----
+
+// code cell end
+
+// code cell start uuid: 72602c61-4194-443e-b8c2-0905f5de8081
+[source, python]
+----
+In [47]: perf_comp_data(func_list, data_list)
+----
+
+----
+Out[47]: function: par_value, av. time sec:   0.90832, relative:    1.0
+         function: seq_value, av. time sec:   5.75137, relative:    6.3
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_PCparcomp")))(((range="endofrange", startref="ix_IPpara")))(((range="endofrange", startref="ix_parcomp")))The results clearly demonstrate that using +IPython.parallel+ for parallel execution of functions can lead to an almost linear scaling of the performance with the number of cores available.
+
+
+=== multiprocessing
+
+(((performance computing, multiprocessing module)))(((multiprocessing module)))The advantage of +IPython.parallel+ is that it scales over small- and medium-sized clusters (e.g., with 256 nodes). Sometimes it is, however, helpful to parallelize code execution locally. This is where the "standard" +multiprocessing+ module of +Python+ might prove beneficial:
+
+// code cell start uuid: d2fa8566-0084-408e-a2c8-dc8ec58ef460
+[source, python]
+----
+In [48]: import multiprocessing as mp
+----
+
+// code cell end
+
+Consider the following function to simulate a geometric Brownian motion:
+
+// code cell start uuid: 21c07619-d632-4208-9efd-a80ed68036a7
+[source, python]
+----
+In [49]: import math
+         def simulate_geometric_brownian_motion(p):
+             M, I = p
+               # time steps, paths
+             S0 = 100; r = 0.05; sigma = 0.2; T = 1.0
+               # model parameters
+             dt = T / M
+             paths = np.zeros((M + 1, I))
+             paths[0] = S0
+             for t in range(1, M + 1):
+                 paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
+                        sigma * math.sqrt(dt) * np.random.standard_normal(I))
+             return paths
+----
+
+// code cell end
+
+This function returns simulated paths given the parameterization for +M+ and +I+:
+
+// code cell start uuid: 3b90f803-483d-4042-8365-831b14ae1284
+[source, python]
+----
+In [50]: paths = simulate_geometric_brownian_motion((5, 2))
+         paths
+----
+
+----
+Out[50]: array([[ 100.        ,  100.        ],
+                [  93.65851581,   98.93916652],
+                [  94.70157252,   93.44208625],
+                [  96.73499004,   97.88294562],
+                [ 110.64677908,   96.04515015],
+                [ 124.09826521,  101.86087283]])
+----
+
+// code cell end
+
+Let us implement a test series on a server with eight cores and the following parameter values. In particular, we want to do 100 simulations:
+
+// code cell start uuid: 0a4b66c3-3c89-49ea-871e-8c2856cc4d4e
+[source, python]
+----
+In [51]: I = 10000  # number of paths
+         M = 100  # number of time steps
+         t = 100  # number of tasks/simulations
+----
+
+// code cell end
+
+// code cell start uuid: 428591ca-0dbd-4d12-bcfc-d611883df0cd
+[source, python]
+----
+In [52]: # running on server with 8 cores/16 threads
+         from time import time
+         times = []
+         for w in range(1, 17):
+             t0 = time()
+             pool = mp.Pool(processes=w)
+               # the pool of workers
+             result = pool.map(simulate_geometric_brownian_motion,
+                               t * [(M, I), ])
+               # the mapping of the function to the list of parameter tuples
+             times.append(time() - t0)
+----
+
+// code cell end
+
+We again come to the conclusion that performance scales with the number of cores available. Hyperthreading, however, does not add much (or is even worse) in this case, as <<multi_proc>> illustrates:
+
+// code cell start uuid: 8ef9b38e-b367-447f-a5ac-cb05fb45dc67
+[source, python]
+----
+In [53]: plt.plot(range(1, 17), times)
+         plt.plot(range(1, 17), times, 'ro')
+         plt.grid(True)
+         plt.xlabel('number of processes')
+         plt.ylabel('time in seconds')
+         plt.title('%d Monte Carlo simulations' % t)
+----
+
+[[multi_proc]]
+.Execution speed depending on the number of threads used (eight-core pass:[<phrase role='keep-together'>machine)</phrase>]
+image::images/pyfi_0804.png[]
+
+// code cell end
+
+.Easy Parallelization
+[TIP]
+====
+Many problems in finance allow for the application of simple parallelization techniques, for example, when no data is shared between instances of an algorithm. The +multiprocessing+ module of +Python+ allows us to efficiently harness the power of modern hardware architectures without in general changing the basic algorithms and/or +Python+ functions to be parallelized.
+====
+
+
+=== Dynamic Compiling
+
+((("performance computing", "dynamic compiling", id="ix_PCdyn", range="startofrange")))((("Numba library", id="ix_numba", range="startofrange")))((("dynamic compiling", id="ix_dyn", range="startofrange")))(((LLVM compiler infrastructure)))((("compilation", "dynamic", id="ix_Compdyn", range="startofrange")))http://numba.pydata.org[+Numba+] is an open source, +NumPy+-aware optimizing compiler for +Python+ code. It uses the +LLVM+ compiler infrastructurefootnote:[Formerly, http://www.llvm.org[+LLVM+] was meant to be an acronym for ++Low Level Virtual Machine++; now "it is the full name of the project."] to compile +Python+ byte code to machine code especially for use in the +NumPy+ runtime and +SciPy+ modules.
+
+
+==== Introductory Example
+
+(((dynamic compiling, example of)))Let us start with a problem that typically leads to performance issues in +Python+: algorithms with nested loops. A sandbox variant can illustrate the problem:
+
+// code cell start uuid: 3f198c70-faa5-44a9-b886-227b97c2363d
+[source, python]
+----
+In [54]: from math import cos, log
+         def f_py(I, J):
+             res = 0
+             for i in range(I):
+                 for j in range (J):
+                     res += int(cos(log(1)))
+             return res
+----
+
+// code cell end
+
+In a somewhat compute-intensive way, this function returns the total number of loops given the input parameters +I+ and +J+. Setting both equal to 5,000 leads to 25,000,000 loops:
+
+// code cell start uuid: 7ee49c0c-d153-445f-be3c-c1318e4766c8
+[source, python]
+----
+In [55]: I, J = 5000, 5000
+         %time f_py(I, J)
+----
+
+----
+Out[55]: CPU times: user 17.4 s, sys: 2.3 s, total: 19.7 s
+         Wall time: 15.2 s
+         
+         25000000
+----
+
+// code cell end
+
+In principle, this can be vectorized with the help of +NumPy+ +ndarray+ objects:
+
+// code cell start uuid: 1be826e5-f072-4476-b829-b12fb1b70086
+[source, python]
+----
+In [56]: def f_np(I, J):
+             a = np.ones((I, J), dtype=np.float64)
+             return int(np.sum(np.cos(np.log(a)))), a
+----
+
+// code cell end
+
+// code cell start uuid: 211eb198-f43d-4a89-b362-6e9507c099de
+[source, python]
+----
+In [57]: %time res, a = f_np(I, J)
+----
+
+----
+Out[57]: CPU times: user 1.41 s, sys: 285 ms, total: 1.69 s
+         Wall time: 1.65 s
+         
+----
+
+// code cell end
+
+This is much faster, roughly by a factor of 8–10 times, but not really memory-efficient. The +ndarray+ object consumes 200 MB of memory:
+
+// code cell start uuid: cfd19f8d-bf9a-442b-b3ef-2dfdce9ac3a9
+[source, python]
+----
+In [58]: a.nbytes
+----
+
+----
+Out[58]: 200000000
+----
+
+// code cell end
+
++I+ and +J+ can easily be chosen to make the +NumPy+ approach infeasible given a certain size of RAM. +Numba+ provides an attractive alternative to tackle the performance issue of such loop structures while preserving the memory efficiency of the pure +Python+ approach:
+
+// code cell start uuid: 72e7a2be-97d0-4391-bc6e-3be881bf17a8
+[source, python]
+----
+In [59]: import numba as nb
+----
+
+// code cell end
+
+With +Numba+ you only need to apply the +jit+ function to the pure +Python+ function to generate a +Python+-callable, compiled version of the function:
+
+// code cell start uuid: 125becea-83ae-4718-9064-e1c3424888c3
+[source, python]
+----
+In [60]: f_nb = nb.jit(f_py)
+----
+
+// code cell end
+
+As promised, this new function can be called directly from within the +Python+ interpreter, realizing a significant speedup compared to the +NumPy+ vectorized version:
+
+// code cell start uuid: aeb3d63e-7682-4d89-8c3a-0d5d8e649467
+[source, python]
+----
+In [61]: %time f_nb(I, J)
+----
+
+----
+Out[61]: CPU times: user 143 ms, sys: 12 ms, total: 155 ms
+         Wall time: 139 ms
+         
+         25000000L
+----
+
+// code cell end
+
+Again, let us compare the performance of the different alternatives a bit more pass:[<phrase role='keep-together'>systematically:</phrase>]
+
+// code cell start uuid: 25bc3375-a682-4f25-a303-b756848565d9
+[source, python]
+----
+In [62]: func_list = ['f_py', 'f_np', 'f_nb']
+         data_list = 3 * ['I, J']
+----
+
+// code cell end
+
+// code cell start uuid: 71e376e3-cd8c-47a8-93dc-5daeabd59e92
+[source, python]
+----
+In [63]: perf_comp_data(func_list, data_list)
+----
+
+----
+Out[63]: function: f_nb, av. time sec:   0.02022, relative:    1.0
+         function: f_np, av. time sec:   1.67494, relative:   82.8
+         function: f_py, av. time sec:  15.82375, relative:  782.4
+         
+----
+
+// code cell end
+
+The +Numba+ version of the nested loop implementation is by far the fastest; much faster even than the +NumPy+ vectorized version. The pure +Python+ version is much slower than the other two versions.
+
+.Quick Wins
+[TIP]
+====
+Many approaches for performance improvements (of numerical algorithms) involve considerable effort. With +Python+ and +Numba+ you have an approach available that involves only the smallest effort possible--in general, importing the library and a single additional line of code. It does not work for all kinds of algorithms, but it is often worth a (quick) try and sometimes indeed yields a quick win.
+====
+
+
+==== Binomial Option Pricing
+
+((("dynamic compiling", "binomial option pricing", id="ix_DCbinom", range="startofrange")))((("binomial option pricing", id="ix_binom", range="startofrange")))The previous section uses Monte Carlo simulation to value European call options, using a parallel computing approach. Another popular numerical method to value options is the binomial option pricing model pioneered by Cox, Ross, and Rubinstein (1979). In this model, as in the Black-Scholes-Merton setup, there is a risky asset, an index or stock, and a riskless asset, a bond. As with Monte Carlo, the relevant time interval from today until the maturity of the option is divided into generally equidistant subintervals, &#x1d6e5;__t__. Given an index level at time __s__ of __S~s~__, the index level at __t__ = __s__ + &#x1d6e5;__t__ is given by __S~t~__ = __S~s~__ &#xb7; __m__, where __m__ is chosen randomly from from {__u__,__d__} with latexmath:[$0 < d< e^{r \Delta t} < u = e^{\sigma \sqrt{\Delta t}}$] as well as latexmath:[$u=\frac{1}{d}$]. __r__ is the constant, riskless short rate. The risk-neutral probability for an up-movement is given as latexmath:[$q=\frac{e^{ r \Delta t}-d}{u-d}$].
+
+Consider that a parameterization for the model is given as follows:
+
+// code cell start uuid: 7340fbcb-1355-4862-ba6d-8bc04c04b014
+[source, python]
+----
+In [64]: # model & option parameters
+         S0 = 100.  # initial index level
+         T = 1.  # call option maturity
+         r = 0.05  # constant short rate
+         vola = 0.20  # constant volatility factor of diffusion
+         
+         # time parameters
+         M = 1000  # time steps
+         dt = T / M  # length of time interval
+         df = exp(-r * dt)  # discount factor per time interval
+         
+         # binomial parameters
+         u = exp(vola * sqrt(dt))  # up-movement
+         d = 1 / u  # down-movement
+         q = (exp(r * dt) - d) / (u - d)  # martingale probability
+----
+
+// code cell end
+
+An implementation of the binomial algorithm for European options consists mainly of these parts:
+
+Index level simulation:: Simulate step by step the index levels.
+Inner value calculation:: Calculate the inner values at maturity and/or at every time step.
+Risk-neutral discounting:: Discount the (expected) inner values at maturity step by step to arrive at the present value.
+
+In +Python+ this might take on the form seen in the function +binomial_py+. This function uses +NumPy+ +ndarray+ objects as the basic data structure and implements three different nested loops to accomplish the three steps just sketched:
+
+// code cell start uuid: 435a8933-8bbf-4e17-9f85-ff75f5997916
+[source, python]
+----
+In [65]: import numpy as np
+         def binomial_py(strike):
+             ''' Binomial option pricing via looping.
+         
+             Parameters
+             ==========
+             strike : float
+                 strike price of the European call option
+             '''
+             # LOOP 1 - Index Levels
+             S = np.zeros((M + 1, M + 1), dtype=np.float64)
+               # index level array
+             S[0, 0] = S0
+             z1 = 0
+             for j in xrange(1, M + 1, 1):
+                 z1 = z1 + 1
+                 for i in xrange(z1 + 1):
+                     S[i, j] = S[0, 0] * (u ** j) * (d ** (i * 2))
+         
+             # LOOP 2 - Inner Values
+             iv = np.zeros((M + 1, M + 1), dtype=np.float64)
+               # inner value array
+             z2 = 0
+             for j in xrange(0, M + 1, 1):
+                 for i in xrange(z2 + 1):
+                     iv[i, j] = max(S[i, j] - strike, 0)
+                 z2 = z2 + 1
+         
+             # LOOP 3 - Valuation
+             pv = np.zeros((M + 1, M + 1), dtype=np.float64)
+               # present value array
+             pv[:, M] = iv[:, M]  # initialize last time point
+             z3 = M + 1
+             for j in xrange(M - 1, -1, -1):
+                 z3 = z3 - 1
+                 for i in xrange(z3):
+                     pv[i, j] = (q * pv[i, j + 1] +
+                                 (1 - q) * pv[i + 1, j + 1]) * df
+             return pv[0, 0]
+----
+
+// code cell end
+
+This function returns the present value of a European call option with parameters as specified before:
+
+// code cell start uuid: 9a193f03-655e-40ea-bac4-57869ddf4745
+[source, python]
+----
+In [66]: %time round(binomial_py(100), 3)
+----
+
+----
+Out[66]: CPU times: user 4.18 s, sys: 312 ms, total: 4.49 s
+         Wall time: 3.64 s
+         
+         10.449
+----
+
+// code cell end
+
+We can compare this result with the estimated value the Monte Carlo function +bsm_mcs_valuation+ returns:
+
+// code cell start uuid: 59c6c208-9d55-4822-a390-53a3d83d0ba0
+[source, python]
+----
+In [67]: %time round(bsm_mcs_valuation(100), 3)
+----
+
+----
+Out[67]: CPU times: user 133 ms, sys: 0 ns, total: 133 ms
+         Wall time: 126 ms
+         
+         10.318
+----
+
+// code cell end
+
+The values are similar. They are only "similar" and not the same since the Monte Carlo valuation as implemented with +bsm_mcs_valuation+ is not too precise, in that different sets of random numbers will lead to (slightly) different estimates. 20,000 paths per simulation can also be considered a bit too low for robust Monte Carlo estimates (leading, however, to high valuation speeds). By contrast, the binomial option pricing model with 1,000 time steps is rather precise but also takes much longer in this case.
+
+Again, we can try +NumPy+ vectorization techniques to come up with equally precise but faster results from the binomial approach. The +binomial_np+ function might seem a bit cryptic at first sight; however, when you step through the individual construction steps and inspect the results, it becomes clear what happens behind the (+NumPy+) scenes:
+
+// code cell start uuid: 8b7b292f-5d43-4462-9ac1-5ceb65ee078f
+[source, python]
+----
+In [68]: def binomial_np(strike):
+             ''' Binomial option pricing with NumPy.
+         
+             Parameters
+             ==========
+             strike : float
+                 strike price of the European call option
+             '''
+             # Index Levels with NumPy
+             mu = np.arange(M + 1)
+             mu = np.resize(mu, (M + 1, M + 1))
+             md = np.transpose(mu)
+             mu = u ** (mu - md)
+             md = d ** md
+             S = S0 * mu * md
+         
+             # Valuation Loop
+             pv = np.maximum(S - strike, 0)
+             z = 0
+             for t in range(M - 1, -1, -1):  # backward iteration
+                 pv[0:M - z, t] = (q * pv[0:M - z, t + 1]
+                                 + (1 – q) * pv[1:M - z + 1, t + 1]) * df
+                 z += 1
+             return pv[0, 0]
+----
+
+// code cell end
+
+Let us briefly take a look behind the scenes. For simplicity and readability, consider only +M=4+ time steps. The first step:
+
+// code cell start uuid: 61e7450e-58fb-4b5f-9f68-c95e82fe8070
+[source, python]
+----
+In [69]: M = 4  # four time steps only
+         mu = np.arange(M + 1)
+         mu
+----
+
+----
+Out[69]: array([0, 1, 2, 3, 4])
+----
+
+// code cell end
+
+The second step of the construction:
+
+// code cell start uuid: 0cad7263-b392-4b70-8e41-1b212c5bd076
+[source, python]
+----
+In [70]: mu = np.resize(mu, (M + 1, M + 1))
+         mu
+----
+
+----
+Out[70]: array([[0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4]])
+----
+
+// code cell end
+
+The third one:
+
+// code cell start uuid: 720863b6-f28c-46ad-8bf2-1743a0b09efc
+[source, python]
+----
+In [71]: md = np.transpose(mu)
+         md
+----
+
+----
+Out[71]: array([[0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1],
+                [2, 2, 2, 2, 2],
+                [3, 3, 3, 3, 3],
+                [4, 4, 4, 4, 4]])
+----
+
+// code cell end
+
+The fourth and fifth steps:
+
+// code cell start uuid: cad9aa29-b19d-4ab6-a26a-4664fa166a60
+[source, python]
+----
+In [72]: mu = u ** (mu - md)
+         mu.round(3)
+----
+
+----
+Out[72]: array([[ 1.   ,  1.006,  1.013,  1.019,  1.026],
+                [ 0.994,  1.   ,  1.006,  1.013,  1.019],
+                [ 0.987,  0.994,  1.   ,  1.006,  1.013],
+                [ 0.981,  0.987,  0.994,  1.   ,  1.006],
+                [ 0.975,  0.981,  0.987,  0.994,  1.   ]])
+----
+
+// code cell end
+
+// code cell start uuid: fcf799c2-3311-4ca6-8293-1485caabe8a0
+[source, python]
+----
+In [73]: md = d ** md
+         md.round(3)
+----
+
+----
+Out[73]: array([[ 1.   ,  1.   ,  1.   ,  1.   ,  1.   ],
+                [ 0.994,  0.994,  0.994,  0.994,  0.994],
+                [ 0.987,  0.987,  0.987,  0.987,  0.987],
+                [ 0.981,  0.981,  0.981,  0.981,  0.981],
+                [ 0.975,  0.975,  0.975,  0.975,  0.975]])
+----
+
+// code cell end
+
+Finally, bringing everything together:
+
+// code cell start uuid: e6998500-9c10-4b10-85a2-1766153bd20a
+[source, python]
+----
+In [74]: S = S0 * mu * md
+         S.round(3)
+----
+
+----
+Out[74]: array([[ 100.   ,  100.634,  101.273,  101.915,  102.562],
+                [  98.743,   99.37 ,  100.   ,  100.634,  101.273],
+                [  97.502,   98.121,   98.743,   99.37 ,  100.   ],
+                [  96.276,   96.887,   97.502,   98.121,   98.743],
+                [  95.066,   95.669,   96.276,   96.887,   97.502]])
+----
+
+// code cell end
+
+From the +ndarray+ object +S+, only the upper triangular matrix is of importance. Although we do more calculations with this approach than are needed in principle, the approach is, as expected, much faster than the first version, which relies heavily on nested loops on the +Python+ level:
+
+// code cell start uuid: 29f7228e-7751-46dd-886e-e74c4c28d56b
+[source, python]
+----
+In [75]: M = 1000  # reset number of time steps
+         %time round(binomial_np(100), 3)
+----
+
+----
+Out[75]: CPU times: user 308 ms, sys: 6 ms, total: 314 ms
+         Wall time: 304 ms
+         
+         10.449
+----
+
+// code cell end
+
++Numba+ has proven a valuable performance enhancement tool for our sandbox example. Here, it can prove its worth in the context of a very important financial algorithm:
+
+// code cell start uuid: 0551702a-ecbb-46ec-8a65-eca2b9788adc
+[source, python]
+----
+In [76]: binomial_nb = nb.jit(binomial_py)
+----
+
+// code cell end
+
+// code cell start uuid: ea4be56f-18d2-46c0-8a56-23c24b7c1c9a
+[source, python]
+----
+In [77]: %time round(binomial_nb(100), 3)
+----
+
+----
+Out[77]: CPU times: user 1.71 s, sys: 137 ms, total: 1.84 s
+         Wall time: 1.59 s
+         
+         10.449
+----
+
+// code cell end
+
+We do not yet see a significant speedup over the +NumPy+ vectorized version since the first call of the compiled function involves some overhead. Therefore, using the +perf_comp_func+ function shall shed a more realistic light on how the three different implementations compare with regard to performance. Obviously, the +Numba+ compiled version is indeed significantly faster than the +NumPy+ version:
+
+// code cell start uuid: 6b0286e5-8f41-47e3-897a-0e9cf06ce35f
+[source, python]
+----
+In [78]: func_list = ['binomial_py', 'binomial_np', 'binomial_nb']
+         K = 100.
+         data_list = 3 * ['K']
+----
+
+// code cell end
+
+// code cell start uuid: bf398a3d-c2ce-4cdd-ae1e-0c7e49afcdf7
+[source, python]
+----
+In [79]: perf_comp_data(func_list, data_list)
+----
+
+----
+Out[79]: function: binomial_nb, av. time sec:   0.14800, relative:    1.0
+         function: binomial_np, av. time sec:   0.31770, relative:    2.1
+         function: binomial_py, av. time sec:   3.36707, relative:   22.8
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_PCdyn")))(((range="endofrange", startref="ix_numba")))(((range="endofrange", startref="ix_dyn")))(((range="endofrange", startref="ix_DCbinom")))(((range="endofrange", startref="ix_binom")))(((range="endofrange", startref="ix_Compdyn")))In summary, we can state the following:
+
+* **Efficiency**: using +Numba+ involves only a little additional effort. The original function is often not changed at all; all you need to do is call the +jit+ function.
+* **Speed-up**: +Numba+ often leads to significant improvements in execution speed, not only compared to pure +Python+ but also to vectorized +NumPy+ implementations.
+* **Memory**: with +Numba+ there is no need to initialize large array objects; the compiler specializes the machine code to the problem at hand (as compared to the "universal" functions of +NumPy+) and maintains memory efficiency, as with pure +Python+.
+
+
+=== Static Compiling with Cython
+
+(((performance computing, static compiling with Cython)))(((Cython library)))((("compilation", "static", id="ix_Compstat", range="startofrange")))The strength of +Numba+ is the effortless application of the approach to arbitrary functions. However, +Numba+ will only "effortlessly" generate significant performance improvements for certain types of problems. Another approach, which is more flexible but also more involved, is to go the route of _static compiling_ with +Cython+. In effect, +Cython+ is a hybrid language of +Python+ and +C+. Coming from +Python+, the major differences to be noticed are the static type declarations (as in +C+) and a separate compiling step (as with any compiled language).
+
+As a simple example function, consider the following nested loop that again returns simply the number of loops. Compared to the previous nested loop example, this time the number of inner loop iterations is scaled by the outer loop iterations. In such a case, you will pretty quickly run into memory troubles when you try to apply +NumPy+ for a speedup:
+
+// code cell start uuid: 42984b49-a970-4dd1-9ea0-cad5cae02323
+[source, python]
+----
+In [80]: def f_py(I, J):
+             res = 0.  # we work on a float object
+             for i in range(I):
+                 for j in range (J * I):
+                     res += 1
+             return res
+----
+
+// code cell end
+
+Let us check +Python+ performance for +I = 500+ and +J = 500+. A +NumPy+ +ndarray+ object allowing us to vectorize the function +f_py+ in such a case would already have to have a shape of +(500, 250000)+:
+
+// code cell start uuid: 61275ff2-94d2-4e94-bdb2-caf356435074
+[source, python]
+----
+In [81]: I, J = 500, 500
+         %time f_py(I, J)
+----
+
+----
+Out[81]: CPU times: user 17 s, sys: 2.72 s, total: 19.7 s
+         Wall time: 14.2 s
+         
+         125000000.0
+----
+
+// code cell end
+
+Consider next the code shown in <<nested_loop>>. It takes the very same function and introduces static type declarations for use with +Cython+. Note that the suffix of this +Cython+ file is +.pyx+.
+
+[[nested_loop]]
+.Nested loop example with Cython static type declarations
+====
+[source, python]
+----
+include::ipython/nested_loop.pyx[]
+----
+====
+
+In such a simple case, when no special +C+ modules are needed, there is an easy way to import such a module--namely, via +pyximport+:
+
+// code cell start uuid: 215b732a-4fe7-4901-b054-e6c3b6ca2161
+[source, python]
+----
+In [82]: import pyximport
+         pyximport.install()
+----
+
+----
+Out[82]: (None, <pyximport.pyximport.PyxImporter at 0x92cfc10>)
+----
+
+// code cell end
+
+This allows us now to directly import from the +Cython+ module:
+
+// code cell start uuid: 5adec88a-d48c-4972-abb7-0a6492384f13
+[source, python]
+----
+In [83]: import sys
+         sys.path.append('data/')
+           # path to the Cython script
+           # not needed if in same directory
+----
+
+// code cell end
+
+// code cell start uuid: a28ef97f-7867-4163-bba1-87706aa348ad
+[source, python]
+----
+In [84]: from nested_loop import f_cy
+----
+
+// code cell end
+
+Now, we can check the performance of the +Cython+ function:
+
+// code cell start uuid: cb96d228-6db0-4d9d-ac7e-852698da0098
+[source, python]
+----
+In [85]: %time res = f_cy(I, J)
+----
+
+----
+Out[85]: CPU times: user 154 ms, sys: 0 ns, total: 154 ms
+         Wall time: 153 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 03e8d77b-b0d7-4dab-8b9d-f544dcd10d91
+[source, python]
+----
+In [86]: res
+----
+
+----
+Out[86]: 125000000.0
+----
+
+// code cell end
+
+When working in +IPython+ +Notebook+ there is a more convenient way to use ++Cython++—++cythonmagic++:
+
+// code cell start uuid: ce1d0d99-0fc1-4062-9f77-de253fa41ef7
+[source, python]
+----
+In [87]: %load_ext cythonmagic
+----
+
+// code cell end
+
+Loading this extension from within the +IPython Notebook+ allows us to compile code with +Cython+ from within the tool:
+
+// code cell start uuid: 2a20c9e7-69e5-47e5-a5f9-2271e42661e3
+[source, python]
+----
+In [88]: %%cython
+         #
+         # Nested loop example with Cython
+         #
+         def f_cy(int I, int J):
+             cdef double res = 0
+             # double float much slower than int or long
+             for i in range(I):
+                 for j in range (J * I):
+                     res += 1
+             return res
+----
+
+// code cell end
+
+The performance results should, of course, be (almost) the same:
+
+// code cell start uuid: 44344a84-ccd1-47ce-a23a-69d70cdb6704
+[source, python]
+----
+In [89]: %time res = f_cy(I, J)
+----
+
+----
+Out[89]: CPU times: user 156 ms, sys: 0 ns, total: 156 ms
+         Wall time: 154 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: a1b8b484-49cd-4872-ae0d-d547d6d965d1
+[source, python]
+----
+In [90]: res
+----
+
+----
+Out[90]: 125000000.0
+----
+
+// code cell end
+
+Let us see what +Numba+ can do in this case. The application is as straightforward as before:
+
+// code cell start uuid: f0984dae-8739-44db-bf67-dd9fc4ff058d
+[source, python]
+----
+In [91]: import numba as nb
+----
+
+// code cell end
+
+// code cell start uuid: 7f8097cb-dcca-4280-9371-a49a34c91f28
+[source, python]
+----
+In [92]: f_nb = nb.jit(f_py)
+----
+
+// code cell end
+
+The performance is--when invoking the function for the first time--worse than that of the +Cython+ version (recall that with the first call of the +Numba+ compiled function there is always some overhead involved):
+
+// code cell start uuid: ab30b87b-1ef5-41b7-918d-95e096cbafaf
+[source, python]
+----
+In [93]: %time res = f_nb(I, J)
+----
+
+----
+Out[93]: CPU times: user 285 ms, sys: 9 ms, total: 294 ms
+         Wall time: 273 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: d8c59388-1209-4d26-af73-13ee504a89f2
+[source, python]
+----
+In [94]: res
+----
+
+----
+Out[94]: 125000000.0
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_Compstat")))Finally, the more rigorous comparison--showing that the +Numba+ version indeed keeps up with the +Cython+ version(s):
+
+// code cell start uuid: 86494215-2f3c-4299-83dd-a74b58847658
+[source, python]
+----
+In [95]: func_list = ['f_py', 'f_cy', 'f_nb']
+         I, J = 500, 500
+         data_list = 3 * ['I, J']
+----
+
+// code cell end
+
+// code cell start uuid: 7fdcda66-f27e-4f77-a103-b9c862ed1b33
+[source, python]
+----
+In [96]: perf_comp_data(func_list, data_list)
+----
+
+----
+Out[96]: function: f_nb, av. time sec:   0.15162, relative:    1.0
+         function: f_cy, av. time sec:   0.15275, relative:    1.0
+         function: f_py, av. time sec:  14.08304, relative:   92.9
+         
+----
+
+// code cell end
+
+
+=== Generation of Random Numbers on GPUs
+
+
+(((performance computing, random number generation on GPUs)))(((random number generation)))(((NumbaPro library)))((("General Purpose Graphical Processing Units (GPGPUs)")))The last topic in this chapter is the use of devices for massively parallel operations--i.e., _General Purpose Graphical Processing Units_ (GPGPUs, or simply GPUs). To use an Nvidia GPU, we need to have +CUDA+ (+Compute Unified Device Architecture+, cf. https://developer.nvidia.com[]) installed. An easy way to harness the power of Nvidia GPUs is to use +NumbaPro+, a performance library by Continuum Analytics that dynamically compiles +Python+ code for the GPU (or a multicore CPU).
+
+This chapter does not allow us to go into the details of GPU usage for +Python+ programming. However, there is one financial field that can benefit strongly from the use of a GPU: Monte Carlo simulation and (pseudo)random number generation in particular.footnote:[See also <<stochastics>> on these topics.] In what follows, we use the native +CUDA+ library +curand+ to generate random numbers on the GPU:
+
+// code cell start uuid: 12aa1bd9-b171-4025-8326-b19e828c76d5
+[source, python]
+----
+In [97]: from numbapro.cudalib import curand
+----
+
+// code cell end
+
+As the _benchmark_ case, we define a function, using +NumPy+, that delivers a two-dimensional array of standard normally distributed pseudorandom numbers:
+
+// code cell start uuid: 46a65b60-8124-4fe7-80dd-022da5cc6947
+[source, python]
+----
+In [98]: def get_randoms(x, y):
+             rand = np.random.standard_normal((x, y))
+             return rand
+----
+
+// code cell end
+
+First, let's check if it works:
+
+// code cell start uuid: c242d2b4-090c-43f1-b88c-31ec1f7ad90d
+[source, python]
+----
+In [99]: get_randoms(2, 2)
+----
+
+----
+Out[99]: array([[-0.30561007,  1.33124048],
+                [-0.04382143,  2.31276888]])
+----
+
+// code cell end
+
+Now the function for the Nvidia GPU:
+
+// code cell start uuid: eed83723-6137-4906-b8a9-b1a160778dab
+[source, python]
+----
+In [100]: def get_cuda_randoms(x, y):
+              rand = np.empty((x * y), np.float64)
+                  # rand serves as a container for the randoms
+                  # CUDA only fills 1-dimensional arrays
+              prng = curand.PRNG(rndtype=curand.PRNG.XORWOW)
+                  # the argument sets the random number algorithm
+              prng.normal(rand, 0, 1)  # filling the container
+              rand = rand.reshape((x, y))
+                  # to be "fair", we reshape rand to 2 dimensions
+              return rand  
+----
+
+// code cell end
+
+Again, a brief check of the functionality:
+
+// code cell start uuid: ea656208-e79a-4299-94e5-a9bb5bbd4827
+[source, python]
+----
+In [101]: get_cuda_randoms(2, 2)
+----
+
+----
+Out[101]: array([[ 1.07102161,  0.70846868],
+                 [ 0.89437398, -0.86693007]])
+----
+
+// code cell end
+
+And a first comparison of the performance:
+
+// code cell start uuid: 0a7b42e1-9a22-4b5c-a90d-d60fa06df925
+[source, python]
+----
+In [102]: %timeit a = get_randoms(1000, 1000)
+----
+
+----
+Out[102]: 10 loops, best of 3: 72 ms per loop
+          
+----
+
+// code cell end
+
+// code cell start uuid: edee5812-cbdf-47cb-a5e4-01218b279706
+[source, python]
+----
+In [103]: %timeit a = get_cuda_randoms(1000, 1000)
+          
+----
+
+----
+Out[103]: 100 loops, best of 3: 14.8 ms per loop
+          
+----
+
+// code cell end
+
+Now, a more systematic routine to compare the performance:
+
+// code cell start uuid: 0f81730f-4c01-4443-bb07-972d86a1dc17
+[source, python]
+----
+In [104]: import time as t
+          step = 1000
+          def time_comparsion(factor):
+              cuda_times = list()
+              cpu_times = list()
+              for j in range(1, 10002, step):
+                  i = j * factor
+                  t0 = t.time()
+                  a = get_randoms(i, 1)
+                  t1 = t.time()
+                  cpu_times.append(t1 - t0)
+                  t2 = t.time()
+                  a = get_cuda_randoms(i, 1)
+                  t3 = t.time()
+                  cuda_times.append(t3 - t2)
+              print "Bytes of largest array %i" % a.nbytes
+              return cuda_times, cpu_times
+----
+
+// code cell end
+
+And a helper function to visualize performance results:
+
+// code cell start uuid: af35475e-9d90-40fa-926f-fa27315ef9c8
+[source, python]
+----
+In [105]: def plot_results(cpu_times, cuda_times, factor):
+              plt.plot(x * factor, cpu_times,'b', label='NUMPY')
+              plt.plot(x * factor, cuda_times, 'r', label='CUDA')
+              plt.legend(loc=0)
+              plt.grid(True)
+              plt.xlabel('size of random number array')
+              plt.ylabel('time')
+              plt.axis('tight')
+----
+
+// code cell end
+
+Let's take a look at the first test series with a _medium_ workload:
+
+// code cell start uuid: 7f8a3392-dca2-43a8-93e0-64adf6dc0ad7
+[source, python]
+----
+In [106]: factor = 100
+          cuda_times, cpu_times = time_comparsion(factor)
+----
+
+----
+Out[106]: Bytes of largest array 8000800
+          
+----
+
+// code cell end
+
+Calculation time for the random numbers on the GPU is almost _independent_ of the numbers to be generated. By constrast, time on the CPU _rises sharply_ with increasing size of the random number array to be generated. Both statements can be verified in <<cuda_1>>:
+
+// code cell start uuid: 5ccd070e-d21a-4bdc-b868-ca2f3693668d
+[source, python]
+----
+In [107]: x = np.arange(1, 10002, step)
+----
+
+// code cell end
+
+// code cell start uuid: 84f25aaf-85e0-4b45-aade-decd518345d8
+[source, python]
+----
+In [108]: plot_results(cpu_times, cuda_times, factor)
+----
+
+[[cuda_1]]
+.Random number generation on GPU and CPU (factor = 100)
+image::images/pyfi_0805.png[]
+
+// code cell end
+
+Now let's look at the second test series, with a pretty _low_ workload:
+
+// code cell start uuid: a9f24658-0f0f-4516-957a-0328081fc4fb
+[source, python]
+----
+In [109]: factor = 10
+          cuda_times, cpu_times = time_comparsion(factor)
+----
+
+----
+Out[109]: Bytes of largest array 800080
+          
+----
+
+// code cell end
+
+The _overhead_ of using the GPU is too large for low workloads--something quite obvious from inspecting <<cuda_2>>:
+
+// code cell start uuid: 269eef74-1b52-4572-a07f-56f973a9a900
+[source, python]
+----
+In [110]: plot_results(cpu_times, cuda_times, factor)
+----
+
+[[cuda_2]]
+.Random number generation on GPU and CPU (factor = 10)
+image::images/pyfi_0806.png[]
+
+// code cell end
+
+Now let's consider a test series with a comparatively _heavy_ workload. The largest random number array is 400 MB in size:
+
+// code cell start uuid: 0a983163-d9e3-4f1c-ace5-d6d16b9e8af4
+[source, python]
+----
+In [111]: %%time
+          factor = 5000
+          cuda_times, cpu_times = time_comparsion(factor)
+----
+
+----
+Out[111]: Bytes of largest array 400040000
+          CPU times: user 22 s, sys: 3.52 s, total: 25.5 s
+          Wall time: 25.4 s
+          
+----
+
+// code cell end
+
+For heavy workloads the GPU clearly shows its advantages, as <<cuda_3>> impressively illustrates:
+
+// code cell start uuid: 385b6468-bc77-450b-8e19-155fc186c60e
+[source, python]
+----
+In [112]: plot_results(cpu_times, cuda_times, factor)
+----
+
+[[cuda_3]]
+.Random number generation on GPU and CPU (factor = 5,000)
+image::images/pyfi_0807.png[]
+
+// code cell end
+
+
+=== Conclusions
+
+Nowadays, the +Python+ ecosystem provides a number of ways to improve the performance of code:
+
+Paradigms::
+    Some +Python+ paradigms might be more performant than others,         
+    given a specific problem.
+Libraries:: 
+    There is a wealth of libraries available for different types of     
+    problems, which often lead to much higher performance given a     
+    problem that fits into the scope of the library (e.g., +numexpr+).
+Compiling::
+    A number of powerful compiling solutions are available, 
+    including static (e.g., +Cython+) and dynamic ones (e.g.,     
+    +Numba+).
+Parallelization:: 
+    Some Python libraries have built-in parallelization 
+    capabilities (e.g., +numexpr+), while others allow us to harness the 
+    full power of multiple-core CPUs, whole clusters (e.g., +IPython.parallel+), or GPUs (e.g., +NumbaPro+).
+
+A major benefit of the Python ecosystem is that all these approaches generally are easily implementable, meaning that the additional effort included is generally quite low (even for nonexperts). In other words, performance improvements often are low-hanging fruits given the performance libraries available as of today.
+
+
+
+=== Further Reading
+
+For all performance libraries introduced in this chapter, there are valuable web resources available:
+
+* For details on +numexpr+ see http://github.com/pydata/numexpr[].
+* +IPython.parallel+ is explained here: http://ipython.org/ipython-doc/stable/parallel[].
+* Find the documentation for the +multiprocessing+ module here: https://docs.python.org/2/library/multiprocessing.html[].
+* Information on +Numba+ can be found at http://github.com/numba/numba[].
+* http://cython.org[] is the home of the +Cython+ compiler project.
+* For the documentation of +NumbaPro+, refer to http://docs.continuum.io/numbapro[].
+
+For a reference in book form, see the following:
+
+* Gorelick, Misha and Ian Ozsvald (2014): _High Performance Python_. O'Reilly, Sebastopol, CA.
+

@@ -1,0 +1,1091 @@
+[[introductory_examples]]
+
+
+== Introductory Examples
+
+[quote, John Forman]
+____
+[role="align_me_right"]
+Quantitative analysis, as we define it, is the application of pass:[<phrase role='keep-together'>mathematical and/or statistical methods to market data.</phrase>]
+____
+
+This chapter dives into some concrete examples from _quantitative finance_ to illustrate how convenient and powerful it is to use +Python+ and its libraries for financial analytics. The focus lies on the flow of the exposition, and a number of details that might be important in real-world applications are not touched upon. Also, details of +Python+ usage are mainly skipped because later chapters explain them further.
+
+Specifically, this chapter presents the following examples:
+
+Implied volatilities:: 
+Option quotes for certain maturity dates are taken to back out the implied volatilities of these options and to plot them--a task option traders and risk managers, among others, are faced with on a daily basis.
+Monte Carlo simulation:: 
+The evolution of a stock index over time is simulated via Monte Carlo techniques, selected results are visualized, and European option values are calculated. Monte Carlo simulation is a cornerstone for numerical option pricing as well as for risk management efforts involving value-at-risk calculations or credit value pass:[<phrase role='keep-together'>adjustments.</phrase>]
+Technical analysis:: 
+An analysis of historical time series data is implemented to backtest an investment strategy based on trend signals; both professional investors and ambitious amateurs regularly engage in this kind of investment analysis.
+
+All examples have to deal in some ways with date-time information. <<dates_times>> introduces handling such information with +Python+, +NumPy+, and +pandas+.
+
+
+=== Implied Volatilities
+
+((("dates and times", "implied volatilities example", id="ix_DTimpvol", range="startofrange")))((("financial analytics", "implied volatilities example", id="ix_FAimpvol", range="startofrange")))(((implied volatilities, definition of)))((("analytics", "financial", "implied volatilities example", id="ix_Aimpvol", range="startofrange")))Given an option pricing formula like the seminal one of Black-Scholes-Merton (1973), _implied volatilities_ are those volatility values that, _ceteris paribus_, when put into the formula, give observed market quotes for different option strikes and maturities. In this case, the volatility is not an input parameter for the model/formula, but the result of a (numerical) optimization procedure given that formula.
+
+The example we consider in the following discussion is about a new generation of options, namely volatility options on the VSTOXX volatility index. Eurex, the derivatives exchange that provides these options on the VSTOXX and respective futures contracts, established a comprehensive +Python+-based tutorial called http://www.eurexchange.com/advanced-services/["VSTOXX Advanced Services"] in June 2013 about the index and its derivatives contracts.footnote:[<<volatility_options>> also deals with options based on the VSTOXX volatility index; it calibrates an option pricing model to market quotes and values American, nontraded options given the calibrated model.]
+
+(((implied volatilities, Black-Scholes-Merton formula)))(((Black-Scholes-Merton model, formula for)))However, before proceeding with the VSTOXX options themselves, let us first reproduce in <<bsm_formula>> the famous Black-Scholes-Merton formula for the pricing of European call options on an underlying without dividends.
+
+[[bsm_formula]]
+[latexmath]
+.Black-Scholes-Merton (1973) option pricing formula
+++++
+\begin{eqnarray*}
+C(S_t, K, t, T, r, \sigma) &=& S_{t} \cdot \mathbf{N}(d_{1})-e^{-r(T-t)} \cdot K \cdot \mathbf{N}(d_{2}) \label{eq:BS_CALL}\\
+\mathbf{N}(d)&=&\frac{1}{\sqrt{2\pi}}\int_{-\infty}^{d}e^{-\frac{1}{2}x^{2}}dx \\
+d_{1}&=&\frac{\log \frac{S_{t}}{K}+(r+\frac{\sigma^{2}}{2})(T-t)}{\sigma \sqrt{T-t}} \\
+d_{2}&=&\frac{\log \frac{S_{t}}{K}+(r-\frac{\sigma^{2}}{2})(T-t)}{\sigma \sqrt{T-t}}
+\end{eqnarray*}
+++++
+
+(((Black-Scholes-Merton model, parameters meanings)))The different parameters have the following meaning:
+
+++++
+<?hard-pagebreak?>
+++++
+
+ __S~t~__::
+    Price/level of the underlying at time __t__
+ &#x1d70e;::
+    Constant volatility (i.e., standard deviation of returns) of the underlying
+ __K__::
+    Strike price of the option
+ __T__::
+    Maturity date of the option
+ __r__::
+    Constant riskless short rate
+
+Consider now that an option quote for a European call option __C*__ is given. The implied volatility &#x1d70e;^__imp__^ is the quantity that solves the implicit <<eq_imp_vol>>.
+
+[[eq_imp_vol]]
+[latexmath]
+.Implied volatility given market quote for option
+++++
+\begin{equation*}
+C(S_t, K, t, T, r, \sigma^{imp}) = C*
+\end{equation*}
+++++
+
+(((implied volatilities, Newton scheme for)))(((Newton scheme)))There is no closed-form solution to this equation, such that one has to use a numerical solution procedure like the Newton scheme to estimate the correct solution. This scheme iterates, using the first derivative of the relevant function, until a certain number of iterations or a certain degree of precision is reached. Formally, we have <<eq_newton>> for some starting value latexmath:[$\sigma^{imp}_{0}$] and for 0 < __n__ < &#x221E;.
+
+[[eq_newton]]
+[latexmath]
+.Newton scheme for numerically solving equations
+++++
+\begin{equation*}
+\sigma^{imp}_{n+1} = \sigma^{imp}_{n} - \frac{C(\sigma^{imp}_n) - C*}{\partial C(\sigma^{imp}_n) / \partial \sigma^{imp}_n}
+\end{equation*}
+++++
+
+(((Vega, of a European option in BSM model)))(((Black-Scholes-Merton model, Vega of a European option)))The partial derivative of the option pricing formula with respect to the volatility is called _Vega_ and is given in closed form by <<eq_vega>>.
+
+[[eq_vega]]
+[latexmath]
+.Vega of a European option in BSM model
+++++
+\begin{equation*}
+\frac{\partial C}{\partial \sigma} = S_t \mathbf{N}'(d_1)\sqrt{T-t}
+\end{equation*}
+++++
+
+The financial and numerical tools needed are now complete--even if only roughly described--and we can have a look into the respective +Python+ code that assumes the special case __t__ = 0 (<<bsm_functions>>).
+
+[[bsm_functions]]
+.Black-Scholes-Merton (1973) functions
+====
+[source, python]
+----
+include::ipython/bsm_functions.py[]
+----
+====
+
+(((implied volatilities, option quotes)))These are only the basic functions needed to calculate implied volatilities. What we need as well, of course, are the respective option quotes, in our case for European call options on the VSTOXX index, and the code that generates the single implied volatilities. We will see how to do this based on an interactive +IPython+ session.
+
+Let us start with the day from which the quotes are taken; i.e., our __t__ = 0 reference day. This is March 31, 2014. At this day, the closing value of the index was __V~0~__ = 17.6639 (we change from __S__ to __V__ to indicate that we are now working with the volatility index):
+
+// code cell start uuid: 8e3ac03d-e5c1-4184-8494-5c02f5c1a897
+[source, python]
+----
+In [1]: V0 = 17.6639
+----
+
+// code cell end
+
+For the risk-free short rate, we assume a value of __r__ = 0.01 p.a.:
+
+// code cell start uuid: 3d727b16-4ff1-49fb-a54a-6e96568f54b0
+[source, python]
+----
+In [2]: r = 0.01
+----
+
+// code cell end
+
+All other input parameters are given by the options data (i.e., __T__ and __K__) or have to be calculated  (i.e., &#x1d70e;^__imp__^). The data is stored in a +pandas+ +DataFrame+ object (see <<fin_time_series>>) and saved in a +PyTables+ database file (see <<input_output>>). We have to read it from disk into memory:
+
+// code cell start uuid: 009042d8-f384-482c-8b4b-eeac6312315e
+[source, python]
+----
+In [3]: import pandas as pd
+        h5 = pd.HDFStore('./source/vstoxx_data_31032014.h5', 'r')
+        futures_data = h5['futures_data']  # VSTOXX futures data
+        options_data = h5['options_data']  # VSTOXX call option data
+        h5.close()
+----
+
+// code cell end
+
+(((implied volatilities, futures data)))We need the futures data to select a subset of the VSTOXX options given their (forward) moneyness. Eight futures on the VSTOXX are traded at any time. Their maturities are the next eight _third Fridays_ of the month. At the end of March, there are futures with maturities ranging from the third Friday of April to the third Friday of November. +TTM+ in the following +pandas+ table represents time-to-maturity in year fractions:
+
+// code cell start uuid: 8d5c855d-87d0-4108-93c7-57094610bd68
+[source, python]
+----
+In [4]: futures_data
+----
+
+----
+Out[4]:           DATE  EXP_YEAR  EXP_MONTH  PRICE   MATURITY    TTM
+        496 2014-03-31      2014          4  17.85 2014-04-18  0.049
+        497 2014-03-31      2014          5  19.55 2014-05-16  0.126
+        498 2014-03-31      2014          6  19.95 2014-06-20  0.222
+        499 2014-03-31      2014          7  20.40 2014-07-18  0.299
+        500 2014-03-31      2014          8  20.70 2014-08-15  0.375
+        501 2014-03-31      2014          9  20.95 2014-09-19  0.471
+        502 2014-03-31      2014         10  21.05 2014-10-17  0.548
+        503 2014-03-31      2014         11  21.25 2014-11-21  0.644
+----
+
+// code cell end
+
+The options data set is larger since at any given trading day multiple call and put options are traded per maturity date. The maturity dates, however, are the same as for the futures. There are a total of 395 call options quoted on March 31, 2014:
+
+// code cell start uuid: 48b29f70-8142-4960-8d4d-3a241685bc1d
+[source, python]
+----
+In [5]: options_data.info()
+----
+
+----
+Out[5]: <class 'pandas.core.frame.DataFrame'>
+        Int64Index: 395 entries, 46170 to 46564
+        Data columns (total 8 columns):
+        DATE         395 non-null datetime64[ns]
+        EXP_YEAR     395 non-null int64
+        EXP_MONTH    395 non-null int64
+        TYPE         395 non-null object
+        STRIKE       395 non-null float64
+        PRICE        395 non-null float64
+        MATURITY     395 non-null datetime64[ns]
+        TTM          395 non-null float64
+        dtypes: datetime64[ns](2), float64(3), int64(2), object(1)
+----
+
+// code cell end
+
+// code cell start uuid: dead6085-55a7-46c1-9396-3ec0e247b8f4
+[source, python]
+----
+In [6]: options_data[['DATE', 'MATURITY', 'TTM', 'STRIKE', 'PRICE']].head()
+----
+
+----
+Out[6]:             DATE   MATURITY    TTM  STRIKE  PRICE
+        46170 2014-03-31 2014-04-18  0.049       1  16.85
+        46171 2014-03-31 2014-04-18  0.049       2  15.85
+        46172 2014-03-31 2014-04-18  0.049       3  14.85
+        46173 2014-03-31 2014-04-18  0.049       4  13.85
+        46174 2014-03-31 2014-04-18  0.049       5  12.85
+----
+
+// code cell end
+
+As is obvious in the +pandas+ table, there are call options traded and quoted that are far in-the-money (index level much higher than option strike). There are also options traded that are far out-of-the-money (index level much lower than option strike). We therefore want to restrict the analysis to those call options with a certain (forward) moneyness, given the value of the future for the respective maturity. We allow a maximum deviation of 50% from the futures level.
+
+Before we can start, we need to define a new column in the +options_data+ +DataFrame+ object to store the results. We also need to import the functions from the script in <<bsm_functions>>:
+
+// code cell start uuid: 808a0269-42d5-43ed-b753-28abb46820de
+[source, python]
+----
+In [7]: options_data['IMP_VOL'] = 0.0
+          # new column for implied volatilities
+----
+
+// code cell end
+
+// code cell start uuid: 233c9f45-d3c4-48f4-8422-7e77c490d232
+[source, python]
+----
+In [8]: from bsm_functions import *
+----
+
+// code cell end
+
+The following code now calculates the implied volatilities for all those call options:
+
+// code cell start uuid: 8da4e671-cbbc-44fd-8050-c8fe300a4501
+[source, python]
+----
+In [9]: tol = 0.5  # tolerance level for moneyness
+        for option in options_data.index:
+            # iterating over all option quotes
+            forward = futures_data[futures_data['MATURITY'] == \
+                        options_data.loc[option]['MATURITY']]['PRICE'].values[0]
+              # picking the right futures value
+            if (forward * (1 - tol) < options_data.loc[option]['STRIKE']
+                                     < forward * (1 + tol)):
+                # only for options with moneyness within tolerance
+                imp_vol = bsm_call_imp_vol(
+                        V0,  # VSTOXX value
+                        options_data.loc[option]['STRIKE'],
+                        options_data.loc[option]['TTM'],
+                        r,   # short rate
+                        options_data.loc[option]['PRICE'],
+                        sigma_est=2.,  # estimate for implied volatility
+                        it=100)
+                options_data['IMP_VOL'].loc[option] = imp_vol
+----
+
+// code cell end
+
+In this code, there is some +pandas+ syntax that might not be obvious at first sight. <<fin_time_series>> explains +pandas+ and its use for such operations in detail. At this stage, it suffices to understand the following features:
+
+// code cell start uuid: 94491814-c0c6-4565-b1f7-cedb1af12c48
+[source, python]
+----
+In [10]: futures_data['MATURITY']
+           # select the column with name MATURITY
+----
+
+----
+Out[10]: 496   2014-04-18
+         497   2014-05-16
+         498   2014-06-20
+         499   2014-07-18
+         500   2014-08-15
+         501   2014-09-19
+         502   2014-10-17
+         503   2014-11-21
+         Name: MATURITY, dtype: datetime64[ns]
+----
+
+// code cell end
+
+// code cell start uuid: cbb44f1e-2ab5-4d8f-976a-2d36515eef12
+[source, python]
+----
+In [11]: options_data.loc[46170]
+           # select data row for index 46170
+----
+
+----
+Out[11]: DATE         2014-03-31 00:00:00
+         EXP_YEAR                    2014
+         EXP_MONTH                      4
+         TYPE                           C
+         STRIKE                         1
+         PRICE                      16.85
+         MATURITY     2014-04-18 00:00:00
+         TTM                        0.049
+         IMP_VOL                        0
+         Name: 46170, dtype: object
+----
+
+// code cell end
+
+// code cell start uuid: e267720a-901b-42fd-86eb-f31c29ebc166
+[source, python]
+----
+In [12]: options_data.loc[46170]['STRIKE']
+           # select only the value in column STRIKE
+           # for index 46170 
+----
+
+----
+Out[12]: 1.0
+----
+
+// code cell end
+
+The implied volatilities for the selected options shall now be visualized. To this end, we use only the subset of the +options_data+ object for which we have calculated the implied volatilities:
+
+// code cell start uuid: 03092953-5496-4500-9cf5-e3cbcf46d396
+[source, python]
+----
+In [13]: plot_data = options_data[options_data['IMP_VOL'] > 0]
+----
+
+// code cell end
+
+(((implied volatilities, visualizing data)))(((data visualization, for implied volatilities)))To visualize the data, we iterate over all maturities of the data set and plot the implied volatilities both as lines and as single points. Since all maturities appear multiple times, we need to use a little trick to get to a nonredundent, sorted list with the maturities. The +set+ operation gets rid of all duplicates, but might deliver an unsorted _set_ of the maturities. Therefore, we sort the +set+ object (cf. also <<data_structures>>):footnote:[As we are only considering a single day's worth of futures and options quotes, the +MATURITY+ column of the +futures_data+ object would have delivered the information a bit more easily since there are no duplicates.]
+
+// code cell start uuid: 738b9618-b3a9-434f-a685-441a0c837b76
+[source, python]
+----
+In [14]: maturities = sorted(set(options_data['MATURITY']))
+         maturities
+----
+
+----
+Out[14]: [Timestamp('2014-04-18 00:00:00'),
+          Timestamp('2014-05-16 00:00:00'),
+          Timestamp('2014-06-20 00:00:00'),
+          Timestamp('2014-07-18 00:00:00'),
+          Timestamp('2014-08-15 00:00:00'),
+          Timestamp('2014-09-19 00:00:00'),
+          Timestamp('2014-10-17 00:00:00'),
+          Timestamp('2014-11-21 00:00:00')]
+----
+
+// code cell end
+
+(((implied volatilities, volatility smile)))(((volatility smile)))The following code iterates over all maturities and does the plotting. The result is shown as <<vs_imp_vol>>. As in stock or foreign exchange markets, you will notice the so-called _volatility smile_, which is most pronounced for the shortest maturity and which becomes a bit less pronounced for the longer maturities:
+
+// code cell start uuid: 8886807a-ca71-48d0-b5ef-ab7cb9470548
+[source, python]
+----
+In [15]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         plt.figure(figsize=(8, 6))
+         for maturity in maturities:
+             data = plot_data[options_data.MATURITY == maturity]
+               # select data for this maturity
+             plt.plot(data['STRIKE'], data['IMP_VOL'],
+                      label=maturity.date(), lw=1.5)
+             plt.plot(data['STRIKE'], data['IMP_VOL'], 'r.')
+         plt.grid(True)
+         plt.xlabel('strike')
+         plt.ylabel('implied volatility of volatility')
+         plt.legend()
+         plt.show()
+----
+
+[[vs_imp_vol]]
+.Implied volatilities (of volatility) for European call options on the VSTOXX on March 31, 2014
+image::images/pyfi_0301.png[]
+
+// code cell end
+
+(((pandas library, hierarchically indexed data sets and)))(((integer index)))To conclude this example, we want to show another strength of +pandas+: namely, for working with hierarchically indexed data sets. The +DataFrame+ object +options_data+ has an _integer index_, which we have used in several places. However, this index is not really meaningful--it is "just" a number. The option quotes for the day March 31, 2014 are uniquely described ("identified") by a combination of the _maturity_ and the __strike__—i.e., there is only one call option per maturity and strike.
+
+The +groupby+ method can be used to capitalize on this insight and to get a more meaningful index. To this end, we group by +MATURITY+ first and then by the +STRIKE+. We only want to keep the +PRICE+ and +IMP_VOL+ columns:
+
+// code cell start uuid: 34582055-b4b2-49ea-8678-e44288f7de88
+[source, python]
+----
+In [16]: keep = ['PRICE', 'IMP_VOL']
+         group_data = plot_data.groupby(['MATURITY', 'STRIKE'])[keep]
+         group_data
+----
+
+----
+Out[16]: <pandas.core.groupby.DataFrameGroupBy object at 0x7faf483d5710>
+----
+
+// code cell end
+
+The operation returns a +DataFrameGroupBy+ object.footnote:[Note that you can always look up attributes and methods of unknown objects by using the +Python+ built-in function +dir+, like with +dir(group_data)+.] To get to the data, we need to apply an aggregation operation on the object, like taking the sum. Taking the sum yields the single data point since there is only one data element in every group:
+
+// code cell start uuid: 1b5253de-0b31-4af0-8155-b2c405363a0d
+[source, python]
+----
+In [17]: group_data = group_data.sum()
+         group_data.head()
+----
+
+----
+Out[17]:                    PRICE   IMP_VOL
+         MATURITY   STRIKE                 
+         2014-04-18 9        8.85  2.083386
+                    10       7.85  1.804194
+                    11       6.85  1.550283
+                    12       5.85  1.316103
+                    13       4.85  1.097184
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DTimpvol")))(((range="endofrange", startref="ix_FAimpvol")))(((range="endofrange", startref="ix_Aimpvol")))The resulting +DataFrame+ object has two index levels and two columns. The following shows all values that the two indices can take:
+
+// code cell start uuid: 390e4908-23ed-4419-a62d-b25ed3cf2d15
+[source, python]
+----
+In [18]: group_data.index.levels
+----
+
+----
+Out[18]: FrozenList([[2014-04-18 00:00:00, 2014-05-16 00:00:00, 2014-06-20 00:00
+         :00, 2014-07-18 00:00:00, 2014-08-15 00:00:00, 2014-09-19 00:00:00, 201
+         4-10-17 00:00:00, 2014-11-21 00:00:00], [9.0, 10.0, 11.0, 12.0, 13.0, 1
+         4.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 
+         26.0, 27.0, 28.0, 29.0, 30.0]])
+----
+
+// code cell end
+
+
+=== Monte Carlo Simulation
+
+((("dates and times", "Monte Carlo simulation example", id="ix_DTmonte", range="startofrange")))((("financial analytics", "Monte Carlo simulation example", id="ix_FAmonte", range="startofrange")))(((Monte Carlo simulation, benefits of)))((("analytics", "financial", "Monte Carlo simulation example", id="ix_Amonte", range="startofrange")))Monte Carlo simulation is one of the most important algorithms in finance and numerical science in general. Its importance stems from the fact that it is quite powerful when it comes to option pricing or risk management problems. In comparison to other numerical methods, the Monte Carlo method can easily cope with high-dimensional problems where the complexity and computational demand, respectively, generally increase in linear fashion.
+
+(((Monte Carlo simulation, drawbacks of)))The downside of the Monte Carlo method is that it is per se _computationally demanding_ and often needs huge amounts of memory even for quite simple problems.  Therefore, it is necessary to implement Monte Carlo algorithms efficiently. The example that follows illustrates different implementation strategies in +Python+ and offers three different implementation approaches for a Monte Carlo-based valuation of a European option.footnote:[Although not needed here, all approaches store complete simulation paths in-memory. For the valuation of standard European options this is not necessary, as the corresponding example in <<why_python_for_finance>> shows. However, for the valuation of American options or for certain risk management purposes, whole paths are needed.] The three approaches are:footnote:[These Monte Carlo examples and implementation approaches also appear in the article Hilpisch (2013).]
+
+Pure Python:: 
+This example sticks with the standard library--i.e., those libraries and packages that come with a standard +Python+ installation--and uses only built-in +Python+ capabilities to implement the Monte Carlo valuation.(((Monte Carlo simulation, approaches to)))
+Vectorized NumPy:: 
+This implementation uses the capabilities of +NumPy+ to make the implementation more compact and much faster.
+Fully vectorized NumPy:: 
+The final example combines a different mathematical formulation with the vectorization capabilities of +NumPy+ to get an even more compact version of the same algorithm.
+
+(((Black-Scholes-Merton model, stochastic differential equation)))(((Monte Carlo simulation, BSM stochastic differential equation)))The examples are again based on the model economy of Black-Scholes-Merton (1973), where the risky underlying (e.g., a stock price or index level) follows, under risk neutrality, a geometric Brownian motion with a stochastic differential equation (SDE), as in <<bsm_sde_ch03>>.
+
+[[bsm_sde_ch03]]
+[latexmath]
+.Black-Scholes-Merton (1973) stochastic differential equation
+++++
+\begin{equation*}
+dS_t = r S_t dt + \sigma S_t dZ_t
+\end{equation*}
+++++
+
+The parameters are defined as in <<bsm_formula>> and __Z__ is a Brownian motion. A discretization scheme for the SDE in <<bsm_sde_ch03>> is given by the difference equation in <<sde_disc_1>>.
+
+[[sde_disc_1]]
+[latexmath]
+.Euler discretization of SDE
+++++
+\begin{equation*}
+S_t = S_{t - \Delta t} \exp \left( \left(r - \frac{1}{2} \sigma^2 \right) \Delta t + \sigma \sqrt{\Delta t} z_t \right)
+\end{equation*}
+++++
+
+The variable __z__ is a standard normally distributed random variable, 0 < &#x1d6e5;__t__ < __T__, a (small enough) time interval. It also holds 0 < __t__ &#x2264; __T__ with __T__ the final time horizon.footnote:[For details, refer to the book by Hilpisch (2015).]
+
+We parameterize the model with the values __S__~0~ = 100, __K__ = 105, __T__ = 1.0, __r__ = 0.05, &#x1d70e; = 0.2. Using the Black-Scholes-Merton formula as in <<bsm_formula>> and <<bsm_functions>> from the previous example, we can calculate the exact option value as follows:
+
+// code cell start uuid: 13a3c945-2ae9-4583-b21f-cb6d4e4729b8
+[source, python]
+----
+In [19]: from bsm_functions import bsm_call_value
+         S0 = 100.
+         K = 105.
+         T = 1.0
+         r = 0.05
+         sigma = 0.2
+         bsm_call_value(S0, K, T, r, sigma)
+----
+
+----
+Out[19]: 8.0213522351431763
+----
+
+// code cell end
+
+(((Monte Carlo simulation, for European call option)))This is our benchmark value for the Monte Carlo estimators to follow. To implement a Monte Carlo valuation of the European call option, the following recipe can be applied:
+
+ . Divide the time interval [0,__T__] in equidistant subintervals of length &#x1d6e5;__t__.
+ . Start iterating __i__ = 1, 2,..., __I__.
+ .. For every time step __t__ &#x2208; {&#x1d6e5;__t__, 2&#x1d6e5;__t__,..., __T__}, draw pseudorandom numbers __z~t~__(__i__).
+ .. Determine the time __T__ value of the index level __S~T~__(__i__) by applying
+the pseudo-random numbers time step by time step to the discretization scheme in <<sde_disc_1>>.
+ .. Determine the inner value __h~T~__ of the European call option at __T__ as
+ __h~T~__(__S~T~__(__i__)) = max(__S~T~__(__i__) – __K__,0).
+ .. Iterate until __i__ = __I__.
+ . Sum up the inner values, average, and discount them back with the riskless short rate according to <<mcs_est>>.
+
+<<mcs_est>> provides the numerical Monte Carlo estimator for the value of the European call option.
+
+[[mcs_est]]
+[latexmath]
+.Monte Carlo estimator for European call option
+++++
+\begin{equation*}
+C_0 \approx e^{-rT} \frac{1}{I} \sum_I  h_T(S_T(i))
+\end{equation*}
+++++
+
+==== Pure Python
+
+(((Monte Carlo simulation, pure Python approach)))<<mcs_pure_python>> translates the parametrization and the Monte Carlo recipe into pure +Python+. The code simulates 250,000 paths over 50 time steps.
+
+[[mcs_pure_python]]
+.Monte Carlo valuation of European call option with pure Python
+====
+[source, python]
+----
+include::ipython/mcs_pure_python.py[]
+----
+====
+
+Running the script yields the following output:
+
+// code cell start uuid: aebfedcc-472c-4225-82eb-6405ecf7eaa9
+[source, python]
+----
+In [20]: %run mcs_pure_python.py
+
+Out[20]: European Option Value   7.999
+         Duration in Seconds    34.258
+         
+----
+
+
+
+Note that the estimated option value itself depends on the pseudorandom numbers generated while the time needed is influenced by the hardware the script is pass:[<phrase role='keep-together'>executed on.</phrase>]
+
+The major part of the code in <<mcs_pure_python>> consists of a nested loop that generates step-by-step single values of an index level path in the inner loop and adds completed paths to a +list+ object with the outer loop. The Monte Carlo estimator is calculated using https://docs.python.org/2/tutorial/datastructures.html[+Python+'s +list+ comprehension syntax]. The estimator could also be calculated by a +for+ loop:
+
+// code cell start uuid: d038ec31-373b-4979-aa49-a47ff96fc234
+[source, python]
+----
+In [21]: sum_val = 0.0
+         for path in S:
+             # C-like iteration for comparison
+             sum_val += max(path[-1] - K, 0)
+         C0 = exp(-r * T) * sum_val / I
+         round(C0, 3)
+----
+
+----
+Out[21]: 7.999
+----
+
+// code cell end
+
+Although this loop yields the same result, the +list+ comprehension syntax is more compact and closer to the mathematical notation of the Monte Carlo estimator.
+
+
+==== Vectorization with NumPy
+
+(((Monte Carlo simulation, vectorization with NumPy)))(((NumPy, Monte Carlo simulation with)))(((ndarray class)))(((vectorization, with NumPy)))+NumPy+ provides a powerful multidimensional array class, called +ndarray+, as well as a comprehensive set of functions and methods to manipulate arrays and implement (complex) operations on such objects. From a more general point of view, there are two major benefits of using +NumPy+:
+
+Syntax:: +NumPy+ generally allows implementations that are more compact than pure +Python+ and that are often easier to read and maintain.
+Speed:: The majority of +NumPy+ code is implemented in +C+ or +Fortran+, which makes +NumPy+, when used in the right way,  faster than pure +Python+.
+
+The generally more compact syntax stems from the fact that +NumPy+ brings powerful vectorization and broadcasting capabilities to +Python+. This is similar to having vector notation in mathematics for large vectors or matrices. For example, assume that we have a vector with the first 100 natural numbers, _1, ..., 100_:
+
+[latexmath]
+++++
+\begin{equation*}
+\vec v = \left( \begin{array}{c}
+1 \\
+2 \\
+\vdots \\
+100 \end{array}\right)
+\end{equation*}
+++++
+
+Scalar multiplication of this vector is written compactly as:
+
+[latexmath]
+++++
+\begin{equation*}
+\vec u = 2 \cdot \vec v = \left( \begin{array}{c}
+2 \\
+4 \\
+\vdots \\
+200 \end{array}\right)
+\end{equation*}
+++++
+
+Let's see if we can do this with +Python+ +list+ objects, for example:
+
+// code cell start uuid: 2f695395-b7b7-4d0c-bab3-659fcd4da5d0
+[source, python]
+----
+In [22]: v = range(1, 6)
+         print v
+----
+
+----
+Out[22]: [1, 2, 3, 4, 5]
+         
+----
+
+// code cell end
+
+// code cell start uuid: 548c6e07-9435-421c-9408-d63252608f74
+[source, python]
+----
+In [23]: 2 * v
+----
+
+----
+Out[23]: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+----
+
+// code cell end
+
+_Naive_ scalar multiplication does not return the scalar product. It rather returns, in this case, two times the object (vector). With +NumPy+ the result is, however, as desired:
+
+// code cell start uuid: 0a831df5-d2c3-46af-8399-ad2b4b411001
+[source, python]
+----
+In [24]: import numpy as np
+         v = np.arange(1, 6)
+         v
+----
+
+----
+Out[24]: array([1, 2, 3, 4, 5])
+----
+
+// code cell end
+
+// code cell start uuid: 4c5153ff-983f-4ee1-95d6-0dae809da4bf
+[source, python]
+----
+In [25]: 2 * v
+----
+
+----
+Out[25]: array([ 2,  4,  6,  8, 10])
+----
+
+// code cell end
+
+This approach can be beneficially applied to the Monte Carlo algorithm. <<mcs_numpy>> provides the respective code, this time making use of +NumPy+'s vectorization capabilities.
+
+[[mcs_numpy]]
+.Monte Carlo valuation of European call option with NumPy (first pass:[<phrase role='keep-together'>version)</phrase>]
+====
+[source, python]
+----
+include::ipython/mcs_vector_numpy.py[]
+----
+====
+
+Let us run this script:
+
+// code cell start uuid: 0fca4476-2003-4733-a6e1-f405997e1b1a
+[source, python]
+----
+In [26]: %run mcs_vector_numpy.py
+----
+
+----
+Out[26]: European Option Value   8.037
+         Duration in Seconds     1.215
+         
+----
+
+// code cell end
+
+// code cell start uuid: 6d10a22b-fed3-4627-a2bc-6f958824ca2f
+[source, python]
+----
+In [27]: round(tpy / tnp1, 2)
+----
+
+----
+Out[27]: 28.2
+----
+
+// code cell end
+
+(((vectorization, speed increase achieved by)))Vectorization brings a _speedup of more than 30 times_ in comparison to pure +Python+. The estimated Monte Carlo value is again quite close to the benchmark value.
+
+The vectorization becomes obvious when the pseudorandom numbers are generated. In the line in question, 250,000 numbers are generated in a single step, i.e., a single line of code:
+
+[source, python]
+----
+z = np.random.standard_normal(I)
+----
+
+Similarly, this vector of pseudorandom numbers is applied to the discretization scheme 'at once' per time step in a vectorized fashion. In that sense, the tasks that are accomplished by the outer loop in <<mcs_pure_python>> are now delegated to +NumPy+, avoiding the outer loop completely on the +Python+ level.
+
+.Vectorization
+[TIP]
+====
+Using vectorization with +NumPy+ generally results in code that is more compact, easier to read (and maintain), and faster to execute. All these aspects are in general important for financial applications.
+====
+
+
+==== Full Vectorization with Log Euler Scheme
+
+(((Monte Carlo simulation, full vectorization with log Euler scheme)))(((vectorization, full with log Euler scheme)))(((Euler scheme)))Using a different discretization scheme for the SDE in <<bsm_sde_ch03>> can yield an even more compact implementation of the Monte Carlo algorithm. To this end, consider the log version of the discretization in <<sde_disc_1>>, which takes on the form in <<sde_disc_2>>.
+
+[[sde_disc_2]]
+[latexmath]
+.Euler discretization of SDE (log version)
+++++
+\begin{equation*}
+\log S_t = \log S_{t - \Delta t} + \left(r - \frac{1}{2} \sigma^2 \right) \Delta t + \sigma \sqrt{\Delta t} z_t
+\end{equation*}
+++++
+
+This version is completely additive, allowing for an implementation of the Monte Carlo algorithm without any loop on the +Python+ level. <<mcs_full_vec>> shows the resulting code.
+
+[[mcs_full_vec]]
+.Monte Carlo valuation of European call option with NumPy (second pass:[<phrase role='keep-together'>version)</phrase>]
+====
+[source, python]
+----
+include::ipython/mcs_full_vector_numpy.py[]
+----
+====
+
+Let us run this third simulation script.
+
+// code cell start uuid: 02a121e5-75ff-4ad1-9812-ec0e69d3ebaa
+[source, python]
+----
+In [28]: %run mcs_full_vector_numpy.py
+----
+
+----
+Out[28]: European Option Value   8.166
+         Duration in Seconds     1.439
+         
+----
+
+// code cell end
+
+The execution speed is somewhat slower compared to the first +NumPy+ implementation. There might also be a trade-off between compactness and readability in that this implementation approach makes it quite difficult to grasp what exactly is going on on the +NumPy+ level. However, it shows how far one can go sometimes with +NumPy+ vectorization.
+
+
+==== Graphical Analysis
+
+(((Monte Carlo simulation, graphical analysis of)))((("graphical analysis", seealso="matplotlib library")))(((data visualization, graphical analysis of Monte Carlo simulation)))Finally, let us have a graphical look at the underlying mechanics (refer to <<visualization>> for an explanation of the +matplotlib+ plotting library). First, we plot the first 10 simulated paths over all time steps. <<index_paths>> shows the output:
+
+// code cell start uuid: f880bd6e-72fa-4906-b2a7-24f3c7419338
+[source, python]
+----
+In [29]: import matplotlib.pyplot as plt
+         plt.plot(S[:, :10])
+         plt.grid(True)
+         plt.xlabel('time step')
+         plt.ylabel('index level')
+----
+
+[[index_paths]]
+.The first 10 simulated index level paths
+image::images/pyfi_0302.png[]
+
+// code cell end
+
+Second, we want to see the frequency of the simulated index levels at the end of the simulation period. <<index_histo>> shows the output, this time illustrating the (approximately) log-normal distribution of the end-of-period index level values:
+
+// code cell start uuid: 997e2c48-f4e4-49c2-be9b-ce2ed0a2166f
+[source, python]
+----
+In [30]: plt.hist(S[-1], bins=50)
+         plt.grid(True)
+         plt.xlabel('index level')
+         plt.ylabel('frequency')
+----
+
+// code cell end
+
+The same type of figure looks completely different for the option's end-of-period (maturity) inner values, as <<option_iv_hist>> illustrates:
+
+// code cell start uuid: bc4f9174-c92c-4abf-9d31-da3e7d0baec5
+[source, python]
+----
+In [31]: plt.hist(np.maximum(S[-1] - K, 0), bins=50)
+         plt.grid(True)
+         plt.xlabel('option inner value')
+         plt.ylabel('frequency')
+         plt.ylim(0, 50000)
+----
+
+[[index_histo]]
+.Histogram of all simulated end-of-period index level values
+image::images/pyfi_0303.png[]
+
+[[option_iv_hist]]
+.Histogram of all simulated end-of-period option inner values
+image::images/pyfi_0304.png[]
+
+// code cell end
+
+In this case, the majority of the simluated values are zero, indicating that the European call option expires worthless in a significant amount of cases. The exact number is generated through the following calculation:
+
+// code cell start uuid: d5aed456-001a-423c-9366-df294f1c3f0b
+[source, python]
+----
+In [32]: sum(S[-1] < K)
+----
+
+----
+Out[32]: 133533
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DTmonte")))(((range="endofrange", startref="ix_FAmonte")))(((range="endofrange", startref="ix_Amonte")))This number might vary somewhat, of course, from simulation to simulation.
+
+
+=== Technical Analysis
+
+((("dates and times", "technical analysis example", id="ix_DTtech", range="startofrange", seealso="financial time series data")))((("financial analytics", "technical analysis example", id="ix_FAtech", range="startofrange")))(((technical analysis, definition of)))((("analytics", "financial", "technical analysis example", id="ix_Atech", range="startofrange")))Technical analysis based on historical price information is a typical task finance professionals and interested amateurs engage in. On http://en.wikipedia.org/wiki/Technical_analysis[Wikipedia] you find the following definition:
+
+
+[quote]
+____
+In finance, technical analysis is a security analysis methodology for forecasting the direction of prices through the study of past market data, primarily price and volume.
+____
+
+(((technical analysis, backtesting example)))In what follows, we focus on the study of past market data for backtesting purposes, and not too much on using our insights to predict future price movements. Our object of study is the benchmark index Standard & Poor's 500 (S&P 500), which is generally considered to be a good proxy for the _whole_ stock market in the United States. This is due to the high number of names included in the index and the total market capitalization represented by it. It also has highly liquid futures and options markets.
+
+We will read historical index level information from a web source and will implement a simple backtesting for a trading system based on trend signals. But first we need the data to get started. To this end, we mainly rely on the +pandas+ library, which simplifies a number of related technical issues. Since it is almost always used, we should also import +NumPy+ by default:
+
+// code cell start uuid: dcba1a61-94e3-47dd-ab54-2c688e740741
+[source, python]
+----
+In [33]: import numpy as np
+         import pandas as pd
+         import pandas.io.data as web
+----
+
+// code cell end
+
+.Scientific and Financial Python Stack
+[TIP]
+====
+(((Python, scientific stack)))(((scientific stack)))In addition to +NumPy+  and +SciPy+, there are only a couple of important libraries that form the fundamental scientific and financial +Python+ stack. Among them is +pandas+. Make sure to always have current (stable) versions of these libraries installed (but be aware of potential syntax and/or API changes).
+====
+
+(((technical analysis, retrieving time series data)))The sublibrary +pandas.io.data+ contains the function +DataReader+, which helps with getting financial time series data from different sources and in particular from the popular http://finance.yahoo.com[Yahoo! Finance site]. Let's retrieve the data we are looking for, starting on January 1, 2000:
+
+// code cell start uuid: 3b6ce702-6a8c-400c-a6fc-d382f316dd9c
+[source, python]
+----
+In [34]: sp500 = web.DataReader('^GSPC', data_source='yahoo',
+                                start='1/1/2000', end='4/14/2014')
+         sp500.info()
+----
+
+----
+Out[34]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 3592 entries, 2000-01-03 00:00:00 to 2014-04-14 00:00:00
+         Data columns (total 6 columns):
+         Open         3592 non-null float64
+         High         3592 non-null float64
+         Low          3592 non-null float64
+         Close        3592 non-null float64
+         Volume       3592 non-null int64
+         Adj Close    3592 non-null float64
+         dtypes: float64(5), int64(1)
+----
+
+// code cell end
+
++DataReader+ has connected to the data source via an Internet connection and has given back the time series data for the S&P 500 index, from the first trading day in 2000 until the end date. It has also generated automatically a time index with +Timestamp+ objects.
+
+To get a first impression, we can plot the closing quotes over time. This gives an output like that in <<sp500>>:
+
+// code cell start uuid: 444a17d9-8fd1-436d-825a-3001cb080b7c
+[source, python]
+----
+In [35]: sp500['Close'].plot(grid=True, figsize=(8, 5))
+----
+
+[[sp500]]
+.Historical levels of the S&P 500 index
+image::images/pyfi_0305.png[]
+
+// code cell end
+
+(((technical analysis, trend strategy)))The trend strategy we want to implement is based on both a _two-month_ (i.e., 42 trading days) and a _one-year_ (i.e., 252 trading days) _trend_ (i.e., the moving average of the index level for the respective period). Again, +pandas+ makes it efficient to generate the respective time series and to plot the three relevant time series in a single figure. First, the generation of the trend data:
+
+// code cell start uuid: d134fa6d-4db4-40f3-b1ce-952ef2346e18
+[source, python]
+----
+In [36]: sp500['42d'] = np.round(pd.rolling_mean(sp500['Close'], window=42), 2)
+         sp500['252d'] = np.round(pd.rolling_mean(sp500['Close'], window=252), 2)
+----
+
+// code cell end
+
+In this example, the first line simultaneously _adds a new column_ to the +pandas+ +DataFrame+ object and _puts in the values_ for the 42-day trend. The second line does the same with respect to the 252-day trend. Consequently, we now have two new columns. These have fewer entries due to the very nature of the data we have generated for these columns--i.e., they start only at those dates when 42 and 252 observation points, respectively, are available for the first time to calculate the desired statistics:
+
+// code cell start uuid: 8af03824-0abb-4747-9f8f-d517d48bd673
+[source, python]
+----
+In [37]: sp500[['Close', '42d', '252d']].tail()
+----
+
+----
+Out[37]:               Close      42d     252d
+         Date                                 
+         2014-04-08  1851.96  1853.88  1728.66
+         2014-04-09  1872.18  1855.66  1729.79
+         2014-04-10  1833.08  1856.46  1730.74
+         2014-04-11  1815.69  1856.36  1731.64
+         2014-04-14  1830.61  1856.63  1732.74
+----
+
+// code cell end
+
+Second, the plotting of the new data. The resulting plot in <<sp500_trend>> already provides some insights into what was going on in the past with respect to upward and downward trends:
+
+// code cell start uuid: 4dc6ac7e-6fac-4994-811b-35789c551de7
+[source, python]
+----
+In [38]: sp500[['Close', '42d', '252d']].plot(grid=True, figsize=(8, 5))
+----
+
+[[sp500_trend]]
+.The S&P 500 index with 42d and 252d trend lines
+image::images/pyfi_0306.png[]
+
+// code cell end
+
+(((technical analysis, trading signal rules)))Our basic data set is mainly complete, such that we now can devise a rule to generate trading signals. The rule says the following:
+
+Buy signal (go long):: the 42d trend is for the first time _SD points above_ the 252d trend.
+Wait (park in cash):: the 42d trend is within a range of +/– _SD points around_ the 252d trend.
+Sell signal (go short):: the 42d trend is for the first time _SD points below_ the 252d trend.
+
+To this end, we add a new column to the +pandas+ +DataFrame+ object for the differences between the two trends. As you can see, numerical operations with +pandas+ can in general be implemented in a _vectorized_ fashion, in that one can take the difference between two whole columns:
+
+// code cell start uuid: ccc2b0e9-5ab7-49c1-8054-3a1e1b23ab92
+[source, python]
+----
+In [39]: sp500['42-252'] = sp500['42d'] - sp500['252d']
+         sp500['42-252'].tail()
+----
+
+----
+Out[39]: Date
+         2014-04-08    125.22
+         2014-04-09    125.87
+         2014-04-10    125.72
+         2014-04-11    124.72
+         2014-04-14    123.89
+         Name: 42-252, dtype: float64
+----
+
+// code cell end
+
+On the last available trading date the 42d trend lies well above the 252d trend. Although the number of entries in the two trend columns is not equal, +pandas+ takes care of this by putting +NaN+ values at the respective index positions:
+
+// code cell start uuid: e127f7c9-8e7f-4038-b490-502e6bf436f7
+[source, python]
+----
+In [40]: sp500['42-252'].head()
+----
+
+----
+Out[40]: Date
+         2000-01-03   NaN
+         2000-01-04   NaN
+         2000-01-05   NaN
+         2000-01-06   NaN
+         2000-01-07   NaN
+         Name: 42-252, dtype: float64
+----
+
+// code cell end
+
+To make it more formal, we again generate a new column for what we call a _regime_. We assume a value of 50 for the signal threshold:
+
+// code cell start uuid: d1125e1b-3cd0-4274-aee7-9b1136db8c02
+[source, python]
+----
+In [41]: SD = 50
+         sp500['Regime'] = np.where(sp500['42-252'] > SD, 1, 0)
+         sp500['Regime'] = np.where(sp500['42-252'] < -SD, -1, sp500['Regime'])
+         sp500['Regime'].value_counts()
+----
+
+----
+Out[41]:  1    1489
+          0    1232
+         -1     871
+         dtype: int64
+----
+
+// code cell end
+
+In words, on 1,489 trading dates, the 42d trend lies more than +SD+ points above the 252d trend. On 1,232 days, the 42d trend is more than +SD+ points below the 252d trend. Obviously, if the short-term trend crosses the line of the long-term trend it tends to rest there for a (longer) while. This is what we call _regime_ and what is illustrated in <<sp500_signal>>, which is generated by the following two lines of code:
+
+// code cell start uuid: ffec4dc1-ebb4-43e1-962d-1fbc465afee1
+[source, python]
+----
+In [42]: sp500['Regime'].plot(lw=1.5)
+         plt.ylim([-1.1, 1.1])
+----
+
+[[sp500_signal]]
+.Signal regimes over time
+image::images/pyfi_0307.png[]
+
+// code cell end
+
+(((technical analysis, testing investment strategy)))Everything is now available to test the investment strategy based on the signals. We assume for simplicity that an investor can directly invest in the index or can directly short the index, which in the real world must be accomplished by using index funds, exchange-traded funds, or futures on the index, for example. Such trades inevitably lead to transaction costs, which we neglect here. This seems justifiable since we do not plan to trade "too often."
+
+Based on the respective regime, the investor either is long or short in the market (index) or parks his wealth in cash, which does not bear any interest. This simplified strategy allows us to work with market returns only. The investor makes the market return when he is long (1), makes the negative market returns when he is short (–1), and makes no returns (0) when he parks his wealth in cash. We therefore need the returns first. In +Python+, we have the following vectorized +pandas+ operation to calculate the log returns. Note that the +shift+ method shifts a time series by as many index entries as desired--in our case by one trading day, such that we get daily log returns:
+
+// code cell start uuid: 0e51676f-7b84-441d-8191-08799247774c
+[source, python]
+----
+In [43]: sp500['Market'] = np.log(sp500['Close'] / sp500['Close'].shift(1))
+----
+
+// code cell end
+
+Recalling how we constructed our regimes, it is now simple to get the returns of the trend-based trading strategy--we just have to multiply our +Regime+ column, shifted by one day, by the +Returns+ columns (the position is built "yesterday" and yields "today's" returns):
+
+// code cell start uuid: 25f3c42a-ec95-46e3-a194-4e29f0c830af
+[source, python]
+----
+In [44]: sp500['Strategy'] = sp500['Regime'].shift(1) * sp500['Market']
+----
+
+// code cell end
+
+The strategy pays off well; the investor is able to lock in a much higher return over the relevant period than a plain long investment would provide. <<sp500_wealth>> compares the cumulative, continuous returns of the index with the cumulative, continuous returns of our strategy:
+
+// code cell start uuid: ce759e67-918d-432c-a411-b22c6777dac5
+[source, python]
+----
+In [45]: sp500[['Market', 'Strategy']].cumsum().apply(np.exp).plot(grid=True,
+                                                             figsize=(8, 5))
+----
+
+[[sp500_wealth]]
+.The S&P 500 index vs. investor's wealth
+image::images/pyfi_0308.png[]
+
+// code cell end
+
+<<sp500_wealth>> shows that especially during market downturns (2003 and 2008/2009) the shorting of the market yields quite high returns. Although the strategy does not capture the whole upside during bullish periods, the strategy as a whole outperforms the market quite significantly.
+
+However, we have to keep in mind that we completely neglect operational issues (like trade execution) and relevant market microstructure elements (e.g., transaction costs). For example, we are working with daily closing values. A question would be when to execute an exit from the market (from being long to being neutral/in cash): on the same day at the closing value or the next day at the opening value. Such considerations for sure have an impact on the performance, but the overall result would probably persist. Also, transaction costs generally diminish returns, but the trading rule does not generate too many signals.
+
+.Financial Time Series
+[TIP]
+====
+(((range="endofrange", startref="ix_DTtech")))(((range="endofrange", startref="ix_FAtech")))(((pandas library, benefits of)))(((range="endofrange", startref="ix_Atech")))Whenever it comes to the analysis of financial time series, consider using +pandas+. Almost any time series-related problem can be tackled with this powerful library.
+====
+
+
+=== Conclusions
+
+Without going into too much detail, this chapter illustrates the use of +Python+ by the means of concrete and typical financial examples:
+
+Calculation of implied volatilities:: 
+Using real-world data, in the form of a cross section of option data for a given day, we calculate numerically the implied volatilities of European call options on the VSTOXX volatility index. This example introduces some custom +Python+ functions (e.g., for analytical option valuation) and uses functionality from +NumPy+, +SciPy+, and +pandas+.
+Monte Carlo simulation:: 
+Using different implementation approaches, we simulate the evolution of an index level over time and use our simulated end-of-period values to derive Monte Carlo estimators for European call options. Using +NumPy+, the major benefits of vectorization of +Python+ code are illustrated: namely, _compactness of code_ and _speed of execution_.
+Backtesting of trend signal strategy:: 
+Using real historical time series data for the S&P 500, we backtest the performance of a trading strategy based on signals generated by 42-day and 252-day trends (moving averages). This example illustrates the capabilities and convenience of +pandas+ when it comes to time series analytics.
+
+In terms of working with +Python+, this chapter introduces interactive financial analytics (using the +IPython+ interactive shell), working with more complex functions stored in modules, as well as the performance-oriented implementation of algorithms using vectorization. One important topic is not covered: namely, object orientation and classes in +Python+. For the curious reader, <<bsm_option_class>> contains a class definition for a European call option with methods based on the functions found in the code of <<bsm_functions>> in this chapter.
+
+
+=== Further Reading
+
+The major references used in this chapter are:
+
+* Black, Fischer and Myron Scholes (1973): "The Pricing of Options and Corporate Liabilities." _Journal of Political Economy_, Vol. 81, No. 3, pp. 638-659.
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://www.derivatives-analytics-with-python.com[].
+* Hilpisch, Yves (2013): "Efficient Data and Financial Analytics with Python." _Software Developer's Journal_, No. 13, pp. 56-65. http://hilpisch.com/YH_Efficient_Analytics_Article.pdf[].
+* Merton, Robert (1973): "Theory of Rational Option Pricing." _Bell Journal of Economics and Management Science_, Vol. 4, pp. 141-183.
+

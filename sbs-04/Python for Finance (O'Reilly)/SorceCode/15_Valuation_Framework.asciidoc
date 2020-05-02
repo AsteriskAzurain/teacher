@@ -1,0 +1,373 @@
+[[dx_library]]
+= Derivatives Analytics Library
+
+[partintro]
+--
+(((derivatives analytics library, goals for)))((("DX (Derivatives AnalytiX) library")))This part of the book is concerned with the development of a smaller, but nevertheless still powerful, real-world application for the pricing of options and derivatives by Monte Carlo simulation.footnote:[Cf. Bittman, James (2009): _Trading Options as a Professional_ (McGraw Hill, New York) for an introduction to and a comprehensive overview of options trading and related topics like market fundamentals and the role of the so-called Greeks in options risk management.] The goal is to have, in the end, a set of +Python+ classes--a _library_ we call +DX+, for __D__erivatives Analyti__X__—that allows us to do the following:
+
+Modeling:: 
+    To model short rates for discounting purposes; to model European and 
+    American options, including their underlying risk factors, as well as 
+    their relevant market environments; to model even complex portfolios 
+    consisting of multiple options with multiple, possibly correlated, 
+    underlying risk factors
+Simulation:: 
+    To simulate risk factors based on geometric Brownian motions and jump 
+    diffusions as well as on square-root diffusions; to simulate a number 
+    of such risk factors simultaneously and consistently, whether they are 
+    correlated or not
+Valuation:: 
+    To value, by the risk-neutral valuation approach, European and American 
+    options with arbitrary payoffs; to value portfolios composed of such     
+    options in a consistent, integrated fashion
+Risk management:: 
+    To estimate numerically the most important Greeks—i.e., the Delta and 
+    the Vega of an option/derivative--independently of the underlying risk 
+    factor or the exercise type
+Application:: 
+    To use the library to value and manage a VSTOXX volatility options 
+    portfolio in a market-based manner (i.e., with a calibrated model for 
+    the VSTOXX)
+
+(((Quant platform, features of)))(((Python, Quant platform)))(((Python Quants GmbH, features of)))The material presented in this part of the book relies on the http://dx-analytics.com[++DX++ Analytics library], which is developed and offered by the author and The Python Quants GmbH (in combination with the http://quant-platform.com[+Python Quant Platform+]). The full-fledged version allows, for instance, the modeling, pricing, and risk management of complex, multi-risk derivatives and trading books composed thereof.
+
+The part is divided into the following chapters:
+
+* <<valuation_framework>> presents the valuation framework in both theoretical and technical form. Theoretically, the Fundamental Theorem of Asset Pricing and the risk-neutral valuation approach are central. Technically, the chapter presents +Python+ classes for risk-neutral discounting and for market environments.
+* <<model_simulation>> is concerned with the simulation of risk factors based on geometric Brownian motions, jump diffusions, and square-root diffusion processes; a generic class and three specialized classes are discussed.
+* <<derivatives_valuation>> addresses the valuation of single derivatives with European or American exercise based on a single underlying risk factor; again, a generic and two specialized classes represent the major building blocks. The generic class allows the estimation of the Delta and the Vega independent of the option type.
+* <<portfolio_valuation>> is about the valuation of possibly complex derivatives portfolios with multiple derivatives based on multiple, possibly correlated underlyings; a simple class for the modeling of a derivatives position is presented as well as a more complex class for a consistent portfolio valuation.
+* <<volatility_options>> uses the +DX+ library developed in the other chapters to value and manage a portfolio of options on the VSTOXX volatility index.
+--
+
+
+[[valuation_framework]]
+== Valuation Framework
+
+[quote, Albert Einstein]
+____
+[role="align_me_right"]
+Compound interest is the greatest mathematical discovery of all time. 
+____
+
+
+((("derivatives analytics library", "valuation framework", id="ix_DALvalfr", range="startofrange")))(((valuation framework, overview of)))((("analytics", "derivatives analytics library", "valuation framework", id="ix_ALvalfr", range="startofrange")))This chapter provides the framework for the development of the +DX+ library by introducing the most fundamental concepts needed for such an undertaking. It briefly reviews the Fundamental Theorem of Asset Pricing, which provides the theoretical background for the simulation and valuation. It then proceeds by addressing the fundamental concepts of _date handling_ and _risk-neutral discounting_. We take only the simplest case of constant short rates for the discounting, but more complex and realistic models can be added to the library quite easily. This chapter also introduces the concept of a _market environment_—i.e., a collection of constants, lists, and curves needed for the instantiation of almost any other class to come in subsequent chapters.
+
+=== Fundamental Theorem of Asset Pricing
+
+(((valuation framework, Fundamental Theorem of Asset Pricing)))(((Fundamental Theorem of Asset Pricing)))(((martingale measures)))The _Fundamental Theorem of Asset Pricing_ is one of the cornerstones and success stories of modern financial theory and mathematics.footnote:[Cf. the book by Delbaen and Schachermayer (2004) for a comprehensive review and details of the mathematical machinery involved. See also Chapter 4 of Hilpisch (2015) for a shorter introduction, in particular for the discrete time version.] The central notion underlying the Fundamental Theorem of Asset Pricing is the concept of a _martingale_ measure; i.e., a probability measure that removes the drift from a discounted risk factor (stochastic process). In other words, under a martingale measure, all risk factors drift with the risk-free short rate--and not with any other market rate involving some kind of risk premium over the risk-free short rate.
+
+==== A Simple Example
+
+Consider a simple economy at the dates today and tomorrow with a risky asset, a "stock," and a riskless asset, a "bond." The bond costs 10 USD today and pays off 10 USD tomorrow (zero interest rates). The stock costs 10 USD today and, with a probability of 60% and 40%, respectively, pays off 20 USD and 0 USD  tomorrow. The riskless return of the bond is 0. The expected return of the stock is latexmath:[$\frac{0.6 \cdot 20 + 0.4 \cdot 0}{10} - 1 = 0.2$], or 20%. This is the risk premium the stock pays for its riskiness.
+
+Consider now a call option with strike price of 15 USD. What is the fair value of such a contingent claim that pays 5 USD with 60% probability and 0 USD otherwise? We can take the expectation, for example, and discount the resulting value back (here with zero interest rates). This approach yields a value of 0.6 &#xb7; 5 = 3 USD, since the option pays 5 USD in the case where the stock price moves up to 20 USD and 0 USD otherwise.
+
+However, there is another approach that has been successfully applied to option pricing problems like this: _replication_ of the option's payoff through a portfolio of traded securities. It is easily verified that buying 0.25 of the stock perfectly replicates the option's payoff (in the 60% case we then have 0.25 &#xb7; 20 = 5 USD). A quarter of the stock only costs 2.5 USD and _not_ 3 USD. Taking expectations under the real-world probability measure _overvalues_ the option. 
+
+Why is this case? The real-world measure implies a risk premium of 20% for the stock since the risk involved in the stock (gaining 100% or losing 100%) is "real" in the sense that it cannot be diversified or hedged away. On the other hand, there is a portfolio available that replicates the option's payoff without any risk. This also implies that someone writing (selling) such an option can completely hedge away any risk.footnote:[The strategy would involve selling an option at a price of 2.5 USD and buying 0.25 stocks for 2.5 USD. The payoff of such a portfolio is 0 no matter what scenario plays out in the simple economy.] Such a perfectly hedged portfolio of an option and a hedge position must yield the riskless rate in order to avoid arbitrage opportunities (i.e., the opportunity to make some money out of no money with a positive probability).
+
+Can we save the approach of taking expectations to value the call option? Yes, we can. We "only" have to change the probability in such a way that the risky asset, the stock, drifts with the riskless short rate of zero. Obviously, a (martingale) measure giving equal mass of 50% to both scenarios accomplishes this; the calculation is latexmath:[$\frac{0.5 \cdot 20 + 0.5 \cdot 0}{10} - 1 = 0$]. Now, taking expectations of the option's payoff under the new martingale measure yields the correct (arbitrage-free) fair value: 0.5 &#xb7; 5 + 0.5 &#xb7; 0 = 2.5 USD.
+
+==== The General Results
+
+The beauty of this approach is that it carries over to even the most complex economies with, for example, continuous time modeling (i.e., a continuum of points in time to consider), large numbers of risky assets, complex derivative payoffs, etc.
+
+(((general market model)))Therefore, consider a general market model in discrete time:footnote:[Cf. Williams (1991) on the probabilistic concepts.]
+
+[quote]
+____
+A _general market model_ &#x2133; in discrete time is a collection of:
+
+* A finite state space &#x1d6fa;
+* A filtration latexmath:[$\mathbb{F}$]
+* A strictly positive probability measure __P__ defined on &#x2118;(&#x1d6fa;)
+* A terminal date __T__ &#x2208; &#x2115;, __T__ < &#x221e; 
+* A set latexmath:[$\mathbb{S}\equiv \{(S_{t}^{k})_{t\in \{0,...,T\}}:k\in \{0,...,K\}\}$] of __K__ + 1 strictly positive security price processes
+
+We write &#x2133; = {(&#x1d6fa;,&#x2118;(&#x1d6fa;),&#x1d53d;,__P__),__T__,&#x1d54a;}.
+____
+
+Based on such a general market model, we can formulate the Fundamental Theorem of Asset Pricing as follows:footnote:[Cf. Delbaen and Schachermayer (2004).]
+
+[quote]
+____
+Consider the general market model &#x2133;. According to the _Fundamental Theorem of Asset Pricing_, the following three statements are equivalent:
+	
+* There are no arbitrage opportunities in the market model &#x2133;.
+* The set &#x211a; of __P__-equivalent martingale measures is nonempty.
+* The set &#x2119; of consistent linear price systems is nonempty.
+____
+
+When it comes to valuation and pricing of contingent claims (i.e., options, derivatives, futures, forwards, swaps, etc.), the importance of the theorem is illustrated by the following corollary:
+
+[quote]
+____
+If the market model &#x2133; is arbitrage-free, then there exists a _unique price_ latexmath:[$V_{0}$] associated with any attainable (i.e., replicable) contingent claim (option, derivative, etc.) __V~T~__. It satisfies latexmath:[$\forall Q \in \mathbb{Q}: V_{0}=\mathbf{E}_{0}^{Q}(e^{-rT} V_{T})$], where __e^–rT^__ is the relevant risk-neutral discount factor for a constant short rate __r__.
+____
+
+This result illustrates the importance of the theorem, and shows that our simple reasoning from the introductory above indeed carries over to the general market model.
+
+(((risk-neutral valuation approach)))Due to the role of the martingale measure, this approach to valuation is also often called the _martingale approach_, or--since under the martingale measure all risky assets drift with the riskless short rate--the _risk-neutral valuation approach_. The second term might, for our purposes, be the better one because in numerical applications, we "simply" let the risk factors (stochastic processes) drift by the risk-neutral short rate. One does not have to deal with the probability measures directly for our applications--they are, however, what theoretically justifies the central theoretical results we apply and the technical approach we implement.
+
+Finally, consider market completeness in the general market model:
+
+
+[quote]
+____
+The market model &#x2133; is _complete_ if it is arbitrage-free and if every contingent claim (option, derivative, etc.) is attainable (i.e., replicable).
+
+Suppose that the market model &#x2133; is arbitrage-free. The market model is complete if and only if &#x211a; is a singleton; i.e., if there is a unique __P__-equivalent martingale measure.
+____
+
+This mainly completes the discussion of the theoretical background for what follows. For a detailed exposition of the concepts, notions, definitions, and results, refer to Chapter 4 of Hilpisch (2015).
+
+=== Risk-Neutral Discounting
+
+(((valuation framework, risk-neutral discounting)))(((risk-neutral discounting)))(((discounting)))Obviously, risk-neutral discounting is central to the risk-neutral valuation approach. We therefore start by developing a +Python+ class for risk-neutral discounting. However, it pays to first have a closer look at the modeling and handling of _relevant dates_ for a valuation.
+
+==== Modeling and Handling Dates
+
+(((dates and times, in risk-neutral discounting)))A necessary prerequisite for discounting is the modeling of dates (see also <<dates_times>>). For valuation purposes, one typically divides the time interval between today and the final date of the general market model __T__ into discrete time intervals. These time intervals can be homogenous (i.e., of equal length), or they can be heterogenous (i.e., of varying length). A valuation library should be able to handle the more general case of heterogeneous time intervals, since the simpler case is then automatically included. Therefore, we work with lists of dates, assuming that the smallest relevant time interval is _one day_. This implies that we do not care about intraday events, for which we would have to model _time_ (in addition to dates).footnote:[Adding a time component is actually a straightforward undertaking, which is nevertheless not done here for the ease of the exposition.]
+
+To compile a list of relevant dates, one can basically take one of two approaches: constructing a list of concrete _dates_ (e.g., as +datetime.datetime+ objects in +Python+) or of _year fractions_ (as decimal numbers, as is often done in theoretical works).
+
+For example, the following two definitions of +dates+ and +fractions+ are (roughly) equivalent:
+
+[source, python]
+----
+In [1]: import datetime as dt
+
+In [2]: dates = [dt.datetime(2015, 1, 1), dt.datetime(2015, 7, 1),
+				 dt.datetime(2016, 1, 1)]
+
+In [3]: (dates[1] - dates[0]).days / 365.
+Out[3]: 0.4958904109589041
+
+In [4]: (dates[2] - dates[1]).days / 365.
+Out[4]: 0.5041095890410959
+
+In [5]: fractions = [0.0, 0.5, 1.0] 
+----
+
+They are only _roughly_ equivalent since year fractions seldom lie on the beginning (0 a.m.) of a certain day. Just consider the result of dividing a year by 50.
+
+Sometimes it is necessary to get year fractions out of a list of dates. The function +get_year_deltas+ presented in <<get_year_deltas>> does the job.
+
+[[get_year_deltas]]
+.Function to get year fractions from a list or array of datetime objects
+====
+[source, python]
+----
+include::python/dx/get_year_deltas.py[]
+----
+====
+
+This function can then be applied as follows:
+
+[source, python]
+----
+In [1]: import datetime as dt
+
+In [2]: dates = [dt.datetime(2015, 1, 1), dt.datetime(2015, 7, 1),
+                                 dt.datetime(2016, 1, 1)]
+
+In [3]: get_year_deltas(dates)
+Out[4]: array([ 0.        ,  0.49589041,  1.        ]) 
+----
+
+When modeling the short rate, it becomes clear what the benefit of this is.
+
+==== Constant Short Rate
+
+(((classes, for risk-neutral discounting)))(((Python, classes in)))(((constant short rate)))(((short rates)))We focus on the simplest case for discounting by the short rate; namely, the case where the short rate is _constant through time_. Many option pricing models, like the ones of Black-Scholes-Merton (1973), Merton (1976), and Cox-Ross-Rubinstein (1979), make this assumption.footnote:[For the pricing of, for example, short-dated options, this assumption seems satisfied in many circumstances.] We assume continuous discounting, as is usual for option pricing applications. In such a case, the general discount factor as of today, given a future date __t__ and a constant short rate of __r__, is then given by __D__~0~(__t__) = __e^–rt^__. Of course, for the end of the economy we have the special case __D__~0~(__T__) = __e^–rT^__. Note that here both __t__ and __T__ are in year fractions.
+
+The discount factors can also be interpreted as the value of a _unit zero-coupon bond_ (ZCB) as of today, maturing at __t__ and __T__, respectively.footnote:[A _unit zero-coupon bond_ pays exactly one currency unit at its maturity and no coupons between today and maturity.] Given two dates __t__ &#x2265; __s__ &#x2265; 0, the discount factor relevant for discounting from __t__ to __s__ is then given by the equation __D~s~__(__t__) = __D__~0~(__t__) / __D__~0~(__s__) = __e^–rt^__ / __e^–rs^__ = __e^–rt^__ &#xb7; __e^rs^__ = __e^–r(t–s)^__.
+
+<<constant_short_rate>> presents a +Python+ class that translates all these considerations into +Python+ code.footnote:[See <<objects_guis>> for the basics of object-oriented development in +Python+. Here, and for the rest of this part, we deviate from the standard PEP 8 naming conventions with regard to +Python+ class names. PEP 8 recommends using "CapWords" or "CamelCase" convention in general for +Python+ class names. We rather use the function name convention as mentioned in PEP 8 as a valid alternative "in cases where the interface is documented and used primarily as a callable."]
+
+[[constant_short_rate]]
+.Class for risk-neutral discounting with constant short rate
+====
+[source, python]
+----
+include::python/dx/constant_short_rate.py[]
+----
+====
+
+The application of the class +constant_short_rate+ is best illustrated by a simple, concrete example. We stick to the same list of +datetime+ objects as before:
+
+[source, python]
+----
+In [1]: import datetime as dt
+
+In [2]: dates = [dt.datetime(2015, 1, 1), dt.datetime(2015, 7, 1),
+   ...:          dt.datetime(2016, 1, 1)]
+
+In [3]: from constant_short_rate import *
+
+In [4]: csr = constant_short_rate('csr', 0.05)
+
+In [5]: csr.get_discount_factors(dates)
+Out[5]: 
+array([[datetime.datetime(2015, 1, 1, 0, 0), 0.95122942450071402],
+       [datetime.datetime(2015, 7, 1, 0, 0), 0.9755103387657228],
+       [datetime.datetime(2016, 1, 1, 0, 0), 1.0]], dtype=object)
+----
+
+The main result is a two-dimensional +ndarray+ object containing pairs of a +datetime+ object and the relevant discount factor.  The class in general and the object +csr+ in particular work with year fractions as well:
+
+[source, python]
+----
+In [7]: deltas = get_year_deltas(dates)
+
+In [8]: csr.get_discount_factors(deltas, dtobjects=False)
+Out[8]: 
+array([[ 0.        ,  0.95122942],
+       [ 0.49589041,  0.97551034],
+       [ 1.        ,  1.        ]])
+----
+
+This class will take care of all discounting operations needed in other classes.
+
+=== Market Environments
+
+(((market environments)))_Market environment_ is "just" a name for a collection of other data and +Python+ objects. However, it is rather convenient to work with this abstraction since it simplifies a number of operations and also allows for a consistent modeling of recurring aspects.footnote:[On this concept see also Fletcher and Gardner (2009), who use market environments extensively.] A market environment mainly consists of three dictionaries to store the following types of data and +Python+ objects:
+
+Constants:: 
+    These can be, for example, model parameters or option maturity dates.
+Lists:: 
+    These are sequences of objects in general, like a +list+ object of 
+    objects modeling (risky) securities.
+Curves:: 
+    These are objects for discounting; for example, like an 
+    instance of the +constant_short_rate+ class.
+
+<<market_environment>> presents the +market_environment+ class. Refer to <<data_structures>> for a refresher on the handling of +dict+ objects.
+
+[[market_environment]]
+.Class for modeling a market environment with constants, lists, and curves
+====
+[source, python]
+----
+include::python/dx/market_environment.py[]
+----
+====
+
+Although there is nothing special in the +market_environment+ class, a simple example shall illustrate how convenient it is to work with instances of the class:
+
+[source, python]
+----
+In [1]: from market_environment import *
+
+In [2]: import datetime as dt
+
+In [3]: dates = [dt.datetime(2015, 1, 1), dt.datetime(2015, 7, 1),
+				 dt.datetime(2016, 1, 1)]
+
+In [4]: csr = constant_short_rate('csr', 0.05)
+
+In [5]: me_1 = market_environment('me_1', dt.datetime(2015, 1, 1))
+
+In [6]: me_1.add_list('symbols', ['AAPL', 'MSFT', 'FB'])
+
+In [7]: me_1.get_list('symbols')
+Out[7]: ['AAPL', 'MSFT', 'FB']
+
+In [8]: me_2 = market_environment('me_2', dt.datetime(2015, 1, 1))
+
+In [9]: me_2.add_constant('volatility', 0.2)
+
+In [10]: me_2.add_curve('short_rate', csr)  # add instance of discounting class
+
+In [11]: me_2.get_curve('short_rate')
+Out[11]: <constant_short_rate.constant_short_rate at 0x104ac3c90>
+
+In [12]: me_1.add_environment(me_2)  # add complete environment
+
+In [13]: me_1.get_curve('short_rate')
+Out[13]: <constant_short_rate.constant_short_rate at 0x104ac3c90>
+
+In [14]: me_1.constants
+Out[14]: {'volatility': 0.2}
+
+In [15]: me_1.lists
+Out[15]: {'symbols': ['AAPL', 'MSFT', 'FB']}
+
+In [16]: me_1.curves
+Out[16]: {'short_rate': <constant_short_rate.constant_short_rate at 0x104ac3c90>}
+
+In [17]: me_1.get_curve('short_rate').short_rate
+Out[17]: 0.05
+----
+
+This illustrates the basic handling of this rather generic "storage" class. For practical applications, market data and other data as well as +Python+ objects are first collected, then a +market_environment+ object is instantiated and filled with the relevant data and objects. This is then delivered in a single step to other classes that need the data and objects stored in the respective +market_environment+ object.
+
+(((range="endofrange", startref="ix_DALvalfr")))(((range="endofrange", startref="ix_ALvalfr")))A major advantage of this object-oriented modeling approach is, for example, that instances of the +constant_short_rate+ class can live in multiple environments. Once the instance is updated--for example, when a new constant short rate is set--all the instances of the +market_environment+ class containing that particular instance of the discounting class will be updated automatically.
+
+
+=== Conclusions
+
+This chapter provides the framework for the larger project of building a +Python+ library to value options and other derivatives by Monte Carlo simulation. The chapter introduces the Fundamental Theorem of Asset Pricing, illustrating it by a rather simple numerical example. Important results in this regard are provided for a general market model in discrete time.
+
+The chapter also develops a +Python+ class for risk-neutral discounting purposes to make numerical use of the machinery of the Fundamental Theorem of Asset Pricing. Based on a list of either +Python+ +datetime+ objects or ++float++s representing year fractions, instances of the class +constant_short_rate+ provide the respective discount factors (present values of unit zero-coupon bonds).
+
+The chapter concludes with the rather generic +market_environment+ class, which allows for the collection of relevant data and +Python+ objects for modeling, simulation, valuation, and other purposes.
+
+To simplify future imports we will use a wrapper module called +dx_frame.py+, as presented in <<dx_frame>>.
+
+[[dx_frame]]
+.Wrapper module for framework components
+====
+[source, python]
+----
+include::python/dx/dx_frame.py[]
+----
+====
+
+A single +import+ statement like the following then makes all framework components available in a single step:
+
+[source, python]
+----
+from dx_frame import *
+----
+
+Thinking of a +Python+ library and a package of modules, there is also the option to store all relevant +Python+ modules in a (sub)directory and to put in that directory a special +init+ file that does all the imports. For example, when storing all modules in a directory called +dx+, say, the file presented in <<dx_lib_1>> does the job. However, notice the naming convention for this particular file. 
+
+[[dx_lib_1]]
+.Python packaging file
+====
+[source, python]
+----
+include::python/dx/__init__1.py[]
+----
+====
+
+In that case you can just use the directory name to accomplish all the imports at once:
+
+[source, python]
+----
+from dx import *
+----
+
+Or via the alternative approach:
+
+[source, python]
+----
+import dx
+----
+
+
+
+=== Further Reading
+
+Useful references in book form for the topics covered in this chapter are:
+
+* Delbaen, Freddy and Walter Schachermayer (2004): _The Mathematics of Arbitrage_. Springer Verlag, Berlin, Heidelberg.
+* Fletcher, Shayne and Christopher Gardner (2009): _Financial Modelling in Python_. John Wiley & Sons, Chichester, England.
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://derivatives-analytics-with-python.com[].
+* Williams, David (1991): _Probability with Martingales._ Cambridge University Press, Cambridge, England.
+
+For the original research papers defining the models cited in this chapter, refer to the "Further Reading" sections in subsequent chapters.
+
+

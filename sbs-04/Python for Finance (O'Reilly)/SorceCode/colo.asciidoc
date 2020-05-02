@@ -1,0 +1,14 @@
+[colophon]
+= Colophon
+
+The animal on the cover of _Python for Finance_ is a Hispaniolan solenodon. The Hispaniolan solenodon (__Solenodon paradoxus__) is an endangered mammal that lives on the Caribbean island of Hispaniola, which comprises Haiti and the Dominican Republic. It’s particularly rare in Haiti and a bit more common in the Dominican Republic. 
+
+Solenodons are known to eat arthropods, worms, snails, and reptiles. They also consume roots, fruit, and leaves on occasion. A solenodon weighs a pound or two and has a foot-long head and body plus a ten-inch tail, give or take. This ancient mammal looks somewhat like a big shrew. It’s quite furry, with reddish-brown coloring on top and lighter fur on its undersides, while its tail, legs, and prominent snout lack hair.
+
+It has a rather sedentary lifestyle and often stays out of sight. When it does come out, its movements tend to be awkward, and it sometimes trips when running. However, being a night creature, it has developed an acute sense of hearing, smell, and touch. Its own distinctive scent is said to be "goatlike." 
+
+It gets toxic saliva from a groove in the second lower incisor and uses it to paralyze and attack its invertebrate prey. As such, it is one of few venomous mammals. Sometimes the venom is released when fighting among each other, and can be fatal to the solenodon itself. Often, after initial conflict, they establish a dominance relationship and get along in the same living quarters. Families tend to live together for a long time. Apparently, it only drinks while bathing.
+
+Many of the animals on O'Reilly covers are endangered; all of them are important to the world. To learn more about how you can help, go to http://animals.oreilly.com[__animals.oreilly.com__].
+
+The cover image is from Wood's __Illustrated Natural History__. The cover fonts are URW Typewriter and Guardian Sans. The text font is Adobe Minion Pro; the heading font is Adobe Myriad Condensed; and the code font is Dalton Maag's Ubuntu Mono.

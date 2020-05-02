@@ -1,0 +1,1989 @@
+[[fin_time_series]]
+
+
+== Financial Time Series
+
+[quote, Albert Einstein]
+____
+[role="align_me_right"]
+The only reason for time is so that everything doesn't happen at once.
+____
+
+(((financial time series data, definition of)))One of the most important types of data one encounters in finance are _financial time series_. This is data indexed by date and/or time. For example, prices of stocks represent financial time series data. Similarly, the USD-EUR exchange rate represents a financial time series; the exchange rate is quoted in brief intervals of time, and a collection of such quotes then is a time series of exchange rates.
+
+(((pandas library, development of)))There is no financial discipline that gets by without considering time an important factor. This mainly is the same as with physics and other sciences. The major tool to cope with time series data in +Python+ is the library +pandas+. Wes McKinney, the main author of +pandas+, started developing the library when working as an analyst at AQR Capital Management, a large hedge fund. It is safe to say that +pandas+ has been designed from the ground up to work with financial time series. As this chapter demonstrates, the main inspiration for the fundamental classes, such as the +DataFrame+ and +Series+ classes, is drawn from the +R+ statistical analysis language, which without doubt has a strength in that kind of modeling and analysis.
+
+The chapter is mainly based on a couple of examples drawn from a financial context. It proceeds along the following lines:
+
+First and second steps:: 
+We start exploring the capabilities of +pandas+ by using very simple and small data sets; we then proceed by using a +NumPy+ +ndarray+ object and transforming this to a +DataFrame+ object. As we go, basic analytics and visualization capabilities are pass:[<phrase role='keep-together'>illustrated.</phrase>]
+Data from the Web:: 
++pandas+ allows us to conveniently retrieve data from the Web—e.g., from http://finance.yahoo.com[Yahoo! Finance]—and to analyze such data in many ways.
+Using data from ++CSV++ files:: 
+Comma-separated value (++CSV++) files represent a global standard for the exchange of financial time series data; +pandas+ makes reading data from such files an efficient task. Using data for two indices, we implement a regression analysis with +pandas+.
+High-frequency data:: 
+In recent years, available financial data has increasingly shifted from daily quotes to tick data. Daily tick data volumes for a stock price regularly surpass those volumes of daily data collected over 30 years.footnote:[Considering only daily closing prices, you have approximately 30 &#xd7; 252 = 7,560 closing prices for a single stock over a period of 30 years. It is not uncommon to have more than 10,000 daily (bid/ask) ticks for a single stock.]
+
+All financial time series data contains date and/or time information, by definition. <<dates_times>> provides an overview of how to handle such data with +Python+, +NumPy+, and +pandas+ as well as of how to convert typical date-time object types into each other.
+
+
+=== pandas Basics
+
+((("financial time series data", "pandas library", id="ix_FTSDpan", range="startofrange")))((("pandas library", id="ix_Pan", range="startofrange")))In a sense, +pandas+ is built "on top" of +NumPy+. So, for example, +NumPy+ universal functions will generally work on +pandas+ objects as well. We therefore import both to begin with:
+
+// code cell start uuid: eda2a742-134d-4d47-8b30-557b846b9bb3
+[source, python]
+----
+In [1]: import numpy as np
+        import pandas as pd
+----
+
+// code cell end
+
+
+==== First Steps with DataFrame Class
+
+((("pandas library", "DataFrame class", id="ix_PLdfrm", range="startofrange")))((("DataFrame class", id="ix_dfrm", range="startofrange")))(((DataFrame class, similarity to SQL database table)))On a rather fundamental level, the +DataFrame+ class is designed to manage indexed and labeled data, not too different from a +SQL+ database table or a worksheet in a spreadsheet application. Consider the following creation of a +DataFrame+ object:
+
+// code cell start uuid: f3be2d89-829a-49b2-96fc-07c475db1e3f
+[source, python]
+----
+In [2]: df = pd.DataFrame([10, 20, 30, 40], columns=['numbers'],
+                          index=['a', 'b', 'c', 'd'])
+        df
+----
+
+----
+Out[2]:    numbers
+        a       10
+        b       20
+        c       30
+        d       40
+----
+
+// code cell end
+
+(((DataFrame class, features of)))This simple example already shows some major features of the +DataFrame+ class when it comes to storing data:
+
+Data:: 
+Data itself can be provided in different shapes and types (+list+, +tuple+, +ndarray+, and +dict+ objects are candidates).
+Labels:: 
+Data is organized in columns, which can have custom names.
+Index:: 
+There is an index that can take on different formats (e.g., numbers, strings, time information).
+
+Working with such a +DataFrame+ object is in general pretty convenient and efficient, e.g., compared to regular +ndarray+ objects, which are more specialized and more restricted when you want to do something link enlarge an existing object. The following are simple examples showing how typical operations on a +DataFrame+ object work:
+
+// code cell start uuid: 47b70a7b-710f-4c40-9a70-b09db7af1a12
+[source, python]
+----
+In [3]: df.index  # the index values
+----
+
+----
+Out[3]: Index([u'a', u'b', u'c', u'd'], dtype='object')
+----
+
+// code cell end
+
+// code cell start uuid: a36c6695-520d-4df1-a6fa-5f8362af37a3
+[source, python]
+----
+In [4]: df.columns  # the column names
+----
+
+----
+Out[4]: Index([u'numbers'], dtype='object')
+----
+
+// code cell end
+
+// code cell start uuid: c93aed37-21de-429d-86ed-9849e4c3e23c
+[source, python]
+----
+In [5]: df.ix['c']  # selection via index
+----
+
+----
+Out[5]: numbers    30
+        Name: c, dtype: int64
+----
+
+// code cell end
+
+// code cell start uuid: 8c7c2f69-3673-40d9-a568-0471c629810d
+[source, python]
+----
+In [6]: df.ix[['a', 'd']]  # selection of multiple indices
+----
+
+----
+Out[6]:    numbers
+        a       10
+        d       40
+----
+
+// code cell end
+
+// code cell start uuid: c3ce0cc3-26e8-4256-ab8c-9a2d4b181633
+[source, python]
+----
+In [7]: df.ix[df.index[1:3]]  # selection via Index object
+----
+
+----
+Out[7]:    numbers
+        b       20
+        c       30
+----
+
+// code cell end
+
+// code cell start uuid: 94b1d846-63df-49f4-8a7f-8fed03e5f4fa
+[source, python]
+----
+In [8]: df.sum()  # sum per column
+----
+
+----
+Out[8]: numbers    100
+        dtype: int64
+----
+
+// code cell end
+
+// code cell start uuid: 4e73eb4f-352d-4527-b0c5-4f3a6e7eb354
+[source, python]
+----
+In [9]: df.apply(lambda x: x ** 2)  # square of every element
+----
+
+----
+Out[9]:    numbers
+        a      100
+        b      400
+        c      900
+        d     1600
+----
+
+// code cell end
+
+In general, you can implement the same vectorized operations on a +DataFrame+ object as on a +NumPy+ +ndarray+ object:
+
+// code cell start uuid: 75206a83-0154-4be2-88d0-7a82a190fda1
+[source, python]
+----
+In [10]: df ** 2  # again square, this time NumPy-like
+----
+
+----
+Out[10]:    numbers
+         a      100
+         b      400
+         c      900
+         d     1600
+----
+
+// code cell end
+
+Enlarging the +DataFrame+ object in both dimensions is possible:
+
+// code cell start uuid: 49a2633a-b3c0-4d00-a227-e0ff4a8cf81d
+[source, python]
+----
+In [11]: df['floats'] = (1.5, 2.5, 3.5, 4.5)
+           # new column is generated
+         df
+----
+
+----
+Out[11]:    numbers  floats
+         a       10     1.5
+         b       20     2.5
+         c       30     3.5
+         d       40     4.5
+----
+
+// code cell end
+
+// code cell start uuid: c49b9aea-417a-4c2b-8e27-0e8771a77c87
+[source, python]
+----
+In [12]: df['floats']  # selection of column
+----
+
+----
+Out[12]: a    1.5
+         b    2.5
+         c    3.5
+         d    4.5
+         Name: floats, dtype: float64
+----
+
+// code cell end
+
+A whole +DataFrame+ object can also be taken to define a new column. In such a case, indices are aligned automatically:
+
+// code cell start uuid: aa892c41-6637-45ed-876b-6a70285e4c0b
+[source, python]
+----
+In [13]: df['names'] = pd.DataFrame(['Yves', 'Guido', 'Felix', 'Francesc'],
+                                    index=['d', 'a', 'b', 'c'])
+         df
+----
+
+----
+Out[13]:    numbers  floats     names
+         a       10     1.5     Guido
+         b       20     2.5     Felix
+         c       30     3.5  Francesc
+         d       40     4.5      Yves
+----
+
+// code cell end
+
+Appending data works similarly. However, in the following example we see a side effect that is usually to be avoided--the index gets replaced by a simple numbered index:
+
+// code cell start uuid: 584ac18c-161f-4c7b-8ff1-1cd406fb8437
+[source, python]
+----
+In [14]: df.append({'numbers': 100, 'floats': 5.75, 'names': 'Henry'},
+                        ignore_index=True)
+           # temporary object; df not changed
+----
+
+----
+Out[14]:    numbers  floats     names
+         0       10    1.50     Guido
+         1       20    2.50     Felix
+         2       30    3.50  Francesc
+         3       40    4.50      Yves
+         4      100    5.75     Henry
+----
+
+// code cell end
+
+It is often better to append a +DataFrame+ object, providing the appropriate index information. This preserves the index:
+
+// code cell start uuid: 9068cd04-c6ff-4d0c-bd52-cf04cd89a0e9
+[source, python]
+----
+In [15]: df = df.append(pd.DataFrame({'numbers': 100, 'floats': 5.75,
+                                      'names': 'Henry'}, index=['z',]))
+         df
+----
+
+----
+Out[15]:    floats     names  numbers
+         a    1.50     Guido       10
+         b    2.50     Felix       20
+         c    3.50  Francesc       30
+         d    4.50      Yves       40
+         z    5.75     Henry      100
+----
+
+// code cell end
+
+(((pandas library, working with missing data)))(((data, missing data)))(((missing data)))One of the strengths of +pandas+ is working with missing data. To this end, consider the following code that adds a new column, but with a slightly different index. We use the rather flexible +join+ method here:
+
+// code cell start uuid: 0d526ac2-8691-4a59-83c5-712c800f0464
+[source, python]
+----
+In [16]: df.join(pd.DataFrame([1, 4, 9, 16, 25],
+                     index=['a', 'b', 'c', 'd', 'y'],
+                     columns=['squares',]))
+           # temporary object
+----
+
+----
+Out[16]:    floats     names  numbers  squares
+         a    1.50     Guido       10        1
+         b    2.50     Felix       20        4
+         c    3.50  Francesc       30        9
+         d    4.50      Yves       40       16
+         z    5.75     Henry      100      NaN
+----
+
+// code cell end
+
+What you can see here is that +pandas+ by default accepts only values for those indices that already exist. We lose the value for the index +y+ and have a +NaN+ value (i.e., "Not a Number") at index position +z+. To preserve both indices, we can provide an additional parameter to tell +pandas+ how to join. In our case, we use +how="outer"+ to use the union of all values from both indices:
+
+// code cell start uuid: 6558c7ff-f24e-4dd0-b57e-a30196bad1f4
+[source, python]
+----
+In [17]: df = df.join(pd.DataFrame([1, 4, 9, 16, 25],
+                             index=['a', 'b', 'c', 'd', 'y'],
+                             columns=['squares',]),
+                             how='outer')
+         df
+----
+
+----
+Out[17]:    floats     names  numbers  squares
+         a    1.50     Guido       10        1
+         b    2.50     Felix       20        4
+         c    3.50  Francesc       30        9
+         d    4.50      Yves       40       16
+         y     NaN       NaN      NaN       25
+         z    5.75     Henry      100      NaN
+----
+
+// code cell end
+
+Indeed, the index is now the union of the two original indices. All missing data points, given the new enlarged index, are replaced by +NaN+ values. Other options for the join operation include +inner+ for the intersection of the index values, +left+ (default) for the index values of the object on which the method is called, and +right+ for the index values of the object to be joined.
+
+Although there are missing values, the majority of method calls will still work. For example:
+
+// code cell start uuid: 3e863c7f-7875-4911-997b-6e48123dc1e5
+[source, python]
+----
+In [18]: df[['numbers', 'squares']].mean()
+           # column-wise mean
+----
+
+----
+Out[18]: numbers    40
+         squares    11
+         dtype: float64
+----
+
+// code cell end
+
+// code cell start uuid: c52173a0-485d-4eb2-b6b4-407d1ff2c30e
+[source, python]
+----
+In [19]: df[['numbers', 'squares']].std()
+           # column-wise standard deviation
+----
+
+----
+Out[19]: numbers    35.355339
+         squares     9.669540
+         dtype: float64
+----
+
+// code cell end
+
+
+==== Second Steps with DataFrame Class
+
+From now on, we will work with numerical data. We will add further features as we go, like a +DatetimeIndex+ to manage time series data. To have a dummy data set to work with, generate a +numpy.ndarry+ with, for example, nine rows and four columns of pseudorandom, standard normally distributed numbers:
+
+// code cell start uuid: d6f56a00-91e6-4221-a1ec-6093f416d1be
+[source, python]
+----
+In [20]: a = np.random.standard_normal((9, 4))
+         a.round(6)
+----
+
+----
+Out[20]: array([[-0.737304,  1.065173,  0.073406,  1.301174],
+                [-0.788818, -0.985819,  0.403796, -1.753784],
+                [-0.155881, -1.752672,  1.037444, -0.400793],
+                [-0.777546,  1.730278,  0.417114,  0.184079],
+                [-1.76366 , -0.375469,  0.098678, -1.553824],
+                [-1.134258,  1.401821,  1.227124,  0.979389],
+                [ 0.458838, -0.143187,  1.565701, -2.085863],
+                [-0.103058, -0.36617 , -0.478036, -0.03281 ],
+                [ 1.040318, -0.128799,  0.786187,  0.414084]])
+----
+
+// code cell end
+
+Although you can construct +DataFrame+ objects more directly (as we have seen before), using an +ndarray+ object is generally a good choice since +pandas+ will retain the basic structure and will "only" add meta-information (e.g., index values). It also represents a typical use case for financial applications and scientific research in general. For example:
+
+// code cell start uuid: 450bd14d-7668-4f3f-a863-966f13562818
+[source, python]
+----
+In [21]: df = pd.DataFrame(a)
+         df
+----
+
+----
+Out[21]:           0         1         2         3
+         0 -0.737304  1.065173  0.073406  1.301174
+         1 -0.788818 -0.985819  0.403796 -1.753784
+         2 -0.155881 -1.752672  1.037444 -0.400793
+         3 -0.777546  1.730278  0.417114  0.184079
+         4 -1.763660 -0.375469  0.098678 -1.553824
+         5 -1.134258  1.401821  1.227124  0.979389
+         6  0.458838 -0.143187  1.565701 -2.085863
+         7 -0.103058 -0.366170 -0.478036 -0.032810
+         8  1.040318 -0.128799  0.786187  0.414084
+----
+
+// code cell end
+
+(((DataFrame class, parameters of DataFrame function)))<<DataFrame_params>> lists the parameters that the +DataFrame+ function takes. In the table, "array-like" means a data structure similar to an +ndarray+ object--a +list+, for example. +Index+ is an instance of the +pandas+ +Index+ class.
+
+[[DataFrame_params]]
+.Parameters of DataFrame function
+[options="header, unbreakable"]
+|=======
+|Parameter     |Format                  | Description
+|++data++        |++ndarray++/++dict++/++DataFrame++   | Data for +DataFrame+; +dict+ can contain +Series+, ++ndarray++s, ++list++s
+|+index+       |++Index++/array-like        | Index to use; defaults to +range(n)+
+|+columns+     |++Index++/array-like        | Column headers to use; defaults to +range(n)+
+|+dtype+       |++dtype++, default +None+   | Data type to use/force; otherwise, it is inferred
+|+copy+        |++bool++, default +None+    | Copy data from inputs
+|=======
+
+As with structured arrays, and as we have already seen, +DataFrame+ objects have column names that can be defined directly by assigning a +list+ with the right number of elements. This illustrates that you can define/change the attributes of the +DataFrame+ object as pass:[<phrase role='keep-together'>you go:</phrase>]
+
+// code cell start uuid: 968395a4-12bc-46d2-b486-6c767abce366
+[source, python]
+----
+In [22]: df.columns = [['No1', 'No2', 'No3', 'No4']]
+         df
+----
+
+----
+Out[22]:         No1       No2       No3       No4
+         0 -0.737304  1.065173  0.073406  1.301174
+         1 -0.788818 -0.985819  0.403796 -1.753784
+         2 -0.155881 -1.752672  1.037444 -0.400793
+         3 -0.777546  1.730278  0.417114  0.184079
+         4 -1.763660 -0.375469  0.098678 -1.553824
+         5 -1.134258  1.401821  1.227124  0.979389
+         6  0.458838 -0.143187  1.565701 -2.085863
+         7 -0.103058 -0.366170 -0.478036 -0.032810
+         8  1.040318 -0.128799  0.786187  0.414084
+----
+
+// code cell end
+
+The column names provide an efficient mechanism to access data in the +DataFrame+ object, again similar to structured arrays:
+
+// code cell start uuid: 68e8d73f-93d3-47ac-a656-1edbdebcd1ff
+[source, python]
+----
+In [23]: df['No2'][3]  # value in column No2 at index position 3
+----
+
+----
+Out[23]: 1.7302783624820191
+----
+
+// code cell end
+
+To work with financial time series data efficiently, you must be able to handle time indices well. This can also be considered a major strength of +pandas+. For example, assume that our nine data entries in the four columns correspond to month-end data, beginning in January 2015. A +DatetimeIndex+ object is then generated with +date_range+ as follows:
+
+// code cell start uuid: a80e1e88-d211-4ee4-a6d3-90403a7739a8
+[source, python]
+----
+In [24]: dates = pd.date_range('2015-1-1', periods=9, freq='M')
+         dates
+----
+
+----
+Out[24]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2015-01-31, ..., 2015-09-30]
+         Length: 9, Freq: M, Timezone: None
+----
+
+// code cell end
+
+(((DataFrame class, parameters of date-range function)))(((date_range function)))<<date_range_params>> lists the parameters that the +date_range+ function takes.
+
+[[date_range_params]]
+.Parameters of date_range function
+[options="header, unbreakable"]
+|=======
+|Parameter     |Format             | Description
+|+start+       |++string++/++datetime++    | left bound for generating dates
+|+end+         |++string++/++datetime++    | right bound for generating dates
+|+periods+     |++integer++/++None++       | number of periods (if +start+ or +end+ is +None+)
+|+freq+        |++string++/++DateOffset++  | frequency string, e.g., +5D+ for 5 days
+|+tz+          |++string++/++None++        | time zone name for localized index
+|+normalize+   |+bool+, default +None+ | normalize +start+ and +end+ to midnight
+|+name+        |+string+, default +None+    | name of resulting index
+|=======
+
+So far, we have only encountered indices composed of +string+ and +int+ objects. For time series data, however, a +DatetimeIndex+ object generated with the +date_range+ function is of course what is needed.
+
+As with the columns, we assign the newly generated +DatetimeIndex+ as the new +Index+ object to the +DataFrame+ object:
+
+// code cell start uuid: d8fef9ed-25ca-4ae0-bd0c-026d340a903b
+[source, python]
+----
+In [25]: df.index = dates
+         df
+----
+
+----
+Out[25]:                  No1       No2       No3       No4
+         2015-01-31 -0.737304  1.065173  0.073406  1.301174
+         2015-02-28 -0.788818 -0.985819  0.403796 -1.753784
+         2015-03-31 -0.155881 -1.752672  1.037444 -0.400793
+         2015-04-30 -0.777546  1.730278  0.417114  0.184079
+         2015-05-31 -1.763660 -0.375469  0.098678 -1.553824
+         2015-06-30 -1.134258  1.401821  1.227124  0.979389
+         2015-07-31  0.458838 -0.143187  1.565701 -2.085863
+         2015-08-31 -0.103058 -0.366170 -0.478036 -0.032810
+         2015-09-30  1.040318 -0.128799  0.786187  0.414084
+----
+
+// code cell end
+
+(((DataFrame class, frequency parameters for date-range function)))When it comes to the generation of +DatetimeIndex+ objects with the help of the +date_range+ function, there are a number of choices for the frequency parameter +freq+. <<freq_params>> lists all the options.
+
+[[freq_params]]
+.Frequency parameter values for date_range function
+[options="header, unbreakable"]
+|=======
+|Alias | 	Description
+|+B+| 	Business day frequency
+|+C+| 	Custom business day frequency (experimental)
+|+D+| 	Calendar day frequency
+|+W+| 	Weekly frequency
+|+M+| 	Month end frequency
+|+BM+| 	Business month end frequency
+|+MS+| 	Month start frequency
+|+BMS+| 	Business month start frequency
+|+Q+| 	Quarter end frequency
+|+BQ+| 	Business quarter end frequency
+|+QS+| 	Quarter start frequency
+|+BQS+| 	Business quarter start frequency
+|+A+| 	Year end frequency
+|+BA+| 	Business year end frequency
+|+AS+| 	Year start frequency
+|+BAS+| 	Business year start frequency
+|+H+| 	Hourly frequency
+|+T+| 	Minutely frequency
+|+S+| 	Secondly frequency
+|+L+| 	Milliseonds
+|+U+| 	Microseconds
+|=======
+
+In this subsection, we start with a +NumPy+ +ndarray+ object and end with an enriched version in the form of a +pandas+ +DataFrame+ object. But does this procedure work the other way around as well? Yes, it does:
+
+// code cell start uuid: bcc38d60-3e1c-49bb-b883-ea7564c136b4
+[source, python]
+----
+In [26]: np.array(df).round(6)
+----
+
+----
+Out[26]: array([[-0.737304,  1.065173,  0.073406,  1.301174],
+                [-0.788818, -0.985819,  0.403796, -1.753784],
+                [-0.155881, -1.752672,  1.037444, -0.400793],
+                [-0.777546,  1.730278,  0.417114,  0.184079],
+                [-1.76366 , -0.375469,  0.098678, -1.553824],
+                [-1.134258,  1.401821,  1.227124,  0.979389],
+                [ 0.458838, -0.143187,  1.565701, -2.085863],
+                [-0.103058, -0.36617 , -0.478036, -0.03281 ],
+                [ 1.040318, -0.128799,  0.786187,  0.414084]])
+----
+
+// code cell end
+
+.Arrays and DataFrames
+[TIP]
+====
+(((arrays, DataFrames and)))(((DataFrame class, arrays and)))(((range="endofrange", startref="ix_PLdfrm")))(((range="endofrange", startref="ix_dfrm")))You can generate a +DataFrame+ object in general from an +ndarray+ object. But you can also easily generate an +ndarray+ object out of a +DataFrame+ by using the function +array+ of +NumPy+.
+====
+
+
+==== Basic Analytics
+
+(((convenience methods)))(((pandas library, basic analytics)))((("financial analytics", "basic analytics", seealso="financial time series data")))(((basic analytics)))(((analytics, basic)))Like +NumPy+ arrays, the +pandas+ +DataFrame+ class has built in a multitude of convenience methods. For example, you can easily get the column-wise sums, means, and cumulative sums as follows:
+
+// code cell start uuid: f760ea25-c64c-4e70-9f91-b72701d919ce
+[source, python]
+----
+In [27]: df.sum()
+----
+
+----
+Out[27]: No1   -3.961370
+         No2    0.445156
+         No3    5.131414
+         No4   -2.948346
+         dtype: float64
+----
+
+// code cell end
+
+// code cell start uuid: 3dd9bd77-eb80-46cb-87f3-62c053a8e223
+[source, python]
+----
+In [28]: df.mean()
+----
+
+----
+Out[28]: No1   -0.440152
+         No2    0.049462
+         No3    0.570157
+         No4   -0.327594
+         dtype: float64
+----
+
+// code cell end
+
+// code cell start uuid: 8e167ea8-09b7-4585-8cac-28fe20eefe66
+[source, python]
+----
+In [29]: df.cumsum()
+----
+
+----
+Out[29]:                  No1       No2       No3       No4
+         2015-01-31 -0.737304  1.065173  0.073406  1.301174
+         2015-02-28 -1.526122  0.079354  0.477201 -0.452609
+         2015-03-31 -1.682003 -1.673318  1.514645 -0.853403
+         2015-04-30 -2.459549  0.056960  1.931759 -0.669323
+         2015-05-31 -4.223209 -0.318508  2.030438 -2.223147
+         2015-06-30 -5.357467  1.083313  3.257562 -1.243758
+         2015-07-31 -4.898629  0.940126  4.823263 -3.329621
+         2015-08-31 -5.001687  0.573956  4.345227 -3.362430
+         2015-09-30 -3.961370  0.445156  5.131414 -2.948346
+----
+
+// code cell end
+
+There is also a shortcut to a number of often-used statistics for numerical data sets, the +describe+ method:
+
+// code cell start uuid: 125980cc-91ec-4ab4-9a4a-cfd772dd1254
+[source, python]
+----
+In [30]: df.describe()
+----
+
+----
+Out[30]:             No1       No2       No3       No4
+         count  9.000000  9.000000  9.000000  9.000000
+         mean  -0.440152  0.049462  0.570157 -0.327594
+         std    0.847907  1.141676  0.642904  1.219345
+         min   -1.763660 -1.752672 -0.478036 -2.085863
+         25%   -0.788818 -0.375469  0.098678 -1.553824
+         50%   -0.737304 -0.143187  0.417114 -0.032810
+         75%   -0.103058  1.065173  1.037444  0.414084
+         max    1.040318  1.730278  1.565701  1.301174
+----
+
+// code cell end
+
+You can also apply the majority of +NumPy+ universal functions to +DataFrame+ objects:
+
+// code cell start uuid: 9dfc1e40-c030-4a9c-9e3a-ff28c64a93df
+[source, python]
+----
+In [31]: np.sqrt(df)
+----
+
+----
+Out[31]:                  No1       No2       No3       No4
+         2015-01-31       NaN  1.032072  0.270935  1.140690
+         2015-02-28       NaN       NaN  0.635449       NaN
+         2015-03-31       NaN       NaN  1.018550       NaN
+         2015-04-30       NaN  1.315400  0.645844  0.429045
+         2015-05-31       NaN       NaN  0.314131       NaN
+         2015-06-30       NaN  1.183985  1.107756  0.989641
+         2015-07-31  0.677376       NaN  1.251280       NaN
+         2015-08-31       NaN       NaN       NaN       NaN
+         2015-09-30  1.019960       NaN  0.886672  0.643494
+----
+
+// code cell end
+
+.NumPy Universal Functions
+[TIP]
+====
+(((universal functions)))(((NumPy, universal functions)))In general, you can apply +NumPy+ universal functions to +pandas+ +DataFrame+ objects whenever they could be applied to an +ndarray+ object containing the same data.
+====
+
+(((pandas library, error tolerance in)))(((data, missing data)))(((missing data)))+pandas+ is quite error tolerant, in the sense that it captures errors and just puts a +NaN+ value where the respective mathematical operation fails. Not only this, but as briefly shown already, you can also work with such incomplete data sets as if they were complete in a number of cases:
+
+// code cell start uuid: a540362b-50d7-4ef0-89ba-0b6ee38033f6
+[source, python]
+----
+In [32]: np.sqrt(df).sum()
+----
+
+----
+Out[32]: No1    1.697335
+         No2    3.531458
+         No3    6.130617
+         No4    3.202870
+         dtype: float64
+----
+
+// code cell end
+
+(((DataFrame class, line plot of DataFrame object)))In such cases, +pandas+ just leaves out the +NaN+ values and only works with the other available values. Plotting of data is also only one line of code away in general (cf. <<dataframe_plot>>):
+
+// code cell start uuid: 4b1834ec-9f9b-41d6-8d06-f2efc8433dc4
+[source, python]
+----
+In [33]: %matplotlib inline
+         df.cumsum().plot(lw=2.0)
+----
+
+[[dataframe_plot]]
+.Line plot of a DataFrame object
+image::images/pyfi_0601.png[]
+
+// code cell end
+
+(((matplotlib library, pandas library wrapper for)))(((pandas library, wrapper for matplotlib library)))(((plot method)))Basically, +pandas+ provides a wrapper around +matplotplib+ (cf. <<visualization>>), specifically designed for +DataFrame+ objects. <<plot_params>> lists the parameters that the +plot+ method takes.
+
+[[plot_params]]
+.Parameters of plot method
+[options="header, unbreakable"]
+|=======
+|Parameter     |Format                           | Description
+|+x+           |Label/position, default +None+    | Only used when column values are x-ticks
+|+y+           |Label/position, default +None+    | Only used when column values are y-ticks
+|+subplots+    |Boolean, default +False+         | Plot columns in subplots
+|+sharex+      |Boolean, default +True+          | Sharing of the x-axis
+|+sharey+      |Boolean, default +False+         | Sharing of the y-axis
+|+use_index+   |Boolean, default +True+          | Use of +DataFrame.index+ as x-ticks
+|+stacked+     |Boolean, default +False+         | Stack (only for bar plots)
+|+sort_columns+|Boolean, default +False+         | Sort columns alphabetically before plotting
+|+title+       |String, default +None+           | Title for the plot
+|+grid+        |Boolean, default +False+         | Horizontal and vertical grid lines
+|+legend+      |Boolean, default +True+          | Legend of labels
+|+ax+          |+matplotlib+ axis object         | +matplotlib+ axis object to use for plotting
+|+style+       |String or list/dictionary             | line plotting style (for each column)
+|+kind+        |"+line+"/"+bar+"/"+barh+"/"+kde+"/"+density+"   | type of plot
+|+logx+        |Boolean, default +False+         | Logarithmic scaling of x-axis
+|+logy+        |Boolean, default +False+         | Logarithmic scaling of y-axis
+|+xticks+      |Sequence, default +Index+          | x-ticks for the plot
+|+yticks+      |Sequence, default +Values+         | y-ticks for the plot
+|+xlim+        |2-tuple, list                    | Boundaries for x-axis
+|+ylim+        |2-tuple, list                    | Boundaries for y-axis
+|+rot+         |Integer, default +None+          | Rotation of x-ticks
+|+secondary_y+ |Boolean/sequence, default +False+    | Secondary y-axis
+|+mark_right+  |Boolean, default +True+          | Automatic labeling of secondary axis
+|+colormap+    |String/colormap object, default +None+    | Colormap to use for plotting
+|+kwds+        |Keywords                         | Options to pass to +matplotlib+
+|=======
+
+
+==== Series Class
+
+(((pandas library, Series class)))(((Series class)))So far, we have worked mainly with the +pandas+ +DataFrame+ class: 
+
+// code cell start uuid: e86f82d1-5934-42d3-a986-f01bc829adaa
+[source, python]
+----
+In [34]: type(df)
+----
+
+----
+Out[34]: pandas.core.frame.DataFrame
+----
+
+// code cell end
+
+But there is also a dedicated +Series+ class. We get a +Series+ object, for example, when selecting a single column from our +DataFrame+ object:
+
+// code cell start uuid: bcebc814-623d-4e8a-81e9-314ab36a7429
+[source, python]
+----
+In [35]: df['No1']
+----
+
+----
+Out[35]: 2015-01-31   -0.737304
+         2015-02-28   -0.788818
+         2015-03-31   -0.155881
+         2015-04-30   -0.777546
+         2015-05-31   -1.763660
+         2015-06-30   -1.134258
+         2015-07-31    0.458838
+         2015-08-31   -0.103058
+         2015-09-30    1.040318
+         Freq: M, Name: No1, dtype: float64
+----
+
+// code cell end
+
+// code cell start uuid: ca241ef9-5359-4c89-bc92-be6346cb3959
+[source, python]
+----
+In [36]: type(df['No1'])
+----
+
+----
+Out[36]: pandas.core.series.Series
+----
+
+// code cell end
+
+The main +DataFrame+ methods are available for +Series+ objects as well, and we can, for instance, plot the results as before (cf. <<time_series>>):
+
+// code cell start uuid: b3d4cc90-e499-459c-88a5-011fde80d864
+[source, python]
+----
+In [37]: import matplotlib.pyplot as plt
+         df['No1'].cumsum().plot(style='r', lw=2.)
+         plt.xlabel('date')
+         plt.ylabel('value')
+----
+
+[[time_series]]
+.Line plot of a Series object
+image::images/pyfi_0602.png[]
+
+// code cell end
+
+
+==== GroupBy Operations
+
+(((pandas library, groupby operations)))(((groupby operations)))+pandas+ has powerful and flexible grouping capabilities. They work similarly to grouping in +SQL+ as well as pivot tables in Microsoft +Excel+. To have something to group by, we add a column indicating the quarter the respective data of the index belongs to:
+
+// code cell start uuid: 4bc106dd-9590-4566-bc70-d410517c8223
+[source, python]
+----
+In [38]: df['Quarter'] = ['Q1', 'Q1', 'Q1', 'Q2', 'Q2', 'Q2', 'Q3', 'Q3', 'Q3']
+         df
+----
+
+----
+Out[38]:                  No1       No2       No3       No4 Quarter
+         2015-01-31 -0.737304  1.065173  0.073406  1.301174      Q1
+         2015-02-28 -0.788818 -0.985819  0.403796 -1.753784      Q1
+         2015-03-31 -0.155881 -1.752672  1.037444 -0.400793      Q1
+         2015-04-30 -0.777546  1.730278  0.417114  0.184079      Q2
+         2015-05-31 -1.763660 -0.375469  0.098678 -1.553824      Q2
+         2015-06-30 -1.134258  1.401821  1.227124  0.979389      Q2
+         2015-07-31  0.458838 -0.143187  1.565701 -2.085863      Q3
+         2015-08-31 -0.103058 -0.366170 -0.478036 -0.032810      Q3
+         2015-09-30  1.040318 -0.128799  0.786187  0.414084      Q3
+----
+
+// code cell end
+
+Now, we can group by the "Quarter" column and can output statistics for the single groups:
+
+// code cell start uuid: 41c1962a-05ba-4c0f-b017-e6873e2d245e
+[source, python]
+----
+In [39]: groups = df.groupby('Quarter')
+----
+
+// code cell end
+
+For example, we can easily get the +mean+, +max+, and +size+ of every group bucket as follows:
+
+// code cell start uuid: 804e567f-6b74-4405-a10e-d19d914655e7
+[source, python]
+----
+In [40]: groups.mean()
+----
+
+----
+Out[40]:               No1       No2       No3       No4
+         Quarter                                        
+         Q1      -0.560668 -0.557773  0.504882 -0.284468
+         Q2      -1.225155  0.918877  0.580972 -0.130118
+         Q3       0.465366 -0.212719  0.624617 -0.568196
+----
+
+// code cell end
+
+// code cell start uuid: 7eb45e5c-b86f-4464-afd9-d5a3665e0f8e
+[source, python]
+----
+In [41]: groups.max()
+----
+
+----
+Out[41]:               No1       No2       No3       No4
+         Quarter                                        
+         Q1      -0.155881  1.065173  1.037444  1.301174
+         Q2      -0.777546  1.730278  1.227124  0.979389
+         Q3       1.040318 -0.128799  1.565701  0.414084
+----
+
+// code cell end
+
+// code cell start uuid: a871b95e-5946-4b09-b8dc-bc9503d2ff14
+[source, python]
+----
+In [42]: groups.size()
+----
+
+----
+Out[42]: Quarter
+         Q1         3
+         Q2         3
+         Q3         3
+         dtype: int64
+----
+
+// code cell end
+
+Grouping can also be done with multiple columns. To this end, we add another column, indicating whether the month of the index date is odd or even:
+
+// code cell start uuid: 542cf99a-bbf8-447e-9643-d6887ac74be7
+[source, python]
+----
+In [43]: df['Odd_Even'] = ['Odd', 'Even', 'Odd', 'Even', 'Odd', 'Even',
+                           'Odd', 'Even', 'Odd']
+----
+
+// code cell end
+
+This additional information can now be used for a grouping based on two columns simultaneously:
+
+// code cell start uuid: f5144c9f-ff37-4e35-9417-e39debdcd45b
+[source, python]
+----
+In [44]: groups = df.groupby(['Quarter', 'Odd_Even'])
+----
+
+// code cell end
+
+// code cell start uuid: 06904508-dbf1-431f-a3a2-681f29f03c51
+[source, python]
+----
+In [45]: groups.size()
+----
+
+----
+Out[45]: Quarter  Odd_Even
+         Q1       Even        1
+                  Odd         2
+         Q2       Even        2
+                  Odd         1
+         Q3       Even        1
+                  Odd         2
+         dtype: int64
+----
+
+// code cell end
+
+// code cell start uuid: b8471956-40fc-4203-a54a-aaa45f5a3c00
+[source, python]
+----
+In [46]: groups.mean()
+----
+
+----
+Out[46]:                        No1       No2       No3       No4
+         Quarter Odd_Even                                        
+         Q1      Even     -0.788818 -0.985819  0.403796 -1.753784
+                 Odd      -0.446592 -0.343749  0.555425  0.450190
+         Q2      Even     -0.955902  1.566050  0.822119  0.581734
+                 Odd      -1.763660 -0.375469  0.098678 -1.553824
+         Q3      Even     -0.103058 -0.366170 -0.478036 -0.032810
+                 Odd       0.749578 -0.135993  1.175944 -0.835890
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_FTSDpan")))(((range="endofrange", startref="ix_Pan")))This concludes the introduction into +pandas+ and the use of +DataFrame+ objects. Subsequent sections apply this tool set to real-world financial data.
+
+
+=== Financial Data
+
+((("financial time series data", "financial data", id="ix_FTSDfindt", range="startofrange")))((("financial analytics", "retrieving data", id="ix_FDret", range="startofrange")))((("data", "retrieving", id="ix_Dret", range="startofrange")))(((data, quality of web sources)))((("analytics", "financial", "retrieving data", id="ix_AFDret", range="startofrange")))The Web today provides a wealth of financial information for free. Web giants such as Google or Yahoo! have comprehensive financial data offerings. Although the quality of the data sometimes does not fulfill professional requirements, for example with regard to the handling of stock splits, such data is well suited to illustrate the "financial power" of +pandas+.
+
+(((Yahoo! Finance)))To this end, we will use the +pandas+ built-in function +DataReader+ to retrieve stock price data from http://finance.yahoo.com[Yahoo! Finance], analyze the data, and generate different plots of it.footnote:[For a similar example using +matplotlib+ only, see <<visualization>>.] The required function is stored in a submodule of +pandas+:
+
+// code cell start uuid: 9805e014-8a17-4e54-b6fd-1c77db7b6b78
+[source, python]
+----
+In [47]: import pandas.io.data as web
+----
+
+// code cell end
+
+(((pandas library, data sources supported)))(((data, sources of)))At the time of this writing, +pandas+ supports the following data sources:
+
+* Yahoo! Finance (+yahoo+)
+* Google Finance (+google+)
+* St. Louis FED (+fred+)
+* Kenneth French's data library (+famafrench+)
+* World Bank (via +pandas.io.wb+)
+
+We can retrieve stock price information for the German DAX index, for example, from Yahoo! Finance with a single line of code:
+
+// code cell start uuid: 53a33e39-a3ff-4c95-b0f2-a94d727ae0da
+[source, python]
+----
+In [48]: DAX = web.DataReader(name='^GDAXI', data_source='yahoo',
+                              start='2000-1-1')
+         DAX.info()
+----
+
+----
+Out[48]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 3760 entries, 2000-01-03 00:00:00 to 2014-09-26 00:00:00
+         Data columns (total 6 columns):
+         Open         3760 non-null float64
+         High         3760 non-null float64
+         Low          3760 non-null float64
+         Close        3760 non-null float64
+         Volume       3760 non-null int64
+         Adj Close    3760 non-null float64
+         dtypes: float64(5), int64(1)
+----
+
+// code cell end
+
+(((DataReader function)))<<DataReader_params>> presents the parameters that the ++DataReader++ function takes.
+
+++++
+<?hard-pagebreak?>
+++++
+
+[[DataReader_params]]
+.Parameters of DataReader function
+[options="header, unbreakable"]
+|=======
+|Parameter     |Format             | Description
+|+name+        |String             | Name of data set--generally, the ticker symbol
+|+data_source+ |E.g., "yahoo" | Data source
+|+start+       |String/+datetime+/+None+  | Left boundary of range (default "+2010/1/1+")
+|+end+         |String/+datetime+/+None+  | Right boundary of range (default today)
+|=======
+
+The +tail+ method provides us with the five last rows of the data set:
+
+// code cell start uuid: 11984b1c-5248-4640-8f3b-a85040eb5683
+[source, python]
+----
+In [49]: DAX.tail()
+----
+
+----
+Out[49]:                Open     High      Low    Close    Volume  Adj Close
+         Date                                                               
+         2014-09-22  9748.53  9812.77  9735.69  9749.54  73981000    9749.54
+         2014-09-23  9713.40  9719.66  9589.03  9595.03  88196000    9595.03
+         2014-09-24  9598.77  9669.45  9534.77  9661.97  85850600    9661.97
+         2014-09-25  9644.36  9718.11  9482.54  9510.01  97697000    9510.01
+         2014-09-26  9500.55  9545.34  9454.88  9490.55  83499600    9490.55
+----
+
+// code cell end
+
+To get a better overview of the index's history, a plot is again generated easily with the ++plot++ method (cf. <<dax>>):
+
+// code cell start uuid: 6185abc6-54c5-4711-b273-3252938f3e5e
+[source, python]
+----
+In [50]: DAX['Close'].plot(figsize=(8, 5))
+----
+
+[[dax]]
+.Historical DAX index levels
+image::images/pyfi_0603.png[]
+
+// code cell end
+
+Retrieving data and visualizing it is one thing. Implementing more complex analytics tasks is another. Like +NumPy+ ++ndarray++s, +pandas+ allows for vectorized mathematical operations on whole, and even complex, +DataFrame+ objects. Take the log returns based on the daily closing prices as an example. Adding a column with the respective information could be achieved with the following code, which first generates a new, empty column and then iterates over all indexes to calculate the single log return values step by step:
+
+// code cell start uuid: 18e75059-6755-40d9-b403-0e536576f55f
+[source, python]
+----
+In [51]: %%time
+         DAX['Ret_Loop'] = 0.0
+         for i in range(1, len(DAX)):
+             DAX['Ret_Loop'][i] = np.log(DAX['Close'][i] /
+                                         DAX['Close'][i - 1])
+----
+
+----
+Out[51]: CPU times: user 452 ms, sys: 12 ms, total: 464 ms
+         Wall time: 449 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 2515deb8-2de1-40aa-ba9c-2af7fe8920b0
+[source, python]
+----
+In [52]: DAX[['Close', 'Ret_Loop']].tail()
+----
+
+----
+Out[52]:               Close  Ret_Loop
+         Date                         
+         2014-09-22  9749.54 -0.005087
+         2014-09-23  9595.03 -0.015975
+         2014-09-24  9661.97  0.006952
+         2014-09-25  9510.01 -0.015853
+         2014-09-26  9490.55 -0.002048
+----
+
+// code cell end
+
+Alternatively, you can use vectorized code to reach the same result without looping. To this end, the +shift+ method is useful; it shifts +Series+ or whole +DataFrame+ objects relative to their index, forward as well as backward. To accomplish our goal, we need to shift the +Close+ column by one day, or more generally, one index position:
+
+// code cell start uuid: 9b45b8c2-3b95-4c80-94a0-14f891cdd161
+[source, python]
+----
+In [53]: %time DAX['Return'] = np.log(DAX['Close'] / DAX['Close'].shift(1))
+----
+
+----
+Out[53]: CPU times: user 4 ms, sys: 0 ns, total: 4 ms
+         Wall time: 1.52 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 5fbf45e9-dd56-40ba-8a75-086a80a04d5b
+[source, python]
+----
+In [54]: DAX[['Close', 'Ret_Loop', 'Return']].tail()
+----
+
+----
+Out[54]:               Close  Ret_Loop    Return
+         Date                                   
+         2014-09-22  9749.54 -0.005087 -0.005087
+         2014-09-23  9595.03 -0.015975 -0.015975
+         2014-09-24  9661.97  0.006952  0.006952
+         2014-09-25  9510.01 -0.015853 -0.015853
+         2014-09-26  9490.55 -0.002048 -0.002048
+----
+
+// code cell end
+
+This not only provides the same results with more compact and readable code, but also is the much faster alternative.
+
+.Vectorization with DataFrames
+[TIP]
+====
+(((DataFrame class, vectorization with)))(((vectorization, with DataFrames)))In general, you can use the same vectorization approaches with +pandas+ +DataFrame+ objects as you would whenever you could do such an operation with two +NumPy+ +ndarray+ objects containing the same data.
+====
+
+One column with the log return data is enough for our purposes, so we can delete the other one:
+
+// code cell start uuid: 41cd4741-6e1b-4d56-93ec-16ccfd889b94
+[source, python]
+----
+In [55]: del DAX['Ret_Loop']
+----
+
+// code cell end
+
+Now let us have a look at the newly generated return data. <<dax_returns>> illustrates two stylized facts of equity returns:
+
+Volatility clustering:: 
+Volatility is not constant over time; there are periods of _high volatility_ (both _highly_ positive and negative returns) as well as periods of _low volatility_.(((volatility clustering)))
+Leverage effect:: 
+Generally, volatility and stock market returns are _negatively correlated_; when markets come down volatility rises, and vice versa.(((leverage effect)))
+
+Here is the code that generates this plot:
+
+// code cell start uuid: 8995980e-7fa1-482e-8996-3a0cc1050359
+[source, python]
+----
+In [56]: DAX[['Close', 'Return']].plot(subplots=True, style='b',
+                                       figsize=(8, 5))
+----
+
+[[dax_returns]]
+.The DAX index and daily log returns
+image::images/pyfi_0604.png[]
+
+// code cell end
+
+(((moving averages)))(((rolling functions)))While volatility is something of particular importance for options traders, (technical) stock traders might be more interested in moving averages, or so-called _trends_. A moving average is easily calculated with the +rolling_mean+ function of +pandas+ (there are other "rolling" functions as well, like +rolling_max+, +rolling_min+, and +rolling_corr+):
+
+// code cell start uuid: 956890ca-7927-4fac-a99a-af7a15cac58f
+[source, python]
+----
+In [57]: DAX['42d'] = pd.rolling_mean(DAX['Close'], window=42)
+         DAX['252d'] = pd.rolling_mean(DAX['Close'], window=252)
+----
+
+// code cell end
+
+// code cell start uuid: f5440e3f-b808-4685-9bec-5f6ca39609c5
+[source, python]
+----
+In [58]: DAX[['Close', '42d', '252d']].tail()
+----
+
+----
+Out[58]:               Close          42d         252d
+         Date                                         
+         2014-09-22  9749.54  9464.947143  9429.476468
+         2014-09-23  9595.03  9463.780952  9433.168651
+         2014-09-24  9661.97  9465.300000  9437.122381
+         2014-09-25  9510.01  9461.880476  9440.479167
+         2014-09-26  9490.55  9459.425000  9443.769008
+----
+
+// code cell end
+
+A typical stock price chart with the two trends included then looks like <<dax_trends>>:
+
+// code cell start uuid: 281a5820-2a77-46b4-b399-8c0913423bc3
+[source, python]
+----
+In [59]: DAX[['Close', '42d', '252d']].plot(figsize=(8, 5))
+----
+
+[[dax_trends]]
+.The DAX index and moving averages
+image::images/pyfi_0605.png[]
+
+// code cell end
+
+Returning to the more options trader-like perspective, the moving historical standard deviation of the log returns--i.e. the moving historical volatility--might be more of interest:
+
+// code cell start uuid: 1b12ae02-5e35-47ff-a9c9-8563e468b489
+[source, python]
+----
+In [60]: import math
+         DAX['Mov_Vol'] = pd.rolling_std(DAX['Return'],
+                                         window=252) * math.sqrt(252)
+           # moving annual volatility
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_FTSDfindt")))(((range="endofrange", startref="ix_FDret")))(((range="endofrange", startref="ix_Dret")))(((range="endofrange", startref="ix_AFDret")))<<dax_mov_std>> further supports the hypothesis of the leverage effect by clearly showing that the historical moving volatility tends to increase when markets come down, and to decrease when they rise:
+
+// code cell start uuid: 2e75f8fd-bcf8-4c36-93b9-974ef94366c7
+[source, python]
+----
+In [61]: DAX[['Close', 'Mov_Vol', 'Return']].plot(subplots=True, style='b',
+                                                  figsize=(8, 7))
+----
+
+[[dax_mov_std]]
+.The DAX index and moving, annualized volatility
+image::images/pyfi_0606.png[]
+
+// code cell end
+
+
+=== Regression Analysis
+
+((("ordinary least-squares regression (OLS)")))((("financial time series data", "regression analysis", id="ix_FTSDreg", range="startofrange")))((("regression analysis", "of financial time series data", id="ix_reganal", range="startofrange")))The previous section introduces the leverage effect as a stylized fact of equity market returns. So far, the support that we provided is based on the inspection of financial data plots only. Using +pandas+, we can also base such analysis on a more formal, statistical ground. The simplest approach is to use (linear) _ordinary least-squares regression_ (OLS).
+
+In what follows, the analysis uses two different data sets available on the Web:
+
+EURO STOXX 50:: 
+Historical daily closing values of the EURO STOXX 50 index, composed of European blue-chip stocks
+VSTOXX:: 
+Historical daily closing data for the VSTOXX volatility index, calculated on the basis of volatilities implied by options on the EURO STOXX 50 index
+
+It is noteworthy that we now (indirectly) use _implied volatilities_, which relate to expectations with regard to the future volatility development, while the previous DAX analysis used historical volatility measures. For details, see the http://www.eurexchange.com/advanced-services/vstoxx/["VSTOXX Advanced Services" tutorial pages] provided by Eurex.
+
+We begin with a few imports:
+
+// code cell start uuid: 85bf9df2-d445-4600-a02e-37cf2b7dc9ff
+[source, python]
+----
+In [62]: import pandas as pd
+         from urllib import urlretrieve
+----
+
+// code cell end
+
+For the analysis, we retrieve files from the Web and save them in a folder called +data+. If there is no such folder already, you might want to create one first via +mkdir data+. We proceed by retrieving the most current available information with regard to both indices:
+
+// code cell start uuid: 17a2e317-7047-4c9f-9faf-7e0e4132bd01
+[source, python]
+----
+In [63]: es_url = 'http://www.stoxx.com/download/historical_values/hbrbcpe.txt'
+         vs_url = 'http://www.stoxx.com/download/historical_values/h_vstoxx.txt'
+         urlretrieve(es_url, './data/es.txt')
+         urlretrieve(vs_url, './data/vs.txt')
+         !ls -o ./data/*.txt
+         # Windows: use dir
+----
+
+----
+Out[63]: -rw------- 1 yhilpisch      0 Sep 28 11:14 ./data/es50.txt
+         -rw------- 1 yhilpisch 641180 Sep 28 11:14 ./data/es.txt
+         -rw------- 1 yhilpisch 330564 Sep 28 11:14 ./data/vs.txt
+         
+----
+
+// code cell end
+
+Reading the EURO STOXX 50 data directly with +pandas+ is not the best route in this case. A little data cleaning beforehand will give a better data structure for the import. Two issues have to be addressed, relating to the header and the structure:
+
+* There are a couple of additional header lines that we do not need for the import.
+* From December 27, 2001 onwards, the data set "suddenly" has an additional semicolon at the end of each data row.
+
+The following code reads the whole data set and removes all blanks:footnote:[See <<input_output>> for more information on input-output operations with +Python+.]
+
+// code cell start uuid: 3bdd1237-41d5-4e92-8d2c-3c4ffd25e7e9
+[source, python]
+----
+In [64]: lines = open('./data/es.txt', 'r').readlines()
+         lines = [line.replace(' ', '') for line in lines]
+----
+
+// code cell end
+
+With regard to the header, we can inspect it easily by printing the first couple of lines of the downloaded data set:
+
+// code cell start uuid: 6c7769ea-4fb8-49ef-bdc8-4e06b986fb3e
+[source, python]
+----
+In [65]: lines[:6]
+----
+
+----
+Out[65]: ['PriceIndices-EUROCurrency\n',
+          'Date;Blue-Chip;Blue-Chip;Broad;Broad;ExUK;ExEuroZone;Blue-Chip;Broad\
+         n',
+          ';Europe;Euro-Zone;Europe;Euro-Zone;;;Nordic;Nordic\n',
+          ';SX5P;SX5E;SXXP;SXXE;SXXF;SXXA;DK5F;DKXF\n',
+          '31.12.1986;775.00;900.82;82.76;98.58;98.06;69.06;645.26;65.56\n',
+          '01.01.1987;775.00;900.82;82.76;98.58;98.06;69.06;645.26;65.56\n']
+----
+
+// code cell end
+
+The above-mentioned format change can be seen between lines 3,883 and 3,990 of the file. From December 27, there suddenly appears an additional semicolon at the end of each data row:
+
+// code cell start uuid: b5edc764-13a4-4e0c-b6d3-ac615b4a530b
+[source, python]
+----
+In [66]: for line in lines[3883:3890]:
+             print line[41:],
+----
+
+----
+Out[66]: 317.10;267.23;5268.36;363.19
+         322.55;272.18;5360.52;370.94
+         322.69;272.95;5360.52;370.94
+         327.57;277.68;5479.59;378.69;
+         329.94;278.87;5585.35;386.99;
+         326.77;272.38;5522.25;380.09;
+         332.62;277.08;5722.57;396.12;
+         
+----
+
+// code cell end
+
+To make the data set easier to import, we do the following:
+
+. Generate a new text file.
+. Delete unneeded header lines.
+. Write an appropriate new header line to the new file.
+. Add a helper column, +DEL+ (to catch the trailing semicolons).
+. Write all data rows to the new file.
+
+With these adjustments, the data set can be imported and the helper column deleted after the import. But first, the cleaning code:
+
+// code cell start uuid: ea43adac-94fb-4b11-8af5-153c6fb4cebe
+[source, python]
+----
+In [67]: new_file = open('./data/es50.txt', 'w')
+             # opens a new file
+         new_file.writelines('date' + lines[3][:-1]
+                             + ';DEL' + lines[3][-1])
+             # writes the corrected third line of the original file
+             # as first line of new file
+         new_file.writelines(lines[4:])
+             # writes the remaining lines of the orignial file
+         new_file.close()
+----
+
+// code cell end
+
+Let us see how the new header looks:
+
+// code cell start uuid: aca0ad29-cce1-4da5-b39e-ace9bafe3077
+[source, python]
+----
+In [68]: new_lines = open('./data/es50.txt', 'r').readlines()
+         new_lines[:5]
+----
+
+----
+Out[68]: ['date;SX5P;SX5E;SXXP;SXXE;SXXF;SXXA;DK5F;DKXF;DEL\n',
+          '31.12.1986;775.00;900.82;82.76;98.58;98.06;69.06;645.26;65.56\n',
+          '01.01.1987;775.00;900.82;82.76;98.58;98.06;69.06;645.26;65.56\n',
+          '02.01.1987;770.89;891.78;82.57;97.80;97.43;69.37;647.62;65.81\n',
+          '05.01.1987;771.89;898.33;82.82;98.60;98.19;69.16;649.94;65.82\n']
+----
+
+// code cell end
+
+It looks appropriate for the import with the +read_csv+ function of +pandas+, so we pass:[<phrase role='keep-together'>continue:</phrase>]
+
+// code cell start uuid: 0bc55f0d-cd99-45b9-955e-3a126360e94f
+[source, python]
+----
+In [69]: es = pd.read_csv('./data/es50.txt', index_col=0,
+                          parse_dates=True, sep=';', dayfirst=True)
+----
+
+// code cell end
+
+// code cell start uuid: 73526ac3-4bf0-4455-89b2-f6aa614ffdca
+[source, python]
+----
+In [70]: np.round(es.tail())
+----
+
+----
+Out[70]:             SX5P  SX5E  SXXP  SXXE  SXXF  SXXA  DK5F  DKXF  DEL
+         date                                                           
+         2014-09-22  3096  3257   347   326   403   357  9703   565  NaN
+         2014-09-23  3058  3206   342   321   398   353  9602   558  NaN
+         2014-09-24  3086  3244   344   323   401   355  9629   560  NaN
+         2014-09-25  3059  3202   341   320   397   353  9538   556  NaN
+         2014-09-26  3064  3220   342   321   398   353  9559   557  NaN
+----
+
+// code cell end
+
+The helper column has fulfilled its purpose and can now be deleted:
+
+// code cell start uuid: e6e3100a-8296-494f-9758-bbb0006c5df4
+[source, python]
+----
+In [71]: del es['DEL']
+         es.info()
+----
+
+----
+Out[71]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 7153 entries, 1986-12-31 00:00:00 to 2014-09-26 00:00:00
+         Data columns (total 8 columns):
+         SX5P    7153 non-null float64
+         SX5E    7153 non-null float64
+         SXXP    7153 non-null float64
+         SXXE    7153 non-null float64
+         SXXF    7153 non-null float64
+         SXXA    7153 non-null float64
+         DK5F    7153 non-null float64
+         DKXF    7153 non-null float64
+         dtypes: float64(8)
+----
+
+// code cell end
+
+Equipped with the knowledge about the structure of the EURO STOXX 50 data set, we can also use the advanced capabilities of the +read_csv+ function to make the import more compact and efficient:
+
+// code cell start uuid: fff2d2a1-dce8-4f4c-bab9-0b990a1f7b5f
+[source, python]
+----
+In [72]: cols = ['SX5P', 'SX5E', 'SXXP', 'SXXE', 'SXXF',
+                 'SXXA', 'DK5F', 'DKXF']
+         es = pd.read_csv(es_url, index_col=0, parse_dates=True,
+                          sep=';', dayfirst=True, header=None,
+                          skiprows=4, names=cols)
+----
+
+// code cell end
+
+// code cell start uuid: 76793f6a-1625-4fc2-8063-38536b46b15e
+[source, python]
+----
+In [73]: es.tail()
+----
+
+----
+Out[73]:                SX5P     SX5E    SXXP    SXXE    SXXF    SXXA     DK5F  
+           DKXF
+         2014-09-22  3096.02  3257.48  346.69  325.68  403.16  357.08  9703.33  
+         564.81
+         2014-09-23  3057.89  3205.93  341.89  320.72  397.96  352.56  9602.32  
+         558.35
+         2014-09-24  3086.12  3244.01  344.35  323.42  400.58  354.72  9628.84  
+         559.83
+         2014-09-25  3059.01  3202.31  341.44  319.77  396.90  352.58  9537.95  
+         555.51
+         2014-09-26  3063.71  3219.58  342.30  321.39  398.33  352.71  9558.51  
+         556.57
+----
+
+// code cell end
+
+Fortunately, the VSTOXX data set is already in a form such that it can be imported a bit more easily into a +DataFrame+ object:
+
+// code cell start uuid: 3a1920c2-8c61-4720-941e-afdb983350aa
+[source, python]
+----
+In [74]: vs = pd.read_csv('./data/vs.txt', index_col=0, header=2,
+                          parse_dates=True, sep=',', dayfirst=True)
+         vs.info()
+----
+
+----
+Out[74]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 4010 entries, 1999-01-04 00:00:00 to 2014-09-26 00:00:00
+         Data columns (total 9 columns):
+         V2TX    4010 non-null float64
+         V6I1    3591 non-null float64
+         V6I2    4010 non-null float64
+         V6I3    3960 non-null float64
+         V6I4    4010 non-null float64
+         V6I5    4010 non-null float64
+         V6I6    3995 non-null float64
+         V6I7    4010 non-null float64
+         V6I8    3999 non-null float64
+         dtypes: float64(9)
+----
+
+// code cell end
+
+(((read_csv function)))((("comma-separated value (CSV) files", "parameters of read_csv function")))<<read_csv_params>> contains the parameters of this important import function. There are a multitude of parameters, the majority of which default to +None+; +object+, of course, is nondefault and has to be specified in any case.
+
+[[read_csv_params]]
+.Parameters of read_csv function
+[options="header, unbreakable"]
+|=======
+|Parameter        |Format                  | Description
+|+object+         |String                  | File path, +URL+, or other source
+|+sep+            |String, default +","+     | Delimiter to use
+|+lineterminator+ |String (one character)  | String for line breaks
+|+quotechar+      |String                  | Character for quotes
+|+quoting+        |Integer                 | Controls recognition of quotes
+|+escapechar+     |String                  | String for escaping
+|+dtpye+          |++dtype++/++dict++              | +dict+ of ++dtype++(s) for column(s)
+|+compression+    |++"gzip"++/++"bz2"++            | For decompression of data
+|+dialect+        |String/++csv.Dialect++      | +CSV+ dialect, default +Excel+
+|+header+         |Integer                 | Number of header rows
+|+skiprows+       |Integer                 | Number of rows to skip
+|+index_col+      |Integer                 | Number of index columns (sequence for multi-index)
+|+names+          |Array-like              | Column names if no header rows
+|+prefix+         |String                  | String to add to column numbers if no header names
+|+na_values+      |List/++dict++               | Additional strings to recognize as +NA+, +NaN+
+|+true_values+    |List                    | Values to consider as +True+
+|+false_values+   |List                    | Values to consider as +False+
+|+keep_default_na+|Boolean, default +True+         | If +True+, +NaN+ is added to +na_values+
+|+parse_dates+    |Boolean/list, default +False+   | Whether to parse dates in index columns or multiple columns
+|+keep_date_col+  |Boolean, default +False+        | Keeps original date columns
+|+dayfirst+       |Boolean, default +False+        | For European date convention DD/MM
+|+thousands+      |String                  | Thousands operator
+|+comment+        |String                  | Rest of line as comment (not to be parsed)
+|+decimal+        |String                  | String to indicate decimal, e.g., +"."+ or +","+
+|+nrows+          |Integer                 | Number of rows of file to read
+|+iterator+       |Boolean, default +False+        | Return +TextFileReader+ object
+|+chunksize+      |Integer                 | Return +TextFileReader+ object for iteration
+|+skipfooter+     |Integer                 | Number of lines to skip at bottom
+|+converters+     |Dictionary              | Function to convert/translate column data
+|+verbose+        |Boolean, default +False+        | Report number of +NA+ values in nonnumeric columns
+|+delimiter+      |String                  | Alternative to +sep+, can contain regular expressions
+|+encoding+       |String                  | Encoding to use, e.g., "+UTF-8+"
+|+squeeze+        |Boolean, default +False+        | Return one-column data sets as +Series+
+|+na_filter+      |Boolean, default +False+        | Detect missing value markers automatically
+|+usecols+        |Array-like              | Selection of columns to use
+|+mangle_dupe_cols+  |Boolean, default +False+     | Name duplicate columns differently
+|+tupleize_cols+     |Boolean, default +False+     | Leave a list of tuples on columns as is
+|=======
+
+To implement the regression analysis, we only need one column from each data set. We therefore generate a new +DataFrame+ object within which we combine the two columns of interest, namely those for the major indexes. Since VSTOXX data is only available from the beginning of January 1999, we only take data from that date on:
+
+// code cell start uuid: 3a437278-4466-41bf-b7f2-f9c17d2c44a7
+[source, python]
+----
+In [75]: import datetime as dt
+         data = pd.DataFrame({'EUROSTOXX' :
+                              es['SX5E'][es.index > dt.datetime(1999, 1, 1)]})
+         data = data.join(pd.DataFrame({'VSTOXX' :
+                              vs['V2TX'][vs.index > dt.datetime(1999, 1, 1)]}))
+----
+
+// code cell end
+
+(((fillna method)))(((ffill parameter)))(((bfill parameter)))We also fill missing values with the last available values from the time series. We call the +fillna+ method, providing +ffill+ (for _forward fill_) as the +method+ parameter. Another option would be +bfill+ (for _backward fill_), which would however lead to a "foresight" issue:
+
+// code cell start uuid: 9223e142-d574-40c9-92e7-149d86628458
+[source, python]
+----
+In [76]: data = data.fillna(method='ffill')
+         data.info()
+----
+
+----
+Out[76]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 4034 entries, 1999-01-04 00:00:00 to 2014-09-26 00:00:00
+         Data columns (total 2 columns):
+         EUROSTOXX    4034 non-null float64
+         VSTOXX       4034 non-null float64
+         dtypes: float64(2)
+----
+
+// code cell end
+
+// code cell start uuid: fc5fc92a-3475-4e4b-a5fe-145809d35919
+[source, python]
+----
+In [77]: data.tail()
+----
+
+----
+Out[77]:             EUROSTOXX   VSTOXX
+         2014-09-22    3257.48  15.8303
+         2014-09-23    3205.93  17.7684
+         2014-09-24    3244.01  15.9504
+         2014-09-25    3202.31  17.5658
+         2014-09-26    3219.58  17.6012
+----
+
+// code cell end
+
+Again, a graphical representation of the new data set might provide some insights. Indeed, as <<es50_vs>> shows, there seems to be a negative correlation between the two indexes:
+
+// code cell start uuid: 07158c72-907f-4636-ad40-95182b7728e3
+[source, python]
+----
+In [78]: data.plot(subplots=True, grid=True, style='b', figsize=(8, 6))
+----
+
+[[es50_vs]]
+.The EURO STOXX 50 index and the VSTOXX volatility index
+image::images/pyfi_0607.png[]
+
+// code cell end
+
+However, to put this on more formal ground, we want to work again with the log returns of the two financial time series. <<es50_vs_rets>> shows these graphically:
+
+// code cell start uuid: 17ae59ff-9863-4c30-9493-22d44c0e5edf
+[source, python]
+----
+In [79]: rets = np.log(data / data.shift(1))
+         rets.head()
+----
+
+----
+Out[79]:             EUROSTOXX    VSTOXX
+         1999-01-04        NaN       NaN
+         1999-01-05   0.017228  0.489248
+         1999-01-06   0.022138 -0.165317
+         1999-01-07  -0.015723  0.256337
+         1999-01-08  -0.003120  0.021570
+----
+
+// code cell end
+
+// code cell start uuid: 771c53bf-78fb-4260-865b-39307973cb77
+[source, python]
+----
+In [80]: rets.plot(subplots=True, grid=True, style='b', figsize=(8, 6))
+----
+
+[[es50_vs_rets]]
+.Log returns of EURO STOXX 50 and VSTOXX
+image::images/pyfi_0608.png[]
+
+// code cell end
+
+We have everything together to implement the regression analysis. In what follows, the EURO STOXX 50 returns are taken as the independent variable while the VSTOXX returns are taken as the dependent variable:
+
+// code cell start uuid: 709bc1e8-03a8-47c6-9b21-4efa08052dab
+[source, python]
+----
+In [81]: xdat = rets['EUROSTOXX']
+         ydat = rets['VSTOXX']
+         model = pd.ols(y=ydat, x=xdat)
+         model
+----
+
+----
+Out[81]: -------------------------Summary of Regression Analysis----------------
+         ---------
+         
+         Formula: Y ~ <x> + <intercept>
+         
+         Number of Observations:         4033
+         Number of Degrees of Freedom:   2
+         
+         R-squared:         0.5322
+         Adj R-squared:     0.5321
+         
+         Rmse:              0.0389
+         
+         F-stat (1, 4031):  4586.3942, p-value:     0.0000
+         
+         Degrees of Freedom: model 1, resid 4031
+         
+         -----------------------Summary of Estimated Coefficients---------------
+         ---------
+               Variable       Coef    Std Err     t-stat    p-value    CI 2.5%  
+          CI 97.5%
+         -----------------------------------------------------------------------
+         ---------
+                      x    -2.7529     0.0406     -67.72     0.0000    -2.8326  
+           -2.6732
+              intercept    -0.0001     0.0006      -0.12     0.9043    -0.0013  
+            0.0011
+         ---------------------------------End of Summary------------------------
+         ---------
+----
+
+// code cell end
+
+Obviously, there is indeed a highly negative correlation. We can access the results as follows:
+
+// code cell start uuid: ff00a7f1-173c-40f8-b077-9892ad310f4a
+[source, python]
+----
+In [82]: model.beta
+----
+
+----
+Out[82]: x           -2.752894
+         intercept   -0.000074
+         dtype: float64
+----
+
+// code cell end
+
+This input, in combination with the raw log return data, is used to generate the plot in <<scatter_rets>>, which provides strong support for the leverage effect:
+
+// code cell start uuid: 24c708df-1e81-48c6-b1c2-890dd52e541f
+[source, python]
+----
+In [83]: plt.plot(xdat, ydat, 'r.')
+         ax = plt.axis()  # grab axis values
+         x = np.linspace(ax[0], ax[1] + 0.01)
+         plt.plot(x, model.beta[1] + model.beta[0] * x, 'b', lw=2)
+         plt.grid(True)
+         plt.axis('tight')
+         plt.xlabel('EURO STOXX 50 returns')
+         plt.ylabel('VSTOXX returns')
+----
+
+[[scatter_rets]]
+.Scatter plot of log returns and regression line
+image::images/pyfi_0609.png[]
+
+// code cell end
+
+As a final cross-check, we can calculate the correlation between the two financial time series directly:
+
+// code cell start uuid: e1f9009e-5b73-4e04-9b10-deea36f4e508
+[source, python]
+----
+In [84]: rets.corr()
+----
+
+----
+Out[84]:            EUROSTOXX    VSTOXX
+         EUROSTOXX   1.000000 -0.729538
+         VSTOXX     -0.729538  1.000000
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_FTSDreg")))(((range="endofrange", startref="ix_reganal")))Although the correlation is strongly negative on the whole data set, it varies considerably over time, as shown in <<roll_corr>>. The figure uses correlation on a yearly basis, i.e., for 252 trading days:
+
+// code cell start uuid: a534d3db-df59-4a31-b0b7-1ab3c19d77d0
+[source, python]
+----
+In [85]: pd.rolling_corr(rets['EUROSTOXX'], rets['VSTOXX'],
+                         window=252).plot(grid=True, style='b')
+----
+
+[[roll_corr]]
+.Rolling correlation between EURO STOXX 50 and VSTOXX
+image::images/pyfi_0610.png[]
+
+// code cell end
+
+
+=== High-Frequency Data
+
+(((financial time series data, high frequency data)))(((high frequency data)))(((data, high frequency)))By now, you should have a feeling for the strengths of +pandas+ when it comes to financial time series data. One aspect in this regard has become prevalent in the financial analytics sphere and represents quite a high burden for some market players: _high-frequency data_. This brief section illustrates how to cope with tick data instead of daily financial data. To begin with, a couple of imports:
+
+// code cell start uuid: cd3bd5f2-565a-4158-a796-e8ec41f76d88
+[source, python]
+----
+In [86]: import numpy as np
+         import pandas as pd
+         import datetime as dt
+         from urllib import urlretrieve
+         %matplotlib inline
+----
+
+// code cell end
+
+The Norwegian online broker http://www.netfonds.no[Netfonds] provides tick data for a multitude of stocks, in particular for American names. The web-based API has basically the following format:
+
+// code cell start uuid: 63521c3e-8197-464a-a5bc-dc9a15550893
+[source, python]
+----
+In [87]: url1 = 'http://hopey.netfonds.no/posdump.php?'
+         url2 = 'date=%s%s%s&paper=AAPL.O&csv_format=csv'
+         url = url1 + url2
+----
+
+// code cell end
+
+We want to download, combine, and analyze a week's worth of tick data for the Apple Inc. stock, a quite actively traded name. Let us start with the dates of interest:footnote:[Note that the data provider only provides this type of data for a couple of days back from the current date. Therefore, you might need to use different (i.e., more current) dates to implement the same example.]
+
+// code cell start uuid: 8fa05c35-a914-49b2-8da1-841146b43931
+[source, python]
+----
+In [88]: year = '2014'
+         month = '09'
+         days = ['22', '23', '24', '25']
+           # dates might need to be updated
+----
+
+// code cell end
+
+// code cell start uuid: 946e1882-04bb-4809-869f-1e7dd8ad396a
+[source, python]
+----
+In [89]: AAPL = pd.DataFrame()
+         for day in days:
+             AAPL = AAPL.append(pd.read_csv(url % (year, month, day),
+                                index_col=0, header=0, parse_dates=True))
+         AAPL.columns = ['bid', 'bdepth', 'bdeptht', 
+                         'offer', 'odepth', 'odeptht']
+           # shorter colummn names
+----
+
+// code cell end
+
+The data set now consists of almost 100,000 rows:
+
+// code cell start uuid: 1fce3fb2-c664-4f77-80dc-0e4907f86dac
+[source, python]
+----
+In [90]: AAPL.info()
+----
+
+----
+Out[90]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 95871 entries, 2014-09-22 10:00:01 to 2014-09-25 22:19:25
+         Data columns (total 6 columns):
+         bid        95871 non-null float64
+         bdepth     95871 non-null float64
+         bdeptht    95871 non-null float64
+         offer      95871 non-null float64
+         odepth     95871 non-null float64
+         odeptht    95871 non-null float64
+         dtypes: float64(6)
+----
+
+// code cell end
+
+<<aapl>> shows the bid columns graphically. One can identify a number of periods without any trading activity--i.e., times when the markets are closed:
+
+// code cell start uuid: b0fa9c58-2087-4f99-a7f1-efeb490bb456
+[source, python]
+----
+In [91]: AAPL['bid'].plot()
+----
+
+// code cell end
+
+Over the course of a single trading day when markets are open, there is of course usually a high activity level. <<aapl_day>> shows the trading activity for the first day in the sample and three hours of the third. Times are for the Norwegian time zone and you can see easily when pre-trading starts, when US stock markets are open, and when they close:
+
+// code cell start uuid: 73447893-dc77-488a-8252-64c29a92e4c0
+[source, python]
+----
+In [92]: to_plot = AAPL[['bid', 'bdeptht']][
+             (AAPL.index > dt.datetime(2014, 9, 22, 0, 0))
+          &  (AAPL.index < dt.datetime(2014, 9, 23, 2, 59))]
+           # adjust dates to given data set
+         to_plot.plot(subplots=True, style='b', figsize=(8, 5))
+----
+
+[[aapl]]
+.Apple stock tick data for a week
+image::images/pyfi_0611.png[]
+
+[[aapl_day]]
+.Apple stock tick data and volume for a trading day
+image::images/pyfi_0612.png[]
+
+// code cell end
+
+(((resampling)))(((data, resampling of)))Usually, financial tick data series lead to a +DatetimeIndex+ that is highly irregular. In other words, time intervals between two observation points are highly heterogeneous. Against this background, a _resampling_ of such data sets might sometimes be useful or even in order depending on the task at hand. +pandas+ provides a method for this purpose for the +DataFrame+ object. In what follows, we simply take the mean for the resampling procedure; this might be consistent for some columns (e.g., "bid") but not for others (e.g., "bdepth"):
+
+// code cell start uuid: 47a27b89-f6a1-4b3c-9944-8a6109642c72
+[source, python]
+----
+In [93]: AAPL_resam = AAPL.resample(rule='5min', how='mean')
+         np.round(AAPL_resam.head(), 2)
+----
+
+----
+Out[93]:                         bid  bdepth  bdeptht   offer  odepth  odeptht
+         2014-09-22 10:00:00  100.49  366.67   366.67  100.95     200      200
+         2014-09-22 10:05:00  100.49  100.00   100.00  100.84     200      200
+         2014-09-22 10:10:00  100.54  150.00   150.00  100.74     100      100
+         2014-09-22 10:15:00  100.59  200.00   200.00  100.75    1500     1500
+         2014-09-22 10:20:00  100.50  100.00   100.00  100.75    1500     1500
+----
+
+// code cell end
+
+The resulting plot in <<aapl_resam>> looks a bit smoother. Here, we have also filled empty time intervals with the most recent available values (before the empty time interval):
+
+// code cell start uuid: 7730056f-4ce8-4a23-853e-f5206eb86ea7
+[source, python]
+----
+In [94]: AAPL_resam['bid'].fillna(method='ffill').plot()
+----
+
+[[aapl_resam]]
+.Resampled Apple stock tick data
+image::images/pyfi_0613.png[]
+
+// code cell end
+
+To conclude this section, we apply a custom-defined +Python+ function to our new data set. The function we choose is arbitrary and does not make any economic sense here; it just mirrors the stock performance at a certain stock price level (compare <<aapl_resam_apply>> to <<aapl_resam>>):
+
+// code cell start uuid: d8d2f963-3909-4434-95fa-69f932b49451
+[source, python]
+----
+In [95]: def reversal(x):
+             return 2 * 95 - x
+----
+
+// code cell end
+
+// code cell start uuid: e6d72fc4-0617-480c-84a3-56892f0e4b01
+[source, python]
+----
+In [96]: AAPL_resam['bid'].fillna(method='ffill').apply(reversal).plot()
+----
+
+// code cell end
+
+Finally, let's clean up disk space by erasing all data sets saved to disk:
+
+// code cell start uuid: ac44afa5-337a-4aed-b811-1b76db21682d
+[source, python]
+----
+In [97]: !rm ./data/*
+           # Windows: del /data/*
+----
+
+// code cell end
+
+[[aapl_resam_apply]]
+.Resampled Apple stock tick data with function applied to it
+image::images/pyfi_0614.png[]
+
+
+=== Conclusions
+
+Financial time series data is one of the most common and important forms of data in finance. The library +pandas+ is generally the tool of choice when it comes to working with such data sets. Modeled after the +data.frame+ class of +R+, the +pandas+ +DataFrame+ class provides a wealth of attributes and methods to attack almost any kind of (financial) analytics problem you might face. _Convenience_ is another benefit of using +pandas+: even if you might be able to generate the same result by using +NumPy+ and/or +matplotlib+ only, +pandas+ generally has some neat shortcuts based on a powerful and flexible API.
+
+In addition, +pandas+ makes it really easy to retrieve data from a variety of web sources, like Yahoo! Finance or Google. Compared to "pure" +NumPy+ or +matplotlib+, it automates the management of financial time series data in many respects and also provides higher flexibility when it comes to combining data sets and enlarging existing ones.
+
+++++
+<?hard-pagebreak?>
+++++
+
+
+=== Further Reading
+
+At the time of this writing, the definitive resource in printed form for +pandas+ is the book by the main author of the library:
+
+* McKinney, Wes (2012): _Data Analysis with Python_. O'Reilly, Sebastopol, CA.
+
+Of course, the Web--especially the website of +pandas+ itself--also provides a wealth of information:
+
+* Again, it is good to start on the home page of the library: http://pandas.pydata.org[].
+* There is rather comprehensive online documentation available at http://pandas.pydata.org/pandas-docs/stable/[].
+* The documentation in +PDF+ format with 1,500+ pages illustrates how much functionality +pandas+ has to offer: http://pandas.pydata.org/pandas-docs/stable/pandas.pdf[].
+

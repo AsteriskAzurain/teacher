@@ -1,0 +1,1561 @@
+[[statistics]]
+
+
+== Statistics
+
+[quote, George Canning]
+____
+[role="align_me_right"]
+I can prove anything by statistics except the truth.
+____
+
+(((statistics, focus areas covered)))((("statistics", id="ix_stats", range="startofrange")))Statistics is a vast field. The tools and results the field provides have become indispensible for finance. This also explains the popularity of domain-specific languages like +R+ in the finance industry. The more elaborate and complex statistical models become, the more important it is to have available easy-to-use and high-performing computational solutions.
+
+A single chapter in a book like this one cannot do justice to the richness and the broadness of the field of statistics. Therefore, the approach--as in many other chapters--is to focus on selected topics that seem of paramount importance or that provide a good starting point when it comes to the use of +Python+ for the particular tasks at hand. The chapter has four focal points:
+
+Normality tests::
+    ((("statistics", "normality tests", id="ix_Snorm", range="startofrange")))(((normality tests, overview of)))A large number of important financial models, like the mean-variance 
+    portfolio theory and the capital asset pricing model (CAPM), rest on the 
+    assumption that returns of securities are normally distributed; 
+    therefore, this chapter presents some approaches to test a given time 
+    series for normality of returns.
+Portfolio theory:: 
+    (((statistics, portfolio theory)))((("modern portfolio theory (MPT)")))Modern portfolio theory (MPT) can be considered one of the  
+    biggest successes of statistics in finance; starting in the early 1950s     
+    with the work of pioneer Harry Markowitz, this theory began to replace     
+    people's reliance on judgment and experience with rigorous mathematical and 
+    statistical methods when it comes to the investment of money in 
+    financial markets. In that sense, it is maybe the first real 
+    quantitative approach in finance.
+Principal component analysis:: 
+    (((statistics, principal component analysis)))((("principal component analysis (PCA)", "overview of")))Principal component analysis (PCA) is quite a popular tool in finance, 
+    for example, when it comes to implementing equity investment strategies 
+    or analyzing the principal components that explain the movement in 
+    interest rates. Its major benefit is "complexity reduction," achieved by deriving 
+    a small set of linearly independent (noncorrelated, orthogonal) 
+    components from a potentially large set of maybe highly correlated time 
+    series components; we illustrate the application based on the German 
+    DAX index and the 30 stocks contained in that index.
+Bayesian regression:: 
+    (((statistics, Bayesian regression)))(((Bayesian regression, overview of)))(((beliefs of agents)))(((updating of beliefs)))On a fundamental level, Bayesian statistics introduces the notion of 
+    _beliefs_ of agents and the _updating of beliefs_ to statistics; when 
+    it comes to linear regression, for example, this might take on the form 
+    of having a statistical distribution for regression parameters instead 
+    of single point estimates (e.g., for the intercept and slope of the 
+    regression line). Nowadays, Bayesian methods are rather popular and 
+    important in finance, which is why we illustrate some (advanced) 
+    applications in this chapter.
+
+Many aspects in this chapter relate to date and/or time information. Refer to <<dates_times>> for an overview of handling such data with +Python+, +NumPy+, and +pandas+.
+
+
+=== Normality Tests
+
+((("normality tests", id="ix_norm", range="startofrange")))(((normality tests, importance of)))The _normal distribution_ can be considered the most important distribution in finance and one of the major statistical building blocks of financial theory. Among others, the following cornerstones of financial theory rest to a large extent on the normal distribution of stock market returns:
+
+Portfolio theory:: 
+    (((mean returns)))(((covariances)))(((variance of returns)))((("portfolio theory/portfolio optimization", "overview of")))When stock returns are normally distributed, optimal portfolio choice 
+    can be cast into a setting where only the _mean return_ and the 
+    _variance of the returns_ (or the volatility) as well as the 
+    _covariances_ between different stocks are relevant for an investment 
+    decision (i.e., an optimal portfolio composition).
+Capital asset pricing model:: 
+    (((capital asset pricing model)))Again, when stock returns are normally distributed, prices of single 
+    stocks can be elegantly expressed in relationship to a broad market 
+    index; the relationship is generally expressed by a measure for the 
+    comovement of a single stock with the market index called beta 
+    (&#x1d6fd;).
+Efficient markets hypothesis:: 
+    (((efficient markets hypothesis)))An _efficient_ market is a market where prices reflect all available 
+    information, where "all" can be defined more narrowly or more widely 
+    (e.g., as in "all publicly available" information vs. including also 
+    "only privately available" information); if this hypothesis holds true, 
+    then stock prices fluctuate randomly and returns are normally 
+    distributed.
+Option pricing theory:: 
+    (((option pricing theory)))Brownian motion is _the_ standard and benchmark model for the modeling 
+    of random stock (and other security) price movements; the famous 
+    Black-Scholes-Merton option pricing formula uses a geometric Brownian 
+    motion as the model for a stock's random fluctuations over time, 
+    leading to normally distributed returns.
+
+This by far nonexhaustive list underpins the importance of the normality assumption in finance.
+
+
+==== Benchmark Case
+
+(((normality tests, benchmark case)))(((SciPy, scipy.stats sublibrary)))To set the stage for further analyses, we start with the geometric Brownian motion as one of the canonical stochastic processes used in financial modeling. The following can be said about the characteristics of paths from a geometric Brownian motion __S__:
+
+Normal log returns:: 
+    Log returns latexmath:[$\log \frac{S_t}{S_s} = \log S_t - \log S_s$]     
+    between two times 0 < __s__ < __t__ are normally pass:[<phrase role="keep-together">distributed</phrase>].
+Log-normal values:: 
+    At any time __t__ > 0, the values __S~t~__ are log-normally distributed.
+
+For what follows we need a number of +Python+ libraries, including http://docs.scipy.org/doc/scipy/reference/stats.html[+scipy.stats+] and http://statsmodels.sourceforge.net/stable/[+statsmodels.api+]:
+
+// code cell start uuid: b5c2a3e0-81d2-4aab-bee0-a9239fc9ffa6
+[source, python]
+----
+In [1]: import numpy as np
+        np.random.seed(1000)
+        import scipy.stats as scs
+        import statsmodels.api as sm
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        %matplotlib inline
+----
+
+// code cell end
+
+Let us define a function to generate Monte Carlo paths for the geometric Brownian motion (see also <<stochastics>>):
+
+// code cell start uuid: 596ccb67-e163-4f15-95e8-80362bdade98
+[source, python]
+----
+In [2]: def gen_paths(S0, r, sigma, T, M, I):
+            ''' Generates Monte Carlo paths for geometric Brownian motion.
+        
+            Parameters
+            ==========
+            S0 : float
+                initial stock/index value
+            r : float
+                constant short rate
+            sigma : float
+                constant volatility
+            T : float
+                final time horizon
+            M : int
+                number of time steps/intervals
+            I : int
+                number of paths to be simulated
+        
+            Returns
+            =======
+            paths : ndarray, shape (M + 1, I)
+                simulated paths given the parameters
+            '''
+            dt = float(T) / M
+            paths = np.zeros((M + 1, I), np.float64)
+            paths[0] = S0
+            for t in range(1, M + 1):
+                rand = np.random.standard_normal(I)
+                rand = (rand - rand.mean()) / rand.std()
+                paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
+                                                 sigma * np.sqrt(dt) * rand)
+            return paths
+----
+
+// code cell end
+
+The following is a possible parameterization for the Monte Carlo simulation, generating, in combination with the function +gen_paths+, 250,000 paths with 50 time steps each:
+
+// code cell start uuid: 7b6ba027-7f3c-43ee-a297-66599a4c9ac2
+[source, python]
+----
+In [3]: S0 = 100.
+        r = 0.05
+        sigma = 0.2
+        T = 1.0
+        M = 50
+        I = 250000
+----
+
+// code cell end
+
+// code cell start uuid: abdf423c-dc32-4528-8781-12e05a6703cd
+[source, python]
+----
+In [4]: paths = gen_paths(S0, r, sigma, T, M, I)
+----
+
+// code cell end
+
+<<normal_sim_1>> shows the first 10 simulated paths from the simulation:
+
+// code cell start uuid: 133e6168-692d-4aa7-8b8d-81d21e1d21e9
+[source, python]
+----
+In [5]: plt.plot(paths[:, :10])
+        plt.grid(True)
+        plt.xlabel('time steps')
+        plt.ylabel('index level')
+----
+
+// code cell end
+
+Our main interest is in the distribution of the log returns. The following code generates an +ndarray+ object with all log returns:
+
+// code cell start uuid: c9a7ad7d-921d-4b03-a81e-bff7d6e60b8e
+[source, python]
+----
+In [6]: log_returns = np.log(paths[1:] / paths[0:-1]) 
+----
+
+// code cell end
+
+[[normal_sim_1]]
+.Ten simulated paths of geometric Brownian motion
+image::images/pyfi_1101.png[]
+
+Consider the very first simulated path over the 50 time steps:
+
+// code cell start uuid: 4fe20e49-2c58-454c-a086-14c2f2901dba
+[source, python]
+----
+In [7]: paths[:, 0].round(4)
+----
+
+----
+Out[7]: array([ 100.    ,   97.821 ,   98.5573,  106.1546,  105.899 ,   99.8363,
+                100.0145,  102.6589,  105.6643,  107.1107,  108.7943,  108.2449,
+                106.4105,  101.0575,  102.0197,  102.6052,  109.6419,  109.5725,
+                112.9766,  113.0225,  112.5476,  114.5585,  109.942 ,  112.6271,
+                112.7502,  116.3453,  115.0443,  113.9586,  115.8831,  117.3705,
+                117.9185,  110.5539,  109.9687,  104.9957,  108.0679,  105.7822,
+                105.1585,  104.3304,  108.4387,  105.5963,  108.866 ,  108.3284,
+                107.0077,  106.0034,  104.3964,  101.0637,   98.3776,   97.135 ,
+                 95.4254,   96.4271,   96.3386])
+----
+
+// code cell end
+
+A log-return series for a simulated path might then take on the form:
+
+// code cell start uuid: cd6ee063-9463-405d-96bd-2ad1231d7e7f
+[source, python]
+----
+In [8]: log_returns[:, 0].round(4)
+----
+
+----
+Out[8]: array([-0.022 ,  0.0075,  0.0743, -0.0024, -0.059 ,  0.0018,  0.0261,
+                0.0289,  0.0136,  0.0156, -0.0051, -0.0171, -0.0516,  0.0095,
+                0.0057,  0.0663, -0.0006,  0.0306,  0.0004, -0.0042,  0.0177,
+               -0.0411,  0.0241,  0.0011,  0.0314, -0.0112, -0.0095,  0.0167,
+                0.0128,  0.0047, -0.0645, -0.0053, -0.0463,  0.0288, -0.0214,
+               -0.0059, -0.0079,  0.0386, -0.0266,  0.0305, -0.0049, -0.0123,
+               -0.0094, -0.0153, -0.0324, -0.0269, -0.0127, -0.0178,  0.0104,
+               -0.0009])
+----
+
+// code cell end
+
+This is something one might experience in financial markets as well: days when you make a _positive return_ on your investment and other days when you are _losing money_ relative to your most recent wealth position.
+
+The function +print_statistics+ is a wrapper function for the +describe+ function from the +scipy.stats+ sublibrary. It mainly generates a more (human-)readable output for such statistics as the mean, the skewness, or the kurtosis of a given (historical or simulated) data set:
+
+// code cell start uuid: 77290ae6-4035-42a6-8312-ec89da50f88b
+[source, python]
+----
+In [9]: def print_statistics(array):
+            ''' Prints selected statistics.
+        
+            Parameters
+            ==========
+            array: ndarray
+                object to generate statistics on
+            '''
+            sta = scs.describe(array)
+            print "%14s %15s" % ('statistic', 'value')
+            print 30 * "-"
+            print "%14s %15.5f" % ('size', sta[0])
+            print "%14s %15.5f" % ('min', sta[1][0])
+            print "%14s %15.5f" % ('max', sta[1][1])
+            print "%14s %15.5f" % ('mean', sta[2])
+            print "%14s %15.5f" % ('std', np.sqrt(sta[3]))
+            print "%14s %15.5f" % ('skew', sta[4])
+            print "%14s %15.5f" % ('kurtosis', sta[5])
+----
+
+// code cell end
+
+For example, the following shows the function in action, using a flattened version of the +ndarray+ object containing the log returns. The method +flatten+ returns a 1D array with all the data given in a multidimensional array:
+
+// code cell start uuid: 57ac0ad6-14c7-4158-b67b-b553d662dc21
+[source, python]
+----
+In [10]: print_statistics(log_returns.flatten())
+----
+
+----
+Out[10]:      statistic           value
+         ------------------------------
+                   size  12500000.00000
+                    min        -0.15664
+                    max         0.15371
+                   mean         0.00060
+                    std         0.02828
+                   skew         0.00055
+               kurtosis         0.00085
+         
+----
+
+// code cell end
+
+The data set in this case consists of 12,500,000 data points with the values mainly lying between +/– 0.15. We would expect annualized values of 0.05 for the mean return and 0.2 for the standard deviation (volatility). The annualized values of the data set come close to these values, if not matching them perfectly (multiply the mean value by 50 and the standard deviation by latexmath:[$\sqrt{50}$]).
+
+<<normal_sim_2>> compares the frequency distribution of the simulated log returns with the probability density function (pdf) of the normal distribution given the parameterizations for +r+ and +sigma+. The function used is +norm.pdf+ from the +scipy.stats+ sublibrary. There is obviously quite a good fit:
+
+// code cell start uuid: 1bb98c2c-002b-4e19-88af-ae23db1a673f
+[source, python]
+----
+In [11]: plt.hist(log_returns.flatten(), bins=70, normed=True, label='frequency')
+         plt.grid(True)
+         plt.xlabel('log-return')
+         plt.ylabel('frequency')
+         x = np.linspace(plt.axis()[0], plt.axis()[1])
+         plt.plot(x, scs.norm.pdf(x, loc=r / M, scale=sigma / np.sqrt(M)),
+                  'r', lw=2.0, label='pdf')
+         plt.legend()
+----
+
+[[normal_sim_2]]
+.Histogram of log returns and normal density function
+image::images/pyfi_1102.png[]
+
+// code cell end
+
+(((quantile-quantile (qq) plots)))Comparing a frequency distribution (histogram) with a theoretical pdf is not the only way to graphically "test" for normality. So-called _quantile-quantile plots_ (qq plots) are also well suited for this task. Here, sample quantile values are compared to theoretical quantile values. For normally distributed sample data sets, such a plot might look like <<sim_val_qq_1>>, with the absolute majority of the quantile values (dots) lying on a pass:[<phrase role="keep-together">straight line</phrase>]:
+
+// code cell start uuid: 75c069e5-c518-4fca-8b60-de465ba1a56b
+[source, python]
+----
+In [12]: sm.qqplot(log_returns.flatten()[::500], line='s')
+         plt.grid(True)
+         plt.xlabel('theoretical quantiles')
+         plt.ylabel('sample quantiles')
+----
+
+[[sim_val_qq_1]]
+.Quantile-quantile plot for log returns
+image::images/pyfi_1103.png[]
+
+// code cell end
+
+(((skewness test)))(((kurtosis test)))However appealing the graphical approaches might be, they generally cannot replace more rigorous testing procedures. The function +normality_tests+ combines three different statistical tests:
+
+Skewness test (+skewtest+):: This tests whether the skew of the sample data     
+    is "normal" (i.e., has a value close enough to zero).
+Kurtosis test (+kurtosistest+):: 
+    Similarly, this tests whether the kurtosis of the sample data is 
+    "normal" (again, close enough to zero).
+Normality test (+normaltest+):: 
+    This combines the other two test approaches to test for normality.
+
+We define this function as follows:
+
+// code cell start uuid: a6e5cdd2-0e90-4b34-8c13-d52dfe7e897b
+[source, python]
+----
+In [13]: def normality_tests(arr):
+             ''' Tests for normality distribution of given data set.
+         
+             Parameters
+             ==========
+             array: ndarray
+                 object to generate statistics on
+             '''
+             print "Skew of data set  %14.3f" % scs.skew(arr)
+             print "Skew test p-value %14.3f" % scs.skewtest(arr)[1]
+             print "Kurt of data set  %14.3f" % scs.kurtosis(arr)
+             print "Kurt test p-value %14.3f" % scs.kurtosistest(arr)[1]
+             print "Norm test p-value %14.3f" % scs.normaltest(arr)[1]
+----
+
+// code cell end
+
+The test values indicate that the log returns are indeed normally distributed—i.e., they show p-values of 0.05 or above:
+
+// code cell start uuid: d35f18c9-d798-47f7-85d4-dc09b0907134
+[source, python]
+----
+In [14]: normality_tests(log_returns.flatten())
+----
+
+----
+Out[14]: Skew of data set           0.001
+         Skew test p-value          0.430
+         Kurt of data set           0.001
+         Kurt test p-value          0.541
+         Norm test p-value          0.607
+----
+
+// code cell end
+
+Finally, let us check whether the end-of-period values are indeed log-normally distributed. This boils down to a normality test as well, since we only have to transform the data by applying the log function to it (to then arrive at normally distributed pass:[<phrase role="keep-together">data—</phrase>]or maybe not). <<normal_sim_3>> plots both the log-normally distributed end-of-period values and the transformed ones ("log index level"):
+
+// code cell start uuid: 80629df6-776e-4849-872b-46b6b35d4eb0
+[source, python]
+----
+In [15]: f, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4))
+         ax1.hist(paths[-1], bins=30)
+         ax1.grid(True)
+         ax1.set_xlabel('index level')
+         ax1.set_ylabel('frequency')
+         ax1.set_title('regular data')
+         ax2.hist(np.log(paths[-1]), bins=30)
+         ax2.grid(True)
+         ax2.set_xlabel('log index level')
+         ax2.set_title('log data')
+----
+
+[[normal_sim_3]]
+.Histogram of simulated end-of-period index levels
+image::images/pyfi_1104.png[]
+
+// code cell end
+
+The statistics for the data set show expected behavior—for example, a mean value close to 105 and a standard deviation (volatility) close to 20%:
+
+// code cell start uuid: 9e7b6096-9d21-4199-882b-b38f760fc72e
+[source, python]
+----
+In [16]: print_statistics(paths[-1])
+----
+
+----
+Out[16]:      statistic           value
+         ------------------------------
+                   size    250000.00000
+                    min        42.74870
+                    max       233.58435
+                   mean       105.12645
+                    std        21.23174
+                   skew         0.61116
+               kurtosis         0.65182
+         
+----
+
+// code cell end
+
+The log index level values also have skew and kurtosis values close to zero:
+
+// code cell start uuid: b9b2eab0-7788-48f7-b4b2-c3f1e263f0b6
+[source, python]
+----
+In [17]: print_statistics(np.log(paths[-1]))
+----
+
+----
+Out[17]:      statistic           value
+         ------------------------------
+                   size    250000.00000
+                    min         3.75534
+                    max         5.45354
+                   mean         4.63517
+                    std         0.19998
+                   skew        -0.00092
+               kurtosis        -0.00327
+         
+----
+
+// code cell end
+
+This data set also shows high p-values, providing strong support for the normal distribution hypothesis:
+
+// code cell start uuid: 7bd3a6dc-ca9f-4878-bf30-27127547b952
+[source, python]
+----
+In [18]: normality_tests(np.log(paths[-1]))
+----
+
+----
+Out[18]: Skew of data set          -0.001
+         Skew test p-value          0.851
+         Kurt of data set          -0.003
+         Kurt test p-value          0.744
+         Norm test p-value          0.931
+----
+
+// code cell end
+
+<<normal_sim_4>> compares again the frequency distribution with the pdf of the normal distribution, showing a pretty good fit (as now is, of course, to be expected):
+
+// code cell start uuid: fbe45821-3fda-4924-9b65-b7aae6004ae6
+[source, python]
+----
+In [19]: log_data = np.log(paths[-1])
+         plt.hist(log_data, bins=70, normed=True, label='observed')
+         plt.grid(True)
+         plt.xlabel('index levels')
+         plt.ylabel('frequency')
+         x = np.linspace(plt.axis()[0], plt.axis()[1])
+         plt.plot(x, scs.norm.pdf(x, log_data.mean(), log_data.std()),
+                  'r', lw=2.0, label='pdf')
+         plt.legend()
+----
+
+[[normal_sim_4]]
+.Histogram of log index levels and normal density function
+image::images/pyfi_1105.png[]
+
+// code cell end
+
+<<sim_val_qq_2>> also supports the hypothesis that the log index levels are normally pass:[<phrase role="keep-together">distributed</phrase>]:
+
+// code cell start uuid: 1db3cb57-4537-4e8c-96ca-9a96cb35bf99
+[source, python]
+----
+In [20]: sm.qqplot(log_data, line='s')
+         plt.grid(True)
+         plt.xlabel('theoretical quantiles')
+         plt.ylabel('sample quantiles')
+----
+
+[[sim_val_qq_2]]
+.Quantile-quantile plot for log index levels
+image::images/pyfi_1106.png[]
+
+// code cell end
+
+.Normality
+[TIP]
+====
+(((normality tests, normality assumption)))The normality assumption with regard to returns of securities is central to a number of important financial theories. +Python+ provides efficient statistical and graphical means to test whether time series data is normally distributed or not.
+====
+
+
+==== Real-World Data
+
+(((normality tests, real-world data)))We are now pretty well equipped to attack real-world data and see how the normality assumption does beyond the financial laboratory. We are going to analyze four historical time series: two stock indices (the German DAX index and the American S&P 500 index) and two stocks (Yahoo! Inc. and Microsoft Inc.). The data management tool of choice is +pandas+ (cf. <<fin_time_series>>), so we begin with a few imports:
+
+// code cell start uuid: 2fac84d1-67fd-4345-a9b8-58e8e20b6ea6
+[source, python]
+----
+In [21]: import pandas as pd
+         import pandas.io.data as web
+----
+
+// code cell end
+
+Here are the symbols for the time series we are interested in. The curious reader might of course replace these with any other symbol of interest:
+
+// code cell start uuid: 8c2cddba-d3fc-4e22-8b22-b0a6dcf61f16
+[source, python]
+----
+In [22]: symbols = ['^GDAXI', '^GSPC', 'YHOO', 'MSFT']
+----
+
+// code cell end
+
+The following reads only the +Adj Close+ time series data into a single +DataFrame+ object for all symbols:
+
+// code cell start uuid: eaa5651f-3c91-4f0f-9941-b564e4b7dbe1
+[source, python]
+----
+In [23]: data = pd.DataFrame()
+         for sym in symbols:
+             data[sym] = web.DataReader(sym, data_source='yahoo',
+                                     start='1/1/2006')['Adj Close']
+         data = data.dropna()
+----
+
+// code cell end
+
+// code cell start uuid: e4574de5-c00f-4665-b341-dad771d24d8e
+[source, python]
+----
+In [24]: data.info()
+----
+
+----
+Out[24]: <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 2179 entries, 2006-01-03 00:00:00 to 2014-09-26 00:00:00
+         Data columns (total 4 columns):
+         ^GDAXI    2179 non-null float64
+         ^GSPC     2179 non-null float64
+         YHOO      2179 non-null float64
+         MSFT      2179 non-null float64
+         dtypes: float64(4)
+----
+
+// code cell end
+
+The four time series start at rather different absolute values:
+
+// code cell start uuid: f2acb16d-fd16-4008-95a7-5213e3df3a9e
+[source, python]
+----
+In [25]: data.head()
+----
+
+----
+Out[25]:              ^GDAXI    ^GSPC   YHOO   MSFT
+         Date                                      
+         2006-01-03  5460.68  1268.80  40.91  22.09
+         2006-01-04  5523.62  1273.46  40.97  22.20
+         2006-01-05  5516.53  1273.48  41.53  22.22
+         2006-01-06  5536.32  1285.45  43.21  22.15
+         2006-01-09  5537.11  1290.15  43.42  22.11
+----
+
+// code cell end
+
+<<real_returns_1>> shows therefore the four time series in direct comparison, but normalized to a starting value of 100:
+
+// code cell start uuid: d4cf7b80-4be5-48d6-b669-acf6c9784941
+[source, python]
+----
+In [26]: (data / data.ix[0] * 100).plot(figsize=(8, 6))
+----
+
+[[real_returns_1]]
+.Evolution of stock and index levels over time
+image::images/pyfi_1107.png[]
+
+// code cell end
+
+Calculating the log returns with +pandas+ is a bit more convenient than with +NumPy+, since we can use the +shift+ method:
+
+// code cell start uuid: 8caf3129-34cb-4ce0-a53b-bef84d3db2dc
+[source, python]
+----
+In [27]: log_returns = np.log(data / data.shift(1))
+         log_returns.head()
+----
+
+----
+Out[27]:               ^GDAXI     ^GSPC      YHOO      MSFT
+         Date                                              
+         2006-01-03       NaN       NaN       NaN       NaN
+         2006-01-04  0.011460  0.003666  0.001466  0.004967
+         2006-01-05 -0.001284  0.000016  0.013576  0.000900
+         2006-01-06  0.003581  0.009356  0.039656 -0.003155
+         2006-01-09  0.000143  0.003650  0.004848 -0.001808
+----
+
+// code cell end
+
+<<real_returns_2>> provides all log returns in the form of histograms. Although not easy to judge, one can guess that these frequency distributions might not be normal:
+
+// code cell start uuid: f6fefbe1-3ec6-4d1b-b774-9db3f3c38c83
+[source, python]
+----
+In [28]: log_returns.hist(bins=50, figsize=(9, 6))
+----
+
+[[real_returns_2]]
+.Histogram of respective log returns
+image::images/pyfi_1108.png[]
+
+// code cell end
+
+As a next step, consider the different statistics for the time series data sets. The kurtosis values seem to be especially far from normal for all four data sets:
+
+// code cell start uuid: 5e6f48e5-68f2-44ec-ad92-635ad3c249ec
+[source, python]
+----
+In [29]: for sym in symbols:
+             print "\nResults for symbol %s" % sym
+             print 30 * "-"
+             log_data = np.array(log_returns[sym].dropna())
+             print_statistics(log_data)
+----
+
+----
+Out[29]: Results for symbol ^GDAXI
+         ------------------------------
+              statistic           value
+         ------------------------------
+                   size      2178.00000
+                    min        -0.07739
+                    max         0.10797
+                   mean         0.00025
+                    std         0.01462
+                   skew         0.02573
+               kurtosis         6.52461
+         
+         Results for symbol ^GSPC
+         ------------------------------
+              statistic           value
+         ------------------------------
+                   size      2178.00000
+                    min        -0.09470
+                    max         0.10957
+                   mean         0.00020
+                    std         0.01360
+                   skew        -0.32017
+               kurtosis        10.05425
+         
+         Results for symbol YHOO
+         ------------------------------
+              statistic           value
+         ------------------------------
+                   size      2178.00000
+                    min        -0.24636
+                    max         0.39182
+                   mean        -0.00000
+                    std         0.02620
+                   skew         0.56530
+               kurtosis        31.98659
+         
+         Results for symbol MSFT
+         ------------------------------
+              statistic           value
+         ------------------------------
+                   size      2178.00000
+                    min        -0.12476
+                    max         0.17039
+                   mean         0.00034
+                    std         0.01792
+                   skew         0.04262
+               kurtosis        10.18038
+         
+----
+
+// code cell end
+
+(((fat tails)))We will inspect the data of two symbols via a qq plot. <<real_val_qq_1>> shows the qq plot for the S&P 500. Obviously, the sample quantile values do not lie on a straight line, indicating "nonnormality." On the left and right sides there are many values that lie well below the line and well above the line, respectively. In other words, the time series data exhibits _fat tails_. This term refers to a (frequency) distribution where negative and positive outliers are observed far more often than a normal distribution would imply. The code to generate this plot is as follows:
+
+// code cell start uuid: 83fc3d8b-03c4-43bc-a7a3-b7ac0747c2b1
+[source, python]
+----
+In [30]: sm.qqplot(log_returns['^GSPC'].dropna(), line='s')
+         plt.grid(True)
+         plt.xlabel('theoretical quantiles')
+         plt.ylabel('sample quantiles')
+----
+
+[[real_val_qq_1]]
+.Quantile-quantile plot for S&P 500 log returns
+image::images/pyfi_1109.png[]
+
+// code cell end
+
+The same conclusions can be drawn from <<real_val_qq_2>>, presenting the data for the Microsoft Inc. stock. There also seems to be strong evidence for a fat-tailed distribution:
+
+// code cell start uuid: a6e1cee5-aebc-4c63-8ce4-100562f31859
+[source, python]
+----
+In [31]: sm.qqplot(log_returns['MSFT'].dropna(), line='s')
+         plt.grid(True)
+         plt.xlabel('theoretical quantiles')
+         plt.ylabel('sample quantiles')
+----
+
+[[real_val_qq_2]]
+.Quantile-quantile plot for Microsoft log returns
+image::images/pyfi_1110.png[]
+
+// code cell end
+
+All this leads us finally to the formal normality tests:
+
+// code cell start uuid: bce2aa32-77f9-4d5a-9a81-1a37b6b90001
+[source, python]
+----
+In [32]: for sym in symbols:
+             print "\nResults for symbol %s" % sym
+             print 32 * "-"
+             log_data = np.array(log_returns[sym].dropna())
+             normality_tests(log_data)
+----
+
+----
+Out[32]: Results for symbol ^GDAXI
+         --------------------------------
+         Skew of data set           0.026
+         Skew test p-value          0.623
+         Kurt of data set           6.525
+         Kurt test p-value          0.000
+         Norm test p-value          0.000
+         
+         Results for symbol ^GSPC
+         --------------------------------
+         Skew of data set          -0.320
+         Skew test p-value          0.000
+         Kurt of data set          10.054
+         Kurt test p-value          0.000
+         Norm test p-value          0.000
+         
+         Results for symbol YHOO
+         --------------------------------
+         Skew of data set           0.565
+         Skew test p-value          0.000
+         Kurt of data set          31.987
+         Kurt test p-value          0.000
+         Norm test p-value          0.000
+         
+         Results for symbol MSFT
+         --------------------------------
+         Skew of data set           0.043
+         Skew test p-value          0.415
+         Kurt of data set          10.180
+         Kurt test p-value          0.000
+         Norm test p-value          0.000
+         
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_Snorm")))(((range="endofrange", startref="ix_norm")))Throughout, the p-values of the different tests are all zero, _strongly rejecting the test hypothesis_ that the different sample data sets are normally distributed. This shows that the normal assumption for stock market returns--as, for example, embodied in the geometric Brownian motion model--cannot be justified in general and that one might have to use richer models generating fat tails (e.g., jump diffusion models or models with stochastic volatility).
+
+
+=== Portfolio Optimization
+
+((("statistics", "portfolio theory", id="ix_Sport", range="startofrange")))((("modern portfolio theory (MPT)")))((("mean-variance portfolio theory (MPT)")))((("portfolio theory/portfolio optimization", "importance of")))Modern or mean-variance portfolio theory (MPT) is a major cornerstone of financial theory. Based on this theoretical breakthrough the Nobel Prize in Economics was awarded to its inventor, Harry Markowitz, in 1990. Although formulated in the 1950s,footnote:[Cf. Markowitz, Harry (1952): "Portfolio Selection." _Journal of Finance_, Vol. 7, 77-91.] it is still a theory taught to finance students and applied in practice today (often with some minor or major modifications). This section illustrates the fundamental principles of the theory.
+
+Chapter 5 in the book by Copeland, Weston, and Shastri (2005) provides a good introduction to the formal topics associated with MPT. As pointed out previously, the assumption of normally distributed returns is fundamental to the theory:
+
+[quote]
+____
+By looking only at mean and variance, we are necessarily assuming that no other statistics are necessary to describe the distribution of end-of-period wealth. Unless investors have a special type of utility function (quadratic utility function), it is necessary to assume that returns have a normal distribution, which can be completely described by mean and variance.
+____
+
+
+==== The Data
+
+((("portfolio theory/portfolio optimization", "data collection for")))Let us begin our +Python+ session by importing a couple of by now well-known libraries:
+
+// code cell start uuid: a0301e42-0104-4cee-bf30-aa224a2260a2
+[source, python]
+----
+In [33]: import numpy as np
+         import pandas as pd
+         import pandas.io.data as web
+         import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+((("portfolio theory/portfolio optimization", "basic idea of")))(((diversification)))We pick five different assets for the analysis: American tech stocks Apple Inc., Yahoo! Inc., and Microsoft Inc., as well as German Deutsche Bank AG and gold as a commodity via an exchange-traded fund (ETF). The basic idea of MPT is _diversification_ to achieve a minimal portfolio risk or maximal portfolio returns given a certain level of risk. One would expect such results for the right combination of a large enough number of assets and a certain diversity in the assets. However, to convey the basic ideas and to show typical effects, these five assets shall suffice:
+
+// code cell start uuid: 74a583b1-1e85-4efa-adf0-c70377606aa6
+[source, python]
+----
+In [34]: symbols = ['AAPL', 'MSFT', 'YHOO', 'DB', 'GLD']
+         noa = len(symbols)
+----
+
+// code cell end
+
+Using the +DataReader+ function of +pandas+ (cf. <<fin_time_series>>) makes getting the time series data rather efficient. We are only interested, as in the previous example, in the +Close+ prices of each stock:
+
+// code cell start uuid: 23729711-44d9-49a9-9c10-8d238be308cb
+[source, python]
+----
+In [35]: data = pd.DataFrame()
+         for sym in symbols:
+             data[sym] = web.DataReader(sym, data_source='yahoo',
+                                        end='2014-09-12')['Adj Close']
+         data.columns = symbols
+----
+
+// code cell end
+
+<<portfolio_1>> shows the time series data in normalized fashion graphically:
+
+// code cell start uuid: 2bd5a671-fb77-4c78-90d9-bef99c34af86
+[source, python]
+----
+In [36]: (data / data.ix[0] * 100).plot(figsize=(8, 5))
+----
+
+[[portfolio_1]]
+.Stock prices over time
+image::images/pyfi_1111.png[]
+
+// code cell end
+
+(((mean-variance)))_Mean-variance_ refers to the mean and variance of the (log) returns of the different securities, which are calculated as follows:
+
+// code cell start uuid: e7e3d4af-6b03-4b05-9bb2-69132aa9b96d
+[source, python]
+----
+In [37]: rets = np.log(data / data.shift(1))
+----
+
+// code cell end
+
+(((annualized performance)))Over the period of the time series data, we see significant differences in the _annualized performance_. We use a factor of 252 trading days to annualize the daily returns:
+
+// code cell start uuid: 3416c8ac-7ee5-4c5d-a929-92aa2881382d
+[source, python]
+----
+In [38]: rets.mean() * 252
+----
+
+----
+Out[38]: AAPL    0.266036
+         MSFT    0.114476
+         YHOO    0.196165
+         DB     -0.125170
+         GLD     0.016054
+         dtype: float64
+----
+
+// code cell end
+
+(((covariance matrix)))The _covariance matrix_ for the assets to be invested in is the central piece of the whole portfolio selection process. +pandas+ has a built-in method to generate the covariance matrix:
+
+// code cell start uuid: 437bb447-a4b0-4ddc-97de-965d2cb6c9f2
+[source, python]
+----
+In [39]: rets.cov() * 252
+----
+
+----
+Out[39]:           AAPL      MSFT      YHOO        DB       GLD
+         AAPL  0.072813  0.020426  0.023254  0.041044  0.005234
+         MSFT  0.020426  0.049384  0.024247  0.046100  0.002105
+         YHOO  0.023254  0.024247  0.093349  0.051528 -0.000864
+         DB    0.041044  0.046100  0.051528  0.177477  0.008775
+         GLD   0.005234  0.002105 -0.000864  0.008775  0.032406
+----
+
+// code cell end
+
+
+==== The Basic Theory
+
+((("portfolio theory/portfolio optimization", "basic theory")))"In what follows, we assume that an investor is not allowed to set up short positions in a security. Only long positions are allowed, which means that 100% of the investor's wealth has to be divided among the available assets in such a way that all positions are long (positive) _and_ that the positions add up to 100%. Given the five securities, you could for example invest equal amounts into every security (i.e., 20% of your wealth in each). The following code generates five random numbers between 0 and 1 and then normalizes the values such that the sum of all values equals 1:
+
+// code cell start uuid: 3d86ff5b-9de8-4cee-99ea-cc01e4697320
+[source, python]
+----
+In [40]: weights = np.random.random(noa)
+         weights /= np.sum(weights)
+----
+
+// code cell end
+
+// code cell start uuid: 9d9499c0-c033-4d4a-b2d4-e8ef064eb9ae
+[source, python]
+----
+In [41]: weights
+----
+
+----
+Out[41]: array([ 0.0346395 ,  0.02726489,  0.2868883 ,  0.10396806,  0.54723926])
+----
+
+// code cell end
+
+(((expected portfolio return)))You can now check that the asset weights indeed add up to 1; i.e., &#x1d6ba;~__I__~__w~i~__ = 1, where __I__ is the number of assets and __w~i~__ &#x2265; 0 is the weight of asset __i__. <<port_return>> provides the formula for the _expected portfolio return_ given the weights for the single securities. This is _expected_ portfolio return in the sense that historical mean performance is assumed to be the best estimator for future (expected) performance. Here, the __r~i~__ are the state-dependent future returns (vector with return values assumed to be normally distributed) and &#x1d707;~__i__~ is the expected return for security __i__. Finally, __w^T^__ is the transpose of the weights vector and &#x1d707; is the vector of the expected security returns.
+
+[[port_return]]
+[latexmath]
+.General formula for expected portfolio return
+++++
+\begin{eqnarray*}
+\mu_p &=& \mathbf{E} \left( \sum_I w_i r_i \right) \\
+        &=& \sum_I w_i \mathbf{E}\left( r_i \right) \\
+        &=& \sum_I w_i \mu_i \\
+        &=& w^T \mu
+\end{eqnarray*}
+++++
+
+Translated into +Python+ this boils down to the following line of code, where we multiply again by 252 to get annualized return values:
+
+// code cell start uuid: c9ec5dc3-df96-4418-90fe-0e76ed7b006d
+[source, python]
+----
+In [42]: np.sum(rets.mean() * weights) * 252
+           # expected portfolio return
+----
+
+----
+Out[42]: 0.064385749262353215
+----
+
+// code cell end
+
+(((expected portfolio variance)))((("portfolio theory/portfolio optimization", "portfolio covariance matrix")))The second object of choice in MPT is the _expected portfolio variance_. The covariance between two securities is defined by &#x1d70e;~__ij__~ = &#x1d70e;~__ji__~ = **E**(__r~i~__ – &#x1d707;~__i__~)(__r~j~__ – &#x1d707;~__j__~)). The variance of a security is the special case of the covariance with itself: latexmath:[$\sigma_{i}^2 = \mathbf{E}\left(\left(r_i-\mu_i\right)^2\right)$]. <<port_covmat>> provides the covariance matrix for a portfolio of securities (assuming an equal weight of 1 for every security).
+
+[[port_covmat]]
+[latexmath]
+.Portfolio covariance matrix
+++++
+\begin{eqnarray*}
+\Sigma = \begin{bmatrix}
+\sigma_{1}^2 \ \sigma_{12} \ \dots \ \sigma_{1I} \\
+\sigma_{21} \ \sigma_{2}^2 \ \dots \ \sigma_{2I} \\
+\vdots \ \vdots \ \ddots \ \vdots \\
+\sigma_{I1} \ \sigma_{I2} \ \dots \ \sigma_{I}^2 \end{bmatrix}
+\end{eqnarray*}
+++++
+
+Equipped with the portfolio covariance matrix, <<port_variance>> then provides the formula for the expected portfolio variance.
+
+[[port_variance]]
+[latexmath]
+.General formula for expected portfolio variance
+++++
+\begin{eqnarray*}
+\sigma_p^2 &=& \mathbf{E}\left( (r - \mu)^2 \right) \\
+        &=& \sum_{i \in I}\sum_{j \in I} w_i w_j \sigma_{ij} \\
+        &=& w^T \Sigma w
+\end{eqnarray*}
+++++
+
+(((dot function)))In +Python+ this all again boils down to a single line of code, making heavy use of ++NumPy++'s vectorization capabilities. The +dot+ function gives the dot product of two vectors/matrices. The +T+ or +transpose+ method gives the transpose of a vector or matrix:
+
+// code cell start uuid: 40f68bdb-74ea-4f6d-9f93-c498a9a13167
+[source, python]
+----
+In [43]: np.dot(weights.T, np.dot(rets.cov() * 252, weights))
+           # expected portfolio variance
+----
+
+----
+Out[43]: 0.024929484097150213
+----
+
+// code cell end
+
+The (expected) portfolio standard deviation or volatility latexmath:[$\sigma_p = \sqrt{\sigma_p^2}$] is then only one square root away:
+
+// code cell start uuid: 351e317e-5f22-474b-b1a5-1f2934f608a1
+[source, python]
+----
+In [44]: np.sqrt(np.dot(weights.T, np.dot(rets.cov() * 252, weights)))
+           # expected portfolio standard deviation/volatility
+----
+
+----
+Out[44]: 0.15789073467797346
+----
+
+// code cell end
+
+.Language
+[TIP]
+====
+The MPT example shows again how efficient it is with +Python+ to translate mathematical concepts, like portfolio return or portfolio variance, into executable, vectorized code (an argument made in <<why_python_for_finance>>).
+====
+
+This mainly completes the tool set for mean-variance portfolio selection. Of paramount interest to investors is what risk-return profiles are possible for a given set of securities, and their statistical characteristics. To this end, we implement a Monte Carlo simulation (cf. <<stochastics>>) to generate random portfolio weight vectors on a larger scale. For every simulated allocation, we record the resulting expected portfolio return and variance:
+
+// code cell start uuid: 689bff52-80a9-48ac-9fce-0855e2a763ae
+[source, python]
+----
+In [45]: prets = []
+         pvols = []
+         for p in range (2500):
+             weights = np.random.random(noa)
+             weights /= np.sum(weights)
+             prets.append(np.sum(rets.mean() * weights) * 252)
+             pvols.append(np.sqrt(np.dot(weights.T,
+                                 np.dot(rets.cov() * 252, weights))))
+         prets = np.array(prets)
+         pvols = np.array(pvols)
+----
+
+// code cell end
+
+<<portfolio_2>> illustrates the results of the Monte Carlo simulation. In addition it provides results for the so-called Sharpe ratio, defined as latexmath:[$SR \equiv \frac{\mu_p - r_f}{\sigma_p}$] (i.e., the expected excess return of the portfolio) over the risk-free short rate __r~f~__ divided by the expected standard deviation of the portfolio. For simplicity, we assume __r~f~__ = 0:
+
+// code cell start uuid: 81d7f822-79e9-41bb-94b1-649807788f2e
+[source, python]
+----
+In [46]: plt.figure(figsize=(8, 4))
+         plt.scatter(pvols, prets, c=prets / pvols, marker='o')
+         plt.grid(True)
+         plt.xlabel('expected volatility')
+         plt.ylabel('expected return')
+         plt.colorbar(label='Sharpe ratio')
+----
+
+[[portfolio_2]]
+.Expected return and volatility for different/random portfolio weights
+image::images/pyfi_1112.png[]
+
+// code cell end
+
+It is clear by inspection of <<portfolio_2>> that not all weight distributions perform well when measured in terms of mean and variance. For example, for a fixed risk level of, say, 20%, there are multiple portfolios that all show different returns. As an investor one is generally interested in the maximum return given a fixed risk level or the minimum risk given a fixed return expectation. This set of portfolios then makes up the so-called _efficient frontier_. This is what we derive later in the section.
+
+
+==== Portfolio Optimizations
+
+((("portfolio theory/portfolio optimization", "portfolio optimizations")))To make our lives a bit easier, first we have a convenience function giving back the major portfolio statistics for an input weights vector/array:
+
+// code cell start uuid: 637b7c75-4c82-4eec-bf8e-2ff5516fd459
+[source, python]
+----
+In [47]: def statistics(weights):
+             ''' Returns portfolio statistics.
+         
+             Parameters
+             ==========
+             weights : array-like
+                 weights for different securities in portfolio
+         
+             Returns
+             =======
+             pret : float
+                 expected portfolio return
+             pvol : float
+                 expected portfolio volatility
+             pret / pvol : float
+                 Sharpe ratio for rf=0
+             '''
+             weights = np.array(weights)
+             pret = np.sum(rets.mean() * weights) * 252
+             pvol = np.sqrt(np.dot(weights.T, np.dot(rets.cov() * 252, weights)))
+             return np.array([pret, pvol, pret / pvol])
+----
+
+// code cell end
+
+The derivation of the optimal portfolios is a constrained optimization problem for which we use the function +minimize+ from the +scipy.optimize+ sublibrary (cf. pass:[<phrase role="keep-together"><xref linkend="math_tools" /></phrase>]):
+
+// code cell start uuid: 1fea02c0-d092-4a29-a9eb-2d4022985a62
+[source, python]
+----
+In [48]: import scipy.optimize as sco
+----
+
+// code cell end
+
+(((minimization function)))(((maximization of Sharpe ratio)))(((Sharpe ratio)))The minimization function +minimize+ is quite general and allows for (in)equality constraints and bounds for the parameters. Let us start with the _maximization of the Sharpe ratio_. Formally, we minimize the negative value of the Sharpe ratio:
+
+// code cell start uuid: 0124792d-7b7f-4f7c-ac42-367681a7145f
+[source, python]
+----
+In [49]: def min_func_sharpe(weights):
+             return -statistics(weights)[2]
+----
+
+// code cell end
+
+The constraint is that all parameters (weights) add up to 1. This can be formulated as follows using the conventions of the +minimize+ function (cf. the http://bit.ly/using_minimize[documentation for this function]).footnote:[An alternative to +np.sum(x) - 1+ would be to write +np.sum(x) == 1+ taking into account that with +Python+ the Boolean +True+ value equals 1 and the +False+ value equals 0.]
+
+// code cell start uuid: a634bb6a-ef2e-4a68-9414-b2e320b58296
+[source, python]
+----
+In [50]: cons = ({'type': 'eq', 'fun': lambda x:  np.sum(x) - 1})
+----
+
+// code cell end
+
+We also bound the parameter values (weights) to be within 0 and 1. These values are provided to the minimization function as a tuple of tuples in this case:
+
+// code cell start uuid: 40e6c1b4-8fb8-4a8f-b2ba-36ffdaefc47b
+[source, python]
+----
+In [51]: bnds = tuple((0, 1) for x in range(noa))
+----
+
+// code cell end
+
+The only input that is missing for a call of the optimization function is a starting parameter list (initial guesses for the weights). We simply use an equal distribution:
+
+// code cell start uuid: d689f1b3-c680-4a1e-865b-85a64b06c0f6
+[source, python]
+----
+In [52]: noa * [1. / noa,]
+----
+
+----
+Out[52]: [0.2, 0.2, 0.2, 0.2, 0.2]
+----
+
+// code cell end
+
+Calling the function returns not only optimal parameter values, but much more. We store the results in an object we call +opts+:
+
+// code cell start uuid: dda15397-398b-445e-be6a-11e7ed0e3c32
+[source, python]
+----
+In [53]: %%time
+         opts = sco.minimize(min_func_sharpe, noa * [1. / noa,], method='SLSQP',
+                                bounds=bnds, constraints=cons)
+----
+
+----
+Out[53]: CPU times: user 52 ms, sys: 0 ns, total: 52 ms
+         Wall time: 50.3 ms
+         
+----
+
+// code cell end
+
+Here are the results:
+
+// code cell start uuid: ee237054-2af4-4879-97d1-0ee77d84d9a8
+[source, python]
+----
+In [54]: opts
+----
+
+----
+Out[54]:   status: 0
+          success: True
+             njev: 6
+             nfev: 42
+              fun: -1.0597540702789927
+                x: array([  6.59141408e-01,   8.82635668e-02,   2.52595026e-01,
+                  8.34564622e-17,  -8.91214186e-17])
+          message: 'Optimization terminated successfully.'
+              jac: array([  3.27527523e-05,  -1.61930919e-04,  -2.88933516e-05,
+                  1.51561590e+00,   1.24186277e-03,   0.00000000e+00])
+              nit: 6
+----
+
+// code cell end
+
+Our main interest lies in getting the optimal portfolio composition. To this end, we access the results object by providing the key of interest—i.e., +'x'+ in our case. The optimization yields a portfolio that only consists of three out of the five assets:
+
+// code cell start uuid: e0a821b0-a330-4979-bec2-a9e731f11656
+[source, python]
+----
+In [55]: opts['x'].round(3)
+----
+
+----
+Out[55]: array([ 0.659,  0.088,  0.253,  0.   , -0.   ])
+----
+
+// code cell end
+
+Using the portfolio weights from the optimization, the following statistics emerge:
+
+// code cell start uuid: faae2c2f-382b-427b-9426-87085a339b76
+[source, python]
+----
+In [56]: statistics(opts['x']).round(3)
+----
+
+----
+Out[56]: array([ 0.235,  0.222,  1.06 ])
+----
+
+// code cell end
+
+The expected return is about 23.5%, the expected volatility is about 22.2%, and the resulting optimal Sharpe ratio is 1.06.
+
+Next, let us minimize the variance of the portfolio. This is the same as minimizing the volatility, but we will define a function to minimize the variance:
+
+// code cell start uuid: 8aefec36-2e2e-49ea-ab30-75ccbcaa2b22
+[source, python]
+----
+In [57]: def min_func_variance(weights):
+             return statistics(weights)[1] ** 2
+----
+
+// code cell end
+
+Everything else can remain the same for the call of the +minimize+ function:
+
+// code cell start uuid: f84ed951-5f9b-4ec7-bb7c-330994bdb0b9
+[source, python]
+----
+In [58]: optv = sco.minimize(min_func_variance, noa * [1. / noa,],
+                                method='SLSQP', bounds=bnds,
+                                constraints=cons)
+----
+
+// code cell end
+
+// code cell start uuid: 76321897-4b6e-4714-965a-79bdd489b846
+[source, python]
+----
+In [59]: optv
+----
+
+----
+Out[59]:   status: 0
+          success: True
+             njev: 9
+             nfev: 64
+              fun: 0.018286019968366075
+                x: array([  1.07591814e-01,   2.49124471e-01,   1.09219925e-01,
+                  1.01101853e-17,   5.34063791e-01])
+          message: 'Optimization terminated successfully.'
+              jac: array([ 0.03636634,  0.03643877,  0.03613905,  0.05222051,
+                  0.03676446,  0.        ])
+              nit: 9
+----
+
+// code cell end
+
+(((absolute minimum variance portfolio)))This time a fourth asset is added to the portfolio. This portfolio mix leads to the _absolute minimum variance portfolio_:
+
+// code cell start uuid: 031a4259-ecec-4cf4-85cd-98515fe15a6c
+[source, python]
+----
+In [60]: optv['x'].round(3)
+----
+
+----
+Out[60]: array([ 0.108,  0.249,  0.109,  0.   ,  0.534])
+----
+
+// code cell end
+
+For the expected return, volatility, and Sharpe ratio, we get:
+
+// code cell start uuid: 1859a17c-e501-4a6f-88ae-16b9cf10b308
+[source, python]
+----
+In [61]: statistics(optv['x']).round(3)
+----
+
+----
+Out[61]: array([ 0.087,  0.135,  0.644])
+----
+
+// code cell end
+
+
+==== Efficient Frontier
+
+((("portfolio theory/portfolio optimization", "efficient frontier")))(((efficient frontier)))The derivation of all optimal portfolios—i.e., all portfolios with minimum volatility for a given target return level (or all portfolios with maximum return for a given risk level)—is similar to the previous optimizations. The only difference is that we have to iterate over multiple starting conditions. The approach we take is that we fix a target return level and derive for each such level those portfolio weights that lead to the minimum volatility value. For the optimization, this leads to two conditions: one for the target return level +tret+ and one for the sum of the portfolio weights as before. The boundary values for each parameter stay the same:
+
+// code cell start uuid: a49f6ebe-1552-400f-b97f-a26d1bd9fa2a
+[source, python]
+----
+In [62]: cons = ({'type': 'eq', 'fun': lambda x:  statistics(x)[0] - tret},
+                 {'type': 'eq', 'fun': lambda x:  np.sum(x) - 1})
+         bnds = tuple((0, 1) for x in weights)
+----
+
+// code cell end
+
+For clarity, we define a dedicated function +min_func+ for use in the minimization procedure. It merely returns the volatility value from the +statistics+ function:
+
+// code cell start uuid: 6ec20ed9-ec0d-4b86-bf1e-dbbcbd331b57
+[source, python]
+----
+In [63]: def min_func_port(weights):
+             return statistics(weights)[1]
+----
+
+// code cell end
+
+When iterating over different target return levels (+trets+), one condition for the minimization changes. That is why the conditions dictionary is updated during every loop:
+
+// code cell start uuid: 75433eba-18d3-416a-95a9-c404293ef495
+[source, python]
+----
+In [64]: %%time
+         trets = np.linspace(0.0, 0.25, 50)
+         tvols = []
+         for tret in trets:
+             cons = ({'type': 'eq', 'fun': lambda x:  statistics(x)[0] - tret},
+                     {'type': 'eq', 'fun': lambda x:  np.sum(x) - 1})
+             res = sco.minimize(min_func_port, noa * [1. / noa,], method='SLSQP',
+                                bounds=bnds, constraints=cons)
+             tvols.append(res['fun'])
+         tvols = np.array(tvols)
+----
+
+----
+Out[64]: CPU times: user 4.35 s, sys: 4 ms, total: 4.36 s
+         Wall time: 4.36 s
+         
+----
+
+// code cell end
+
+<<portfolio_3>> shows the optimization results. Crosses indicate the optimal portfolios given a certain target return; the dots are, as before, the random portfolios. In addition, the figure shows two larger stars: one for the minimum volatility/variance portfolio (the leftmost portfolio) and one for the portfolio with the maximum Sharpe ratio:
+
+// code cell start uuid: b16fdf94-8324-481a-a360-ed2060b9f481
+[source, python]
+----
+In [65]: plt.figure(figsize=(8, 4))
+         plt.scatter(pvols, prets,
+                     c=prets / pvols, marker='o')
+                     # random portfolio composition
+         plt.scatter(tvols, trets,
+                     c=trets / tvols, marker='x')
+                     # efficient frontier
+         plt.plot(statistics(opts['x'])[1], statistics(opts['x'])[0],
+                  'r*', markersize=15.0)
+                     # portfolio with highest Sharpe ratio
+         plt.plot(statistics(optv['x'])[1], statistics(optv['x'])[0],
+                  'y*', markersize=15.0)
+                     # minimum variance portfolio
+         plt.grid(True)
+         plt.xlabel('expected volatility')
+         plt.ylabel('expected return')
+         plt.colorbar(label='Sharpe ratio')
+----
+
+[[portfolio_3]]
+.Minimum risk portfolios for given return level (crosses)
+image::images/pyfi_1113.png[]
+
+// code cell end
+
+The _efficient frontier_ is comprised of all optimal portfolios with a higher return than the absolute minimum variance portfolio. These portfolios dominate all other portfolios in terms of expected returns given a certain risk level.
+
+
+==== Capital Market Line
+
+((("portfolio theory/portfolio optimization", "capital market line")))(((capital market line)))In addition to risky securities like stocks or commodities (such as gold), there is in general one universal, riskless investment opportunity available: _cash_ or _cash accounts_. In an idealized world, money held in a cash account with a large bank can be considered riskless (e.g., through public deposit insurance schemes). The downside is that such a riskless investment generally yields only a small return, sometimes close to zero.
+
+However, taking into account such a riskless asset enhances the efficient investment opportunity set for investors considerably. The basic idea is that investors first determine an efficient portfolio of risky assets and then add the riskless asset to the mix. By adjusting the proportion of the investor's wealth to be invested in the riskless asset it is possible to achieve any risk-return profile that lies on the straight line (in the risk-return space) between the riskless asset and the efficient portfolio.
+
+Which efficient portfolio (out of the many options) is to be taken to invest in optimal fashion? It is the one portfolio where the tangent line of the efficient frontier goes exactly through the risk-return point of the riskless portfolio. For example, consider a riskless interest rate of __r~f~__ = 0.01. We look for that portfolio on the efficient frontier for which the tangent goes through the point (&#x1d70e;~__f__~,__r~f~__) = (0,0.01) in risk-return space.
+
+For the calculations to follow, we need a functional approximation and the first derivative for the efficient frontier. We use cubic splines interpolation to this end (cf. pass:[<phrase role="keep-together"><xref linkend="math_tools" /></phrase>]):
+
+// code cell start uuid: b6eb023a-2407-49d7-986d-3d47e9c3ae45
+[source, python]
+----
+In [66]: import scipy.interpolate as sci
+----
+
+// code cell end
+
+For the spline interpolation, we only use the portfolios from the efficient frontier. The following code selects exactly these portfolios from our previously used sets +tvols+ and +trets+:
+
+// code cell start uuid: cca0eb49-0c77-4186-a2df-06ebf56fa923
+[source, python]
+----
+In [67]: ind = np.argmin(tvols)
+         evols = tvols[ind:]
+         erets = trets[ind:]
+----
+
+// code cell end
+
+The new +ndarray+ objects +evols+ and +erets+ are used for the interpolation:
+
+// code cell start uuid: c3bf6d9e-0548-4874-90fc-0555f05afd5e
+[source, python]
+----
+In [68]: tck = sci.splrep(evols, erets)
+----
+
+// code cell end
+
+Via this numerical route we end up being able to define a continuously differentiable function +f(x)+ for the efficient frontier and the respective first derivative function ++df(x)++:
+
+// code cell start uuid: f37d6e01-0091-42d4-a9ca-1102f0fdb436
+[source, python]
+----
+In [69]: def f(x):
+             ''' Efficient frontier function (splines approximation). '''
+             return sci.splev(x, tck, der=0)
+         def df(x):
+             ''' First derivative of efficient frontier function. '''
+             return sci.splev(x, tck, der=1)
+----
+
+// code cell end
+
+What we are looking for is a function __t__(__x__) = __a__ + __b__ &#xb7; __x__ describing the line that passes through the riskless asset in risk-return space and that is tangent to the efficient frontier. <<cml_conditions>> describes all three conditions that the function __t__(__x__) has to satisfy.
+
+[[cml_conditions]]
+[latexmath]
+.Mathematical conditions for capital market line
+++++
+\begin{eqnarray*}
+t(x) &=& a + b \cdot x \\
+t(0) &=& r_f &\iff& a &=& r_f \\
+t(x) &=& f(x) &\iff& a + b \cdot x &=& f(x) \\
+t'(x) &=& f'(x) &\iff& b &=& f'(x)
+\end{eqnarray*}
+++++
+
+Since we do not have a closed formula for the efficient frontier or the first derivative of it, we have to solve the system of equations in <<cml_conditions>> numerically. To this end, we define a +Python+ function that returns the values of all three equations given the parameter set __p__ = (__a__,__b__,__x__):
+
+// code cell start uuid: e0a3d820-a9f1-41fa-a5bf-46fe176fdb68
+[source, python]
+----
+In [70]: def equations(p, rf=0.01):
+             eq1 = rf - p[0]
+             eq2 = rf + p[1] * p[2] - f(p[2])
+             eq3 = p[1] - df(p[2])
+             return eq1, eq2, eq3
+----
+
+// code cell end
+
+The function +fsolve+ from +scipy.optimize+ is capable of solving such a system of equations. We provide an initial parameterization in addition to the function +equations+. Note that success or failure of the optimization might depend on the initial parameterization, which therefore has to be chosen carefully--generally by a combination of educated guesses with trial and error:
+
+// code cell start uuid: 2c23eced-0b5a-45cd-b677-f4eff5876f43
+[source, python]
+----
+In [71]: opt = sco.fsolve(equations, [0.01, 0.5, 0.15])
+----
+
+// code cell end
+
+The numerical optimization yields the following values. As desired, we have pass:[<phrase role="keep-together"><emphasis>a</emphasis> = <emphasis>r<subscript>f</subscript></emphasis> = 0.01</phrase>]:
+
+// code cell start uuid: f4c2c1e9-aef7-4d22-9e1c-3b7ff5066830
+[source, python]
+----
+In [72]: opt
+----
+
+----
+Out[72]: array([ 0.01      ,  1.01498858,  0.22580367])
+----
+
+// code cell end
+
+The three equations are also, as desired, zero:
+
+// code cell start uuid: 3651a6fa-7740-43fe-a18a-1134cbed7b0a
+[source, python]
+----
+In [73]: np.round(equations(opt), 6)
+----
+
+----
+Out[73]: array([ 0., -0., -0.])
+----
+
+// code cell end
+
+<<portfolio_4>> presents the results graphically: the star represents the optimal portfolio from the efficient frontier where the tangent line passes through the riskless asset point (0,__r~f~__ = 0.01). The optimal portfolio has an expected volatility of 20.5% and an expected return of 17.6%. The plot is generated with the following code:
+
+// code cell start uuid: b4e45542-14a5-4e96-9bbe-186873d9f429
+[source, python]
+----
+In [74]: plt.figure(figsize=(8, 4))
+         plt.scatter(pvols, prets,
+                     c=(prets - 0.01) / pvols, marker='o')
+                     # random portfolio composition
+         plt.plot(evols, erets, 'g', lw=4.0)
+                     # efficient frontier
+         cx = np.linspace(0.0, 0.3)
+         plt.plot(cx, opt[0] + opt[1] * cx, lw=1.5)
+                     # capital market line
+         plt.plot(opt[2], f(opt[2]), 'r*', markersize=15.0)
+         plt.grid(True)
+         plt.axhline(0, color='k', ls='--', lw=2.0)
+         plt.axvline(0, color='k', ls='--', lw=2.0)
+         plt.xlabel('expected volatility')
+         plt.ylabel('expected return')
+         plt.colorbar(label='Sharpe ratio')
+----
+
+[[portfolio_4]]
+.Capital market line and tangency portfolio (star) for risk-free rate of 1%
+image::images/pyfi_1114.png[]
+
+// code cell end
+
+(((range="endofrange", startref="ix_Sport")))The portfolio weights of the optimal (tangent) portfolio are as follows. Only three of the five assets are in the mix:
+
+// code cell start uuid: f2e04c2a-434a-442d-bce2-0f7be60c6e80
+[source, python]
+----
+In [75]: cons = ({'type': 'eq', 'fun': lambda x:  statistics(x)[0] - f(opt[2])},
+                 {'type': 'eq', 'fun': lambda x:  np.sum(x) - 1})
+         res = sco.minimize(min_func_port, noa * [1. / noa,], method='SLSQP',
+                                bounds=bnds, constraints=cons)
+----
+
+// code cell end
+
+// code cell start uuid: 78362c70-0acf-4f13-9a7d-04adbc7de43a
+[source, python]
+----
+In [76]: res['x'].round(3)
+----
+
+----
+Out[76]: array([ 0.684,  0.059,  0.257, -0.   ,  0.   ])
+----
+
+// code cell end
+

@@ -1,0 +1,1022 @@
+
+=== Principal Component Analysis
+
+((("statistics", "principal component analysis", id="ix_Spca", range="startofrange")))((("principal component analysis (PCA)", id="ix_pca", range="startofrange")))((("principal component analysis (PCA)", "definition of")))_Principal component analysis_ (PCA) has become a popular tool in finance. Wikipedia defines the technique as follows:
+
+[quote]
+____
+Principal component analysis (PCA) is a statistical procedure that uses orthogonal transformation to convert a set of observations of possibly correlated variables into a set of values of linearly uncorrelated variables called principal components. The number of principal components is less than or equal to the number of original variables. This transformation is defined in such a way that the first principal component has the largest possible variance (that is, accounts for as much of the variability in the data as possible), and each succeeding component in turn has the highest variance possible under the constraint that it is orthogonal to (i.e., uncorrelated with) the preceding components.
+____
+
+Consider, for example, a stock index like the German DAX index, composed of 30 different stocks. The stock price movements of all stocks taken together determine the movement in the index (via some well-documented formula). In addition, the stock price movements of the single stocks are generally correlated, for example, due to general economic conditions or certain developments in certain sectors.
+
+For statistical applications, it is generally quite hard to use 30 correlated factors to explain the movements of a stock index. This is where PCA comes into play. It derives single, uncorrelated _components_ that are "well suited" to explain the movements in the stock index. One can think of these components as linear combinations (i.e., portfolios) of selected stocks from the index. Instead of working with 30 correlated index constituents, one can then work with maybe 5, 3, or even only 1 _principal component_.
+
+The example of this section illustrates the use of PCA in such a context. We retrieve data for both the German DAX index and all stocks that make up the index. We then use PCA to derive principal components, which we use to construct what we call a pass:[<phrase role="keep-together"><literal>pca_index</literal></phrase>].
+
+(((KernelPCA function)))(((scikit-learn library)))First, some imports. In particular, we use the +KernelPCA+ function of the +scikit-learn+ machine learning library (cf. the http://bit.ly/kernelpca[documentation for ++KernelPCA++]):
+
+// code cell start uuid: a82b3a95-9ee0-4ac3-9601-16972b7728b0
+[source, python]
+----
+In [1]: import numpy as np
+        import pandas as pd
+        import pandas.io.data as web
+        from sklearn.decomposition import KernelPCA
+----
+
+// code cell end
+
+
+==== The DAX Index and Its 30 Stocks
+
+((("principal component analysis (PCA)", "DAX index stocks")))The following +list+ object contains the 30 symbols for the stocks contained in the German DAX index, as well as the symbol for the index itself:
+
+// code cell start uuid: b5f51ac2-45b2-4a72-befd-27f38ef6f6d8
+[source, python]
+----
+In [2]: symbols = ['ADS.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BEI.DE',
+                   'BMW.DE', 'CBK.DE', 'CON.DE', 'DAI.DE', 'DB1.DE',
+                   'DBK.DE', 'DPW.DE', 'DTE.DE', 'EOAN.DE', 'FME.DE',
+                   'FRE.DE', 'HEI.DE', 'HEN3.DE', 'IFX.DE', 'LHA.DE',
+                   'LIN.DE', 'LXS.DE', 'MRK.DE', 'MUV2.DE', 'RWE.DE',
+                   'SAP.DE', 'SDF.DE', 'SIE.DE', 'TKA.DE', 'VOW3.DE',
+                   '^GDAXI']
+----
+
+// code cell end
+
+We work only with the closing values of each data set that we retrieve (for details on how to retrieve stock data with +pandas+, see <<fin_time_series>>):
+
+// code cell start uuid: 1556b1fa-99da-4122-8aa7-b9e06c069a21
+[source, python]
+----
+In [3]: %%time
+        data = pd.DataFrame()
+        for sym in symbols:
+            data[sym] = web.DataReader(sym, data_source='yahoo')['Close']
+        data = data.dropna()
+----
+
+----
+Out[3]: CPU times: user 408 ms, sys: 68 ms, total: 476 ms
+        Wall time: 5.61 s
+        
+----
+
+// code cell end
+
+Let us separate the index data since we need it regularly:
+
+// code cell start uuid: b4813521-7846-4660-8391-770fea7c318f
+[source, python]
+----
+In [4]: dax = pd.DataFrame(data.pop('^GDAXI'))
+----
+
+// code cell end
+
+The +DataFrame+ object +data+ now has log return data for the 30 DAX stocks:
+
+// code cell start uuid: 03d4a81f-3bd8-47dd-a5b6-84f060fcdf97
+[source, python]
+----
+In [5]: data[data.columns[:6]].head()
+----
+
+----
+Out[5]:             ADS.DE  ALV.DE  BAS.DE  BAYN.DE  BEI.DE  BMW.DE
+        Date                                                       
+        2010-01-04   38.51   88.54   44.85    56.40   46.44   32.05
+        2010-01-05   39.72   88.81   44.17    55.37   46.20   32.31
+        2010-01-06   39.40   89.50   44.45    55.02   46.17   32.81
+        2010-01-07   39.74   88.47   44.15    54.30   45.70   33.10
+        2010-01-08   39.60   87.99   44.02    53.82   44.38   32.65
+----
+
+// code cell end
+
+
+==== Applying PCA
+
+((("principal component analysis (PCA)", "applying")))Usually, PCA works with normalized data sets. Therefore, the following convenience function proves helpful:
+
+// code cell start uuid: 5ae896a2-8493-4d0c-978c-1b4f26ce2291
+[source, python]
+----
+In [6]: scale_function = lambda x: (x - x.mean()) / x.std()
+----
+
+// code cell end
+
+For the beginning, consider a PCA with multiple components (i.e., we do not restrict the number of components):footnote:[Note that we work here—and in the section to follow on Bayesian statistics—with absolute stock prices and _not with return data_, which would be more statistically sound. The reason for this is that it simplifies intuition and makes graphical plots easier to interpret. In real-world applications, you would use return data.]
+
+// code cell start uuid: 4503ea73-aa94-4187-b9c8-cbf00564bf7a
+[source, python]
+----
+In [7]: pca = KernelPCA().fit(data.apply(scale_function))
+----
+
+// code cell end
+
+The importance or explanatory power of each component is given by its +Eigenvalue+. These are found in an attribute of the +KernelPCA+ object. The analysis gives too many components:
+
+// code cell start uuid: e6f9ebd8-1d61-4047-a254-fe0e524f4c8f
+[source, python]
+----
+In [8]: len(pca.lambdas_)
+----
+
+----
+Out[8]: 655
+----
+
+// code cell end
+
+Therefore, let us only have a look at the first 10 components. The tenth component already has almost negligible influence:
+
+// code cell start uuid: 1694bb38-778a-403f-82af-0129fdd3a260
+[source, python]
+----
+In [9]: pca.lambdas_[:10].round()
+----
+
+----
+Out[9]: array([ 22816.,   6559.,   2535.,   1558.,    697.,    442.,    378.,
+                  255.,    183.,    151.])
+----
+
+// code cell end
+
+We are mainly interested in the relative importance of each component, so we will normalize these values. Again, we use a convenience function for this:
+
+// code cell start uuid: 8c11b92d-c1ea-48dd-a47a-fb4d980b5f40
+[source, python]
+----
+In [10]: get_we = lambda x: x / x.sum()
+----
+
+// code cell end
+
+// code cell start uuid: b72fcfcb-d6f0-4101-a59b-c8df516154e8
+[source, python]
+----
+In [11]: get_we(pca.lambdas_)[:10]
+----
+
+----
+Out[11]: array([ 0.6295725 ,  0.1809903 ,  0.06995609,  0.04300101,  0.01923256,
+                 0.01218984,  0.01044098,  0.00704461,  0.00505794,  0.00416612])
+----
+
+// code cell end
+
+With this information, the picture becomes much clearer. The first component already explains about 60% of the variability in the 30 time series. The first five components explain about 95% of the variability:
+
+// code cell start uuid: d40695cd-b736-484d-bc11-4755eb1d3448
+[source, python]
+----
+In [12]: get_we(pca.lambdas_)[:5].sum()
+----
+
+----
+Out[12]: 0.94275246704834414
+----
+
+// code cell end
+
+
+==== Constructing a PCA Index
+
+((("principal component analysis (PCA)", "constructing PCA indices")))Next, we use PCA to construct a PCA (or factor) index over time and compare it with the original index. First, we have a PCA index with a single component only:
+
+// code cell start uuid: b4691f51-fa25-48d1-855d-907136ee39a7
+[source, python]
+----
+In [13]: pca = KernelPCA(n_components=1).fit(data.apply(scale_function))
+         dax['PCA_1'] = pca.transform(-data)
+----
+
+// code cell end
+
+<<pca_1>> shows the results for normalized data—already not too bad, given the rather simple application of the approach:
+
+// code cell start uuid: 9addd109-7de2-4998-b2f0-11c72c3b98da
+[source, python]
+----
+In [14]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         dax.apply(scale_function).plot(figsize=(8, 4))
+----
+
+[[pca_1]]
+.German DAX index and PCA index with one component
+image::images/pyfi_1115.png[]
+
+// code cell end
+
+Let us see if we can improve the results by adding _more_ components. To this end, we need to calculate a weighted average from the single resulting components:
+
+// code cell start uuid: 4b039aad-93a0-439b-b2d5-d24119604fa4
+[source, python]
+----
+In [15]: pca = KernelPCA(n_components=5).fit(data.apply(scale_function))
+         pca_components = pca.transform(-data)
+         weights = get_we(pca.lambdas_)
+         dax['PCA_5'] = np.dot(pca_components, weights)
+----
+
+// code cell end
+
+The results as presented in <<pca_2>> are still "good," but not that much better than before--at least upon visual inspection:
+
+// code cell start uuid: fc7a90b6-167b-44dc-9a31-38d479be9026
+[source, python]
+----
+In [16]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         dax.apply(scale_function).plot(figsize=(8, 4))
+----
+
+[[pca_2]]
+.German DAX index and PCA indices with one and five components
+image::images/pyfi_1116.png[]
+
+// code cell end
+
+In view of the results so far, we want to inspect the relationship between the DAX index and the PCA index in a different way--via a scatter plot, adding date information to the mix. First, we convert the +DatetimeIndex+ of the +DataFrame+ object to a ++matplotlib++-compatible format:
+
+// code cell start uuid: ceb357ad-d98a-4618-8e73-a6dc77a80436
+[source, python]
+----
+In [17]: import matplotlib as mpl
+         mpl_dates = mpl.dates.date2num(data.index)
+         mpl_dates
+----
+
+----
+Out[17]: array([ 733776.,  733777.,  733778., ...,  735500.,  735501.,  735502.])
+----
+
+// code cell end
+
+This new date list can be used for a scatter plot, highlighting through different colors which date each data point is from. <<pca_3>> shows the data in this fashion: 
+
+// code cell start uuid: 60ae390c-9534-4e57-bc1e-42e261d0abc9
+[source, python]
+----
+In [18]: plt.figure(figsize=(8, 4))
+         plt.scatter(dax['PCA_5'], dax['^GDAXI'], c=mpl_dates)
+         lin_reg = np.polyval(np.polyfit(dax['PCA_5'],
+                                         dax['^GDAXI'], 1),
+                                         dax['PCA_5'])
+         plt.plot(dax['PCA_5'], lin_reg, 'r', lw=3)
+         plt.grid(True)
+         plt.xlabel('PCA_5')
+         plt.ylabel('^GDAXI')
+         plt.colorbar(ticks=mpl.dates.DayLocator(interval=250),
+                         format=mpl.dates.DateFormatter('%d %b %y'))
+----
+
+[[pca_3]]
+.DAX return values against PCA return values with linear regression
+image::images/pyfi_1117.png[]
+
+// code cell end
+
+<<pca_3>> reveals that there is obviously some kind of structural break sometime in the middle of 2011. If the PCA index were to perfectly replicate the DAX index, we would expect all the points to lie on a straight line and to see the regression line going through these points. Perfection is hard to achieve, but we can maybe do better.
+
+To this end, let us divide the total time frame into two subintervals. We can then implement an _early_ and a _late_ regression:
+
+// code cell start uuid: 2c9bea6f-bed0-49d0-83ad-a30c17b31922
+[source, python]
+----
+In [19]: cut_date = '2011/7/1'
+         early_pca = dax[dax.index < cut_date]['PCA_5']
+         early_reg = np.polyval(np.polyfit(early_pca,
+                         dax['^GDAXI'][dax.index < cut_date], 1),
+                         early_pca)
+----
+
+// code cell end
+
+// code cell start uuid: 0df5fdce-32ae-4b85-836d-91355f33bb90
+[source, python]
+----
+In [20]: late_pca = dax[dax.index >= cut_date]['PCA_5']
+         late_reg = np.polyval(np.polyfit(late_pca,
+                         dax['^GDAXI'][dax.index >= cut_date], 1),
+                         late_pca)
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_Spca")))(((range="endofrange", startref="ix_pca")))<<pca_7>> shows the new regression lines, which indeed display the high explanatory power both before our cutoff date and thereafter. This heuristic approach will be made a bit more formal in the next section on Bayesian statistics:
+
+// code cell start uuid: ad8b2336-b13f-49a2-92b9-3f7b340be327
+[source, python]
+----
+In [21]: plt.figure(figsize=(8, 4))
+         plt.scatter(dax['PCA_5'], dax['^GDAXI'], c=mpl_dates)
+         plt.plot(early_pca, early_reg, 'r', lw=3)
+         plt.plot(late_pca, late_reg, 'r', lw=3)
+         plt.grid(True)
+         plt.xlabel('PCA_5')
+         plt.ylabel('^GDAXI')
+         plt.colorbar(ticks=mpl.dates.DayLocator(interval=250),
+                         format=mpl.dates.DateFormatter('%d %b %y'))
+----
+
+[[pca_7]]
+.DAX index values against PCA index values with early and late regression (regime switch)
+image::images/pyfi_1118.png[]
+
+// code cell end
+
+
+=== Bayesian Regression
+
+((("statistics", "Bayesian regression", id="ix_Sbay", range="startofrange")))((("Bayesian regression", id="ix_bay", range="startofrange")))Bayesian statistics nowadays is a cornerstone in empirical finance. This chapter cannot lay the foundations for all concepts of the field. You should therefore consult, if needed, a textbook like that by Geweke (2005) for a general introduction or Rachev (2008) for one that is financially motivated.
+
+
+==== Bayes's Formula
+
+((("diachronic interpretation (of Bayes's formula)")))((("Bayesian regression", "diachronic interpretation of Bayes's formula")))The most common interpretation of Bayes' formula in finance is the _diachronic interpretation_. This mainly states that over time we learn new information about certain variables or parameters of interest, like the mean return of a time series. <<bayes>> states the theorem formally. Here, __H__ stands for an event, the hypothesis, and __D__ represents the data an experiment or the real world might present.footnote:[For a +Python+-based introduction into these and other fundamental concepts of Bayesian statistics, refer to Downey (2013).] On the basis of these fundamental definitions, we have:
+
+* __p__(__H__) is called the __prior__ probability.
+* __p__(__D__) is the probability for the data under any hypothesis, called the __normalizing constant__.
+* __p__(__D__|__H__) is the __likelihood__ (i.e., the probability) of the data under hypothesis __H__.
+* __p__(__H__|__D__) is the __posterior__ probability; i.e., after we have seen the data.
+
+[[bayes]]
+[latexmath]
+.Bayes's formula
+++++
+\begin{equation*}
+p(H|D) = \frac{p(H) p(D|H)}{p(D)}
+\end{equation*}
+++++
+
+Consider a simple example. We have two boxes, __B__~1~ and __B__~2~. Box __B__~1~ contains 20 black balls and 70 red balls, while box __B__~2~ contains 40 black balls and 50 red balls. We randomly draw a ball from one of the two boxes. Assume the ball is _black_. What are the probabilities for the hypotheses &#x201c;__H__~1~: Ball is from box __B__~1~&#x201d; and &#x201c;__H__~2~: Ball is from box __B__~2~,&#x201d; respectively?
+
+Before we randomly draw the ball, both hypotheses are equally likely. After it is clear that the ball is black, we have to update the probability for both hypotheses according to Bayes' formula. Consider hypothesis __H__~1~:
+
+* **Prior**: __p__(__H__~1~) = 0.5
+* **Normalizing constant**: __p__(__D__) = 0.5 &#xb7; 0.2 + 0.5 &#xb7; 0.4 = 0.3
+* **Likelihood**: __p__(__D__|__H__~1~) = 0.2
+
+This gives for the updated probability of __H__~1~ latexmath:[$p(H_1|D) = \frac{0.5 \cdot 0.2}{0.3} = \frac{1}{3}$].
+
+This result also makes sense intuitively. The probability for drawing a black ball from box __B__~2~ is twice as high as for the same event happening with box __B__~1~. Therefore, having drawn a black ball, the hypothesis __H__~2~ has with latexmath:[$p(H_2|D)= \frac{2}{3}$] an updated probability two times as high as the updated probability for hypothesis __H__~1~.
+
+
+==== PyMC3
+
+((("Bayesian regression", "PyMC3 library")))((("PyMC3 library")))With +PyMC3+ the +Python+ ecosystem provides a powerful and performant library to technically implement Bayesian statistics. +PyMC3+ is (at the time of this writing) _not_ part of the +Anaconda+ distribution recommended in <<infrastructure>>. On a +Linux+ or a +Mac OS X+ operating system, the installation comprises mainly the following steps.
+
+First, you need to install the +Theano+ compiler package needed for +PyMC3+ (cf. http://bit.ly/install_theano). In the shell, execute the following commands:
+
+----
+$ git clone git://github.com/Theano/Theano.git
+$ sudo python Theano/python.py install
+----
+
+On a +Mac OS X+ system you might need to add the following line to your +.bash_profile+ file (to be found in your _home/user_ directory):
+
+----
+export DYLD_FALLBACK_LIBRARY_PATH= \
+$DYLD_FALLBACK_LIBRARY_PATH:/Library/anaconda/lib:
+----
+
+Once +Theano+ is installed, the installation of +PyMC3+ is straightforward:
+
+----
+$ git clone https://github.com/pymc-devs/pymc.git
+$ cd pymc
+$ sudo python setup.py install
+----
+
+If successful, you should be able to import the library named +pymc+ as usual:
+
+// code cell start uuid: 72026681-577f-49e6-abe0-f5554e39fa06
+[source, python]
+----
+In [22]: import warnings
+         warnings.simplefilter('ignore')
+         import pymc as pm
+         import numpy as np
+         np.random.seed(1000)
+         import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+.PyMC3
+[WARNING]
+====
++PyMC3+ is already a powerful library at the time of this writing. However, it is still in its early stages, so you should expect further enhancements, changes to the API, etc. Make sure to stay up to date by regularly checking the http://bit.ly/pymc3[website] when using +PyMC3+.
+====
+
+==== Introductory Example
+
+Consider now an example where we have noisy data around a straight line:footnote:[This example and the one in the following subsection are from a http://bit.ly/bayesian-data-analysis-pymc3[presentation by Thomas Wiecki], one of the lead developers of +PyMC3+; he allowed me to use them for this chapter, for which I am most grateful.]
+
+// code cell start uuid: 4b612fde-e947-4a33-a275-6202d7ded7bb
+[source, python]
+----
+In [23]: x = np.linspace(0, 10, 500)
+         y = 4 + 2 * x + np.random.standard_normal(len(x)) * 2
+----
+
+// code cell end
+
+((("Bayesian regression", "introductory example")))As a benchmark, consider first an ordinary least-squares regression given the noisy data, using ++NumPy++'s +polyfit+ function (cf. <<math_tools>>). The regression is implemented as pass:[<phrase role="keep-together">follows</phrase>]:
+
+// code cell start uuid: ad9f9a77-ffb5-4eed-a79b-bd2ea33ae0e2
+[source, python]
+----
+In [24]: reg = np.polyfit(x, y, 1)
+           # linear regression
+----
+
+// code cell end
+
+<<pm_fig_0>> shows the data and the regression line graphically:
+
+// code cell start uuid: 4f6cbf6d-06ce-4f8d-a7a7-1209004b686a
+[source, python]
+----
+In [25]: plt.figure(figsize=(8, 4))
+         plt.scatter(x, y, c=y, marker='v')
+         plt.plot(x, reg[1] + reg[0] * x, lw=2.0)
+         plt.colorbar()
+         plt.grid(True)
+         plt.xlabel('x')
+         plt.ylabel('y')
+----
+
+[[pm_fig_0]]
+.Sample data points and regression line
+image::images/pyfi_1119.png[]
+
+// code cell end
+
+The result of the "standard" regression approach is fixed values for the parameters of the regression line:
+
+// code cell start uuid: 5903887a-2a6b-4dce-89f1-9de9be686ef4
+[source, python]
+----
+In [26]: reg
+----
+
+----
+Out[26]: array([ 2.03384161,  3.77649234])
+----
+
+// code cell end
+
+Note that the highest-order monomial factor (in this case, the slope of the regression line) is at index level 0 and that the intercept is at index level 1. The original parameters 2 and 4 are not perfectly recovered, but this of course is due to the noise included in pass:[<phrase role="keep-together">the data</phrase>].
+
+Next, the Bayesian regression. Here, we assume that the parameters are distributed in a certain way. For example, consider the equation describing the regression line __&#x177;__(__x__) = &#x1d6fc; + &#x1d6fd; &#xb7; __x__. We now assume the following _priors_:
+
+* &#x1d6fc; is normally distributed with mean 0 and a standard deviation of 20.
+* &#x1d6fd; is normally distributed with mean 0 and a standard deviation of 20.
+
+For the _likelihood_, we assume a normal distribution with mean of __&#x177;__(__x__) and a uniformly distributed standard deviation between 0 and 10.
+
+((("(Markov Chain) Monte Carlo (MCMC) sampling", sortas="Markov Chain Monte Carlo (MCMC) sampling")))A major element of Bayesian regression is (Markov Chain) Monte Carlo (MCMC) sampling.footnote:[Cf. http://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo. For example, the Monte Carlo algorithms used throughout the book and analyzed in detail in <<stochastics>> all generate so-called _Markov chains_, since the immediate next step/value only depends on the current state of the process and not on any other historic state or value.] In principle, this is the same as drawing balls multiple times from boxes, as in the previous simple example--just in a more systematic, automated way.
+
+(((local maximum a posteriori point)))(((NUTS algorithm)))For the technical sampling, there are three different functions to call:
+
+* +find_MAP+ finds the starting point for the sampling algorithm by deriving the _local maximum a posteriori point_.
+* +NUTS+ implements the so-called "efficient No-U-Turn Sampler with dual averaging" (NUTS) algorithm for MCMC sampling given the assumed priors.
+* +sample+ draws a number of samples given the starting value from +find_MAP+ and the optimal step size from the +NUTS+ algorithm.
+
+All this is to be wrapped into a +PyMC3+ +Model+ object and executed within a +with+ statement:
+
+// code cell start uuid: 46936559-a438-475e-bd5b-f669abed06e2
+[source, python]
+----
+In [27]: with pm.Model() as model:
+                 # model specifications in PyMC3
+                 # are wrapped in a with statement
+             # define priors
+             alpha = pm.Normal('alpha', mu=0, sd=20)
+             beta = pm.Normal('beta', mu=0, sd=20)
+             sigma = pm.Uniform('sigma', lower=0, upper=10)
+         
+             # define linear regression
+             y_est = alpha + beta * x
+         
+             # define likelihood
+             likelihood = pm.Normal('y', mu=y_est, sd=sigma, observed=y)
+         
+             # inference
+             start = pm.find_MAP()
+               # find starting value by optimization
+             step = pm.NUTS(state=start)
+               # instantiate MCMC sampling algorithm
+             trace = pm.sample(100, step, start=start, progressbar=False)
+               # draw 100 posterior samples using NUTS sampling
+----
+
+// code cell end
+
+Have a look at the estimates from the first sample:
+
+// code cell start uuid: e06c4eed-10d4-4d4c-aea0-4e4164f4d7f5
+[source, python]
+----
+In [28]: trace[0]
+----
+
+----
+Out[28]: {'alpha': 3.8783781152509031,
+          'beta': 2.0148472296530033,
+          'sigma': 2.0078134493352975}
+----
+
+// code cell end
+
+All three values are rather close to the original values (4, 2, 2). However, the whole procedure yields, of course, many more estimates. They are best illustrated with the help of a __trace plot__, as in <<pm_fig_1>>—i.e., a plot showing the resulting posterior distribution for the different parameters as well as all single estimates per sample. The posterior distribution gives us an intuitive sense about the uncertainty in our estimates:
+
+// code cell start uuid: c172bd48-8b11-4128-9e97-f20ce835d319
+[source, python]
+----
+In [29]: fig = pm.traceplot(trace, lines={'alpha': 4, 'beta': 2, 'sigma': 2})
+         plt.figure(figsize=(8, 8))
+----
+
+[[pm_fig_1]]
+.Trace plots for alpha, beta, and sigma
+image::images/pyfi_1120.png[]
+
+// code cell end
+
+Taking only the +alpha+ and +beta+ values from the regression, we can draw all resulting regression lines as shown in <<pm_fig_2>>:
+
+// code cell start uuid: 99e44b63-168c-415a-be8f-9347f45578aa
+[source, python]
+----
+In [30]: plt.figure(figsize=(8, 4))
+         plt.scatter(x, y, c=y, marker='v')
+         plt.colorbar()
+         plt.grid(True)
+         plt.xlabel('x')
+         plt.ylabel('y')
+         for i in range(len(trace)):
+             plt.plot(x, trace['alpha'][i] + trace['beta'][i] * x)
+----
+
+[[pm_fig_2]]
+.Sample data and regression lines from Bayesian regression
+image::images/pyfi_1121.png[]
+
+// code cell end
+
+
+==== Real Data
+
+((("Bayesian regression", "real data", id="ix_BRreal", range="startofrange")))Having seen Bayesian regression with +PyMC3+ in action with dummy data, we now move on to real market data. In this context, we introduce yet another +Python+ library: +zipline+ (cf. https://github.com/quantopian/zipline[] and https://pypi.python.org/pypi/zipline[]). +zipline+ is a +Pythonic+, open source algorithmic trading library that powers the community backtesting platform http://www.quantopian.com[Quantopian].
+
+It is also to be installed separately, e.g., by using https://pip.readthedocs.org/en/latest/[+pip+]:
+
+----
+$ pip install zipline
+----
+
+After installation, import +zipline+ as well +pytz+ and +datetime+ as follows:
+
+// code cell start uuid: 0562fc9b-01c8-4eae-8e57-959a6e551610
+[source, python]
+----
+In [31]: import warnings
+         warnings.simplefilter('ignore')
+         import zipline
+         import pytz
+         import datetime as dt
+----
+
+// code cell end
+
+Similar to +pandas+, +zipline+ provides a convenience function to load financial data from different sources. Under the hood, +zipline+ also uses +pandas+.
+
+The example we use is a "classical" pair trading strategy, namely with gold and stocks of gold mining companies. These are represented by ETFs with the following symbols, respectively:
+
+* http://finance.yahoo.com/q/pr?s=GLD+Profile[+GLD+] 
+* http://finance.yahoo.com/q/pr?s=GDX+Profile[+GDX+]
+
+We can load the data using ++zipline++ as follows:
+
+// code cell start uuid: a3774b4d-09a8-47ce-a56e-aac894334dbd
+[source, python]
+----
+In [32]: data = zipline.data.load_from_yahoo(stocks=['GLD', 'GDX'],
+                  end=dt.datetime(2014, 3, 15, 0, 0, 0, 0, pytz.utc)).dropna()
+         data.info()
+----
+
+----
+Out[32]: GLD
+         GDX
+         <class 'pandas.core.frame.DataFrame'>
+         DatetimeIndex: 1967 entries, 2006-05-22 00:00:00+00:00 to 2014-03-14 00
+         :00:00+00:00
+         Data columns (total 2 columns):
+         GDX    1967 non-null float64
+         GLD    1967 non-null float64
+         dtypes: float64(2)
+----
+
+// code cell end
+
+<<zip_fig_1>> shows the historical data for both ETFs:
+
+// code cell start uuid: 07c6dea4-fd4f-496c-86f2-e92689797fe8
+[source, python]
+----
+In [33]: data.plot(figsize=(8, 4))
+----
+
+[[zip_fig_1]]
+.Comovements of trading pair
+image::images/pyfi_1122.png[]
+
+// code cell end
+
+The absolute performance differs significantly:
+
+// code cell start uuid: 8b467729-65d9-4579-8b4c-944fb18bee4c
+[source, python]
+----
+In [34]: data.ix[-1] / data.ix[0] - 1
+----
+
+----
+Out[34]: GDX   -0.216002
+         GLD    1.038285
+         dtype: float64
+----
+
+// code cell end
+
+However, both time series seem to be quite strongly positively correlated when inspecting <<zip_fig_1>>, which is also reflected in the correlation data:
+
+// code cell start uuid: ed244e7b-692f-4e14-b642-80ceccf221b2
+[source, python]
+----
+In [35]: data.corr()
+----
+
+----
+Out[35]:           GDX       GLD
+         GDX  1.000000  0.466962
+         GLD  0.466962  1.000000
+----
+
+// code cell end
+
+As usual, the +DatetimeIndex+ object of the +DataFrame+ object consists of +Timestamp+ objects:
+
+// code cell start uuid: a92a57dd-76c4-4e8b-ab75-8523fbb49435
+[source, python]
+----
+In [36]: data.index
+----
+
+----
+Out[36]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2006-05-22, ..., 2014-03-14]
+         Length: 1967, Freq: None, Timezone: UTC
+----
+
+// code cell end
+
+To use the date-time information with +matplotlib+ in the way we want to in the following, we have to first convert it to an ordinal date representation:
+
+// code cell start uuid: facf1920-22f9-4300-90ed-39f79d9b024c
+[source, python]
+----
+In [37]: import matplotlib as mpl
+         mpl_dates = mpl.dates.date2num(data.index)
+         mpl_dates
+----
+
+----
+Out[37]: array([ 732453.,  732454.,  732455., ...,  735304.,  735305.,  735306.])
+----
+
+// code cell end
+
+<<zip_fig_2>> shows a scatter plot of the time series data, plotting the +GLD+ values against the +GDX+ values and illustrating the dates of each data pair with different colorings:footnote:[Note also here that we are working with absolute price levels and not return data, which would be statistically more sound. For a real-world (trading) application, you would rather choose the return data to implement such an analysis.]
+
+// code cell start uuid: f73eecbd-a135-4448-a5d4-8caa6259039e
+[source, python]
+----
+In [38]: plt.figure(figsize=(8, 4))
+         plt.scatter(data['GDX'], data['GLD'], c=mpl_dates, marker='o')
+         plt.grid(True)
+         plt.xlabel('GDX')
+         plt.ylabel('GLD')
+         plt.colorbar(ticks=mpl.dates.DayLocator(interval=250),
+                      format=mpl.dates.DateFormatter('%d %b %y'))
+----
+
+[[zip_fig_2]]
+.Scatter plot of prices for GLD and GDX
+image::images/pyfi_1123.png[]
+
+// code cell end
+
+Let us implement a Bayesian regression on the basis of these two time series. The parameterizations are essentially the same as in the previous example with dummy data; we just replace the dummy data with the real data we now have available:
+
+// code cell start uuid: 0cf4e75d-b4ea-4822-9e25-8c837fe6049d
+[source, python]
+----
+In [39]: with pm.Model() as model:
+             alpha = pm.Normal('alpha', mu=0, sd=20)
+             beta = pm.Normal('beta', mu=0, sd=20)
+             sigma = pm.Uniform('sigma', lower=0, upper=50)
+         
+             y_est = alpha + beta * data['GDX'].values
+         
+             likelihood = pm.Normal('GLD', mu=y_est, sd=sigma,
+                                    observed=data['GLD'].values)
+         
+             start = pm.find_MAP()
+             step = pm.NUTS(state=start)
+             trace = pm.sample(100, step, start=start, progressbar=False)
+----
+
+// code cell end
+
+<<zip_fig_3>> shows the results from the MCMC sampling procedure given the assumptions about the prior probability distributions for the three parameters:
+
+// code cell start uuid: 1a64e594-4985-4413-b4b6-c8400691fbc2
+[source, python]
+----
+In [40]: fig = pm.traceplot(trace)
+         plt.figure(figsize=(8, 8))
+----
+
+[[zip_fig_3]]
+.Trace plots for alpha, beta, and sigma based on GDX and GLD data
+image::images/pyfi_1124.png[]
+
+// code cell end
+
+<<zip_fig_4>> adds all the resulting regression lines to the scatter plot from before. All the regression lines are pretty close to each other:
+
+// code cell start uuid: cd213b2f-72e3-4afb-8be3-60e61e94c7c6
+[source, python]
+----
+In [41]: plt.figure(figsize=(8, 4))
+         plt.scatter(data['GDX'], data['GLD'], c=mpl_dates, marker='o')
+         plt.grid(True)
+         plt.xlabel('GDX')
+         plt.ylabel('GLD')
+         for i in range(len(trace)):
+             plt.plot(data['GDX'], trace['alpha'][i] + trace['beta'][i] * data
+                      ['GDX'])
+         plt.colorbar(ticks=mpl.dates.DayLocator(interval=250),
+                      format=mpl.dates.DateFormatter('%d %b %y'))
+----
+
+[[zip_fig_4]]
+.Scatter plot with "simple" regression lines
+image::images/pyfi_1125.png[]
+
+// code cell end
+
+The figure reveals a major drawback of the regression approach used: the approach does not take into account evolutions over time. That is, the most recent data is treated the same way as the oldest data.
+
+As pointed out at the beginning of this section, the Bayesian approach in finance is generally most useful when seen as diachronic—i.e., in the sense that new data revealed over time allows for better regressions and estimates.
+
+To incorporate this concept in the current example, we assume that the regression parameters are not only random and distributed in some fashion, but that they follow some kind of random walk over time. It is the same generalization used when making the transition in finance theory from random variables to stochastic processes (which are essentially ordered sequences of random variables):
+
+To this end, we define a new +PyMC3+ model, this time specifying parameter values as random walks with the variance parameter values transformed to log space (for better sampling characteristics).
+
+// code cell start uuid: 88129af4-b234-4399-abe8-dfd7f7d76542
+[source, python]
+----
+In [42]: model_randomwalk = pm.Model()
+         with model_randomwalk:
+             # std of random walk best sampled in log space
+             sigma_alpha, log_sigma_alpha = \
+                     model_randomwalk.TransformedVar('sigma_alpha',
+                                     pm.Exponential.dist(1. / .02, testval=.1),
+                                     pm.logtransform)
+             sigma_beta, log_sigma_beta = \
+                     model_randomwalk.TransformedVar('sigma_beta',
+                                     pm.Exponential.dist(1. / .02, testval=.1),
+                                     pm.logtransform)
+----
+
+// code cell end
+
+After having specified the distributions of the random walk parameters, we can proceed with specifying the random walks for +alpha+ and +beta+. To make the whole procedure more efficient, 50 data points at a time share common coefficients:
+
+// code cell start uuid: 3a778dc5-5c8b-492e-9e15-774b858a42c2
+[source, python]
+----
+In [43]: from pymc.distributions.timeseries import GaussianRandomWalk
+         # to make the model simpler, we will apply the same coefficients
+         # to 50 data points at a time
+         subsample_alpha = 50
+         subsample_beta = 50
+         
+         with model_randomwalk:
+             alpha = GaussianRandomWalk('alpha', sigma_alpha**-2,
+                                        shape=len(data) / subsample_alpha)
+             beta = GaussianRandomWalk('beta', sigma_beta**-2,
+                                       shape=len(data) / subsample_beta)
+         
+             # make coefficients have the same length as prices
+             alpha_r = np.repeat(alpha, subsample_alpha)
+             beta_r = np.repeat(beta, subsample_beta)
+----
+
+// code cell end
+
+The time series data sets have a length of 1,967 data points:
+
+// code cell start uuid: 49d957bb-a262-4c57-bc6a-dfb8406a5b1b
+[source, python]
+----
+In [44]: len(data.dropna().GDX.values)  # a bit longer than 1,950
+----
+
+----
+Out[44]: 1967
+----
+
+// code cell end
+
+For the sampling to follow, the number of data points must be divisible by 50. Therefore, only the first 1,950 data points are taken for the regression:
+
+// code cell start uuid: b3321856-0fca-4ab7-a989-0c92c1b2d9d1
+[source, python]
+----
+In [45]: with model_randomwalk:
+             # define regression
+             regression = alpha_r + beta_r * data.GDX.values[:1950]
+         
+             # assume prices are normally distributed
+             # the mean comes from the regression
+             sd = pm.Uniform('sd', 0, 20)
+             likelihood = pm.Normal('GLD',
+                                    mu=regression,
+                                    sd=sd,
+                                    observed=data.GLD.values[:1950])
+----
+
+// code cell end
+
+All these definitions are a bit more involved than before due to the use of random walks instead of a single random variable. However, the inference steps with the MCMC remain essentially the same. Note, though, that the computational burden increases substantially since we have to estimate per random walk sample 1,950 / 50 = 39 parameter pairs (instead of 1, as before):
+
+// code cell start uuid: bd60e4ab-f384-4f8e-9e25-71b9c7ae426c
+[source, python]
+----
+In [46]: import scipy.optimize as sco
+         with model_randomwalk:
+             # first optimize random walk
+             start = pm.find_MAP(vars=[alpha, beta], fmin=sco.fmin_l_bfgs_b)
+         
+             # sampling
+             step = pm.NUTS(scaling=start)
+             trace_rw = pm.sample(100, step, start=start, progressbar=False)
+----
+
+// code cell end
+
+In total, we have 100 estimates with 39 time intervals:
+
+// code cell start uuid: 360bff30-a524-413d-b348-1ad82d712236
+[source, python]
+----
+In [47]: np.shape(trace_rw['alpha'])
+----
+
+----
+Out[47]: (100, 39)
+----
+
+// code cell end
+
+We can illustrate the evolution of the regression factors +alpha+ and +beta+ over time by plotting a subset of the estimates and the average over all samples, as in <<zip_fig_5>>:
+
+// code cell start uuid: 365a04de-c0f1-400c-871f-ec7ea58206f2
+[source, python]
+----
+In [48]: part_dates = np.linspace(min(mpl_dates), max(mpl_dates), 39)
+----
+
+// code cell end
+
+// code cell start uuid: c0e08130-d0e5-4bd5-ac38-db50ebb345d6
+[source, python]
+----
+In [49]: fig, ax1 = plt.subplots(figsize=(10, 5))
+         plt.plot(part_dates, np.mean(trace_rw['alpha'], axis=0),
+                  'b', lw=2.5, label='alpha')
+         for i in range(45, 55):
+             plt.plot(part_dates, trace_rw['alpha'][i], 'b-.', lw=0.75)
+         plt.xlabel('date')
+         plt.ylabel('alpha')
+         plt.axis('tight')
+         plt.grid(True)
+         plt.legend(loc=2)
+         ax1.xaxis.set_major_formatter(mpl.dates.DateFormatter('%d %b %y') )
+         ax2 = ax1.twinx()
+         plt.plot(part_dates, np.mean(trace_rw['beta'], axis=0),
+                  'r', lw=2.5, label='beta')
+         for i in range(45, 55):
+             plt.plot(part_dates, trace_rw['beta'][i], 'r-.', lw=0.75)
+         plt.ylabel('beta')
+         plt.legend(loc=4)
+         fig.autofmt_xdate()
+----
+
+[[zip_fig_5]]
+.Evolution of (mean) alpha and (mean) beta over time (updated estimates over time)
+image::images/pyfi_1126.png[]
+
+// code cell end
+
+.Absolute Price Data Versus Relative Return Data
+[CAUTION]
+====
+Both when presenting the PCA analysis implementation and for this example about Bayesian statistics, we've worked with absolute price levels instead of relative (log) return data. This is for illustration purposes only, because the respective graphical results are easier to understand and interpret (they are visually "more appealing"). However, for real-world financial applications you would instead rely on relative return data.
+====
+
+Using the mean +alpha+ and +beta+ values, we can illustrate how the regression is updated over time. <<zip_fig_6>> again shows the data points as a scatter plot. In addition, the 39 regression lines resulting from the mean +alpha+ and +beta+ values are displayed. It is obvious that updating over time increases the regression fit (for the current/most recent data) tremendously—in other words, every time period needs its own regression:  
+
+// code cell start uuid: 92d091ea-e27c-4de9-bd69-3baa59f1eeee
+[source, python]
+----
+In [50]: plt.figure(figsize=(10, 5))
+         plt.scatter(data['GDX'], data['GLD'], c=mpl_dates, marker='o')
+         plt.colorbar(ticks=mpl.dates.DayLocator(interval=250),
+                      format=mpl.dates.DateFormatter('%d %b %y'))
+         plt.grid(True)
+         plt.xlabel('GDX')
+         plt.ylabel('GLD')
+         x = np.linspace(min(data['GDX']), max(data['GDX']))
+         for i in range(39):
+             alpha_rw = np.mean(trace_rw['alpha'].T[i])
+             beta_rw = np.mean(trace_rw['beta'].T[i])
+             plt.plot(x, alpha_rw + beta_rw * x, color=plt.cm.jet(256 * i / 39))
+----
+
+[[zip_fig_6]]
+.Scatter plot with time-dependent regression lines (updated estimates)
+image::images/pyfi_1127.png[]
+
+// code cell end
+
+(((range="endofrange", startref="ix_Sbay")))(((range="endofrange", startref="ix_bay")))(((range="endofrange", startref="ix_BRreal")))(((range="endofrange", startref="ix_stats")))This concludes the section on Bayesian regression, which shows that +Python+ offers with +PyMC3+ a powerful library to implement different approaches from Bayesian statistics. Bayesian regression in particular is a tool that has become quite popular and important recently in quantitative finance.
+
+
+=== Conclusions
+
+Statistics is not only an important discipline in its own right, but also provides indispensible tools for many other disciplines, like finance and the social sciences. It is impossible to give a broad overview of statistics in a single chapter. This chapter therefore concentrates on four important topics, illustrating the use of +Python+ and several statistics libraries on the basis of realistic examples:
+
+Normality tests:: 
+    (((normality tests, overview of)))The normality assumption with regard to financial market returns is an 
+    important one for many financial theories and applications; it is 
+    therefore important to be able to test whether certain time series data 
+    conforms to this assumption. As we have seen--via graphical and 
+    statistical means--real-world return data generally is _not_ normally 
+    distributed.
+Modern portfolio theory:: 
+    ((("portfolio theory/portfolio optimization", "overview of")))MPT, with its focus on the mean and variance/volatility of returns, can 
+    be considered one of the major conceptual and intellectual successes of 
+    statistics in finance; the important concept of investment _diversification_ is beautifully illustrated in this context.
+Principal component analysis:: 
+    ((("principal component analysis (PCA)", "overview of")))PCA provides a pretty helpful method to reduce complexity for factor/component analysis tasks; we have shown that five principal components—constructed from the 30 stocks contained in the DAX index—suffice to 
+    explain more than 95% of the index's variability.
+Bayesian regression:: 
+    (((Bayesian regression, overview of)))Bayesian statistics in general (and Bayesian regression in particular) has become a popular tool in finance, since this approach overcomes 
+    shortcomings of other approaches, as introduced in <<math_tools>>; 
+    even if the mathematics and the formalism are more involved, the 
+    fundamental ideas--like the updating of probability/distribution 
+    beliefs over time--are easily grasped intuitively.
+
+
+=== Further Reading
+
+The following online resources are helpful:
+
+* Information about the +SciPy+ statistical functions is found here: http://docs.scipy.org/doc/scipy/reference/stats.html[].
+* Also consult the documentation of the +statsmodels+ library: http://statsmodels.sourceforge.net/stable/[].
+* For the optimization functions used in this chapter, refer to http://docs.scipy.org/doc/scipy/reference/optimize.html[].
+* There is a http://bit.ly/pymc3_tutorial[short tutorial available for +PyMC3+]; at the time of this writing the library is still in early release mode and not yet fully documented.
+
+Useful references in book form are:
+
+* Copeland, Thomas, Fred Weston, and Kuldeep Shastri (2005): _Financial Theory and Corporate Policy_, 4th ed. Pearson, Boston, MA.
+* Downey, Allen (2013): pass:[<ulink url="http://shop.oreilly.com/product/0636920030720.do" role="orm:hideurl"><emphasis>Think Bayes</emphasis></ulink>]. O'Reilly, Sebastopol, CA.
+* Geweke, John (2005): _Contemporary Bayesian Econometrics and Statistics_. John Wiley & Sons, Hoboken, NJ.
+* Rachev, Svetlozar et al. (2008): _Bayesian Methods in Finance_. John Wiley & Sons, Hoboken, NJ.
+

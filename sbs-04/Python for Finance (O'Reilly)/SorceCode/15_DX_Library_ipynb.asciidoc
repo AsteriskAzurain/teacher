@@ -1,0 +1,1671 @@
+
+== DX Library
+
+// code cell start uuid: f087ed8b-b432-48a9-a791-451ac477c046
+[source, python]
+----
+In [1]: import numpy as np
+        import pandas as pd
+        import datetime as dt
+----
+
+// code cell end
+
+// code cell start uuid: 1d45b83a-110e-4c94-9404-859554d3f2d7
+[source, python]
+----
+In [2]: import sys
+        sys.path.append('../python/dx')
+----
+
+// code cell end
+
+
+=== DX Frame
+
+// code cell start uuid: 278721fb-d9a8-4270-a7d5-62f85cff52f0
+[source, python]
+----
+In [3]: from dx_frame import *
+----
+
+// code cell end
+
+
+==== Risk-Neutral Discounting
+
+// code cell start uuid: c10b29e3-bd0a-4c3f-83ea-234cc959fa5b
+[source, python]
+----
+In [4]: dates = [dt.datetime(2015, 1, 1), dt.datetime(2015, 7, 1), dt.datetime(2016, 1, 1)]
+----
+
+// code cell end
+
+// code cell start uuid: 6ae9c451-fdf0-41b0-9b4e-89f57c2bcc3c
+[source, python]
+----
+In [5]: deltas = [0.0, 0.5, 1.0]
+----
+
+// code cell end
+
+// code cell start uuid: ed812d8b-0e9d-47ab-8793-4bede4dfaf36
+[source, python]
+----
+In [6]: csr = constant_short_rate('csr', 0.05)
+----
+
+// code cell end
+
+// code cell start uuid: 1ebd8c12-ee83-46cd-a0b6-7439aa8756b4
+[source, python]
+----
+In [7]: csr.get_discount_factors(dates)
+----
+
+----
+Out[7]: array([[datetime.datetime(2015, 1, 1, 0, 0), 0.951229424500714],
+               [datetime.datetime(2015, 7, 1, 0, 0), 0.9755103387657228],
+               [datetime.datetime(2016, 1, 1, 0, 0), 1.0]], dtype=object)
+----
+
+// code cell end
+
+// code cell start uuid: d4d2731c-869c-4ea3-b494-5760aa353b10
+[source, python]
+----
+In [8]: deltas = get_year_deltas(dates)
+        deltas
+----
+
+----
+Out[8]: array([ 0.        ,  0.49589041,  1.        ])
+----
+
+// code cell end
+
+// code cell start uuid: c545e941-ad55-4975-abdd-2071c0453b0a
+[source, python]
+----
+In [9]: csr.get_discount_factors(deltas, dtobjects=False)
+----
+
+----
+Out[9]: array([[ 0.        ,  0.95122942],
+               [ 0.49589041,  0.97551034],
+               [ 1.        ,  1.        ]])
+----
+
+// code cell end
+
+
+==== Market Environment
+
+// code cell start uuid: 455e1e9e-45be-4c74-b2d3-5dac6132d568
+[source, python]
+----
+In [10]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 3d703766-a01a-458a-8730-ab52da923737
+[source, python]
+----
+In [11]: me_gbm.add_constant('initial_value', 36.)
+         me_gbm.add_constant('volatility', 0.2)
+         me_gbm.add_constant('final_date', dt.datetime(2015, 12, 31))
+         me_gbm.add_constant('currency', 'EUR')
+         me_gbm.add_constant('frequency', 'M')
+         me_gbm.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: 946be8e3-9d32-42ec-becf-7174d6d37cb7
+[source, python]
+----
+In [12]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+
+=== DX Simulation
+
+// code cell start uuid: 1b6e0d8a-ec29-4257-b932-741f1ffb6b22
+[source, python]
+----
+In [13]: from sn_random_numbers import *
+----
+
+// code cell end
+
+// code cell start uuid: d9a97cd2-1be4-4d0e-9a16-86e5bcec755a
+[source, python]
+----
+In [14]: snrn = sn_random_numbers((2, 2, 2), antithetic=False, moment_matching=False, fixed_seed=True)
+         snrn
+----
+
+----
+Out[14]: array([[[-0.8044583 ,  0.32093155],
+                 [-0.02548288,  0.64432383]],
+         
+                [[-0.30079667,  0.38947455],
+                 [-0.1074373 , -0.47998308]]])
+----
+
+// code cell end
+
+// code cell start uuid: 9b9a15d4-5e9a-4cf3-aea4-0fee67b38a82
+[source, python]
+----
+In [15]: snrn = sn_random_numbers((2, 2, 2), antithetic=False, moment_matching=True, fixed_seed=True)
+         snrn
+----
+
+----
+Out[15]: array([[[-1.67972865,  0.81075283],
+                 [ 0.04413963,  1.52641815]],
+         
+                [[-0.56512826,  0.96243813],
+                 [-0.13722505, -0.96166678]]])
+----
+
+// code cell end
+
+// code cell start uuid: 72dea3d5-d8c1-4c37-b660-074f1cddff0e
+[source, python]
+----
+In [16]: snrn.mean()
+----
+
+----
+Out[16]: -1.3877787807814457e-17
+----
+
+// code cell end
+
+
+==== Geometric Brownian Motion
+
+The following interactive +IPython+ session illustrates the use of the +geometric_brownian_motion+ class. First, we have to generate a +market_environment+ object with all mandatory elements.
+
+// code cell start uuid: 5e40de07-230f-4e0a-b993-4081ec791fe7
+[source, python]
+----
+In [17]: import sys
+         sys.path.append('../python/dx')
+         from dx_frame import *
+----
+
+// code cell end
+
+// code cell start uuid: b630a638-da9f-4084-9e2b-14b0e1565fd6
+[source, python]
+----
+In [18]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: a49a07ca-f6e7-495e-acc1-edfb73b22edd
+[source, python]
+----
+In [19]: me_gbm.add_constant('initial_value', 36.)
+         me_gbm.add_constant('volatility', 0.2)
+         me_gbm.add_constant('final_date', dt.datetime(2015, 12, 31))
+         me_gbm.add_constant('currency', 'EUR')
+         me_gbm.add_constant('frequency', 'M')
+           # monthly frequency (respcective month end)
+         me_gbm.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: 520e0490-b29b-441e-a2f7-ae89fc87cf0f
+[source, python]
+----
+In [20]: csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: bac36a29-b2b5-4f62-b848-7cb6f382dc9b
+[source, python]
+----
+In [21]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+Second, we instantiate a model simulation object.
+
+// code cell start uuid: f9193b81-e8d5-48ea-a86a-94a15a01022f
+[source, python]
+----
+In [22]: from geometric_brownian_motion import geometric_brownian_motion
+----
+
+// code cell end
+
+// code cell start uuid: a00112c1-422e-4140-83e9-1388bc660b11
+[source, python]
+----
+In [23]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+Third, we can work with the object. For example, let us generate and inspect the +time_grid+. You will notice that we have 13 +datetime+ objects in the +time_grid+ array object. All the respective month ends plus the +pricing_date+.
+
+// code cell start uuid: a6f31102-77b0-4076-a9d6-7a92f3ffdc5e
+[source, python]
+----
+In [24]: gbm.generate_time_grid()
+----
+
+// code cell end
+
+// code cell start uuid: ac81750e-be2b-403b-8260-20822f5307a7
+[source, python]
+----
+In [25]: gbm.time_grid
+----
+
+----
+Out[25]: array([datetime.datetime(2015, 1, 1, 0, 0),
+                datetime.datetime(2015, 1, 31, 0, 0),
+                datetime.datetime(2015, 2, 28, 0, 0),
+                datetime.datetime(2015, 3, 31, 0, 0),
+                datetime.datetime(2015, 4, 30, 0, 0),
+                datetime.datetime(2015, 5, 31, 0, 0),
+                datetime.datetime(2015, 6, 30, 0, 0),
+                datetime.datetime(2015, 7, 31, 0, 0),
+                datetime.datetime(2015, 8, 31, 0, 0),
+                datetime.datetime(2015, 9, 30, 0, 0),
+                datetime.datetime(2015, 10, 31, 0, 0),
+                datetime.datetime(2015, 11, 30, 0, 0),
+                datetime.datetime(2015, 12, 31, 0, 0)], dtype=object)
+----
+
+// code cell end
+
+Next, we might ask for the simulated instrument values.
+
+// code cell start uuid: a480cd1f-a793-476b-bdd2-a79b568a1872
+[source, python]
+----
+In [26]: %time paths_1 = gbm.get_instrument_values()
+----
+
+----
+Out[26]: CPU times: user 12 ms, sys: 4 ms, total: 16 ms
+         Wall time: 14 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: aed54761-2093-409d-912a-fded6f76b418
+[source, python]
+----
+In [27]: paths_1
+----
+
+----
+Out[27]: array([[ 36.        ,  36.        ,  36.        , ...,  36.        ,
+                  36.        ,  36.        ],
+                [ 37.40294432,  38.1202286 ,  34.39982796, ...,  36.25237338,
+                  35.08385942,  39.66803061],
+                [ 39.52141274,  42.25526228,  32.4373032 , ...,  34.85854718,
+                  33.65945317,  37.68717766],
+                ..., 
+                [ 40.49192111,  33.44349499,  23.52000117, ...,  37.87510754,
+                  30.14200933,  30.47215628],
+                [ 42.4832345 ,  36.9254123 ,  21.90666563, ...,  36.03678387,
+                  30.9275866 ,  30.73817091],
+                [ 43.76599201,  37.80507666,  24.12339514, ...,  36.28631617,
+                  28.15660098,  29.06263533]])
+----
+
+// code cell end
+
+Let us generate instrument values for a higher volatility as well.
+
+// code cell start uuid: e6dfa29f-27df-4e30-ba44-7f784425d4d9
+[source, python]
+----
+In [28]: gbm.update(volatility=0.5)
+----
+
+// code cell end
+
+// code cell start uuid: d1ec64b1-5f80-4c8b-b4ef-d1cbe2622d31
+[source, python]
+----
+In [29]: %time paths_2 = gbm.get_instrument_values()
+----
+
+----
+Out[29]: CPU times: user 12 ms, sys: 0 ns, total: 12 ms
+         Wall time: 11.1 ms
+         
+----
+
+// code cell end
+
+The difference in the two sets of paths are illustrated in <<gbm_class_fig>>.
+
+// code cell start uuid: 48e79769-db06-4973-8e3a-a8933df14b1e
+[source, python]
+----
+In [30]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         plt.figure(figsize=(8, 4))
+         p1 = plt.plot(gbm.time_grid, paths_1[:, :10], 'b')
+         p2 = plt.plot(gbm.time_grid, paths_2[:, :10], 'r-.')
+         plt.grid(True)
+         l1 = plt.legend([p1[0], p2[0]],
+                         ['low volatility', 'high volatility'], loc=2)
+         plt.gca().add_artist(l1)
+         plt.xticks(rotation=30)
+----
+
+[[gbm_class_fig]]
+.Simulated paths from geometric Brownian motion simulation class
+image::images/gbm_class_fig.png[]
+
+// code cell end
+
+
+==== Jump Diffusion
+
+In what follows, we again illustrate the use of the simulation class +jump_diffusion+ interactively. We make use of the +market_environment+ object defined for the GBM object in the previous section.
+
+// code cell start uuid: 32912563-dcc1-4399-b5ed-1603c83f19f6
+[source, python]
+----
+In [31]: me_jd = market_environment('me_jd', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 66dda0df-b62e-4596-803f-3f74d0b83320
+[source, python]
+----
+In [32]: # specific to simulation class
+         me_jd.add_constant('lambda', 0.3)
+         me_jd.add_constant('mu', -0.75)
+         me_jd.add_constant('delta', 0.1)
+----
+
+// code cell end
+
+To this environment, we add the complete environment of the GBM simulation class which completes the input needed.
+
+// code cell start uuid: c1e390cc-dd6b-4186-a7be-012f8187ebe4
+[source, python]
+----
+In [33]: me_jd.add_environment(me_gbm)
+----
+
+// code cell end
+
+Based on this +market_environment+ object, we can instantiate the simulation class for the jump diffusion.
+
+// code cell start uuid: 31aeb150-6007-4eaa-b70b-8a798f044f0c
+[source, python]
+----
+In [34]: from jump_diffusion import jump_diffusion
+----
+
+// code cell end
+
+// code cell start uuid: e9c72a6e-3433-442e-9db3-02abf8efaff2
+[source, python]
+----
+In [35]: jd = jump_diffusion('jd', me_jd)
+----
+
+// code cell end
+
+Due to the modelling approach we have implemented, the generation of instrument values is now formally the same. The respective method call in this case, however, a bit slower since we need to simulate more numerical values due to the jump component.
+
+// code cell start uuid: 18fd9ba5-e1c6-4e90-ac6a-fa3727acc524
+[source, python]
+----
+In [36]: %time paths_3 = jd.get_instrument_values()
+----
+
+----
+Out[36]: CPU times: user 32 ms, sys: 4 ms, total: 36 ms
+         Wall time: 34.5 ms
+         
+----
+
+// code cell end
+
+With the aim of again comparing two different sets of paths, change, for example, the jump probability.
+
+// code cell start uuid: 38806874-53b2-4e91-9bd5-5764654446b8
+[source, python]
+----
+In [37]: jd.update(lamb=0.9)
+----
+
+// code cell end
+
+// code cell start uuid: a2bd3f5d-44cb-458d-ae7d-9238d7a6b93b
+[source, python]
+----
+In [38]: %time paths_4 = jd.get_instrument_values()
+----
+
+----
+Out[38]: CPU times: user 24 ms, sys: 8 ms, total: 32 ms
+         Wall time: 28.1 ms
+         
+----
+
+// code cell end
+
+<<jd_class_fig>> compares a couple of simulated paths from the two sets with low and high intensity (jump probability), respectively. You can spot a few jumps for the low intensity case and multiple jumps for the high intensity case in the figure.
+
+// code cell start uuid: 5b744e93-dac1-4868-8499-6a8f70bcfc42
+[source, python]
+----
+In [39]: plt.figure(figsize=(8, 4))
+         p1 = plt.plot(gbm.time_grid, paths_3[:, :10], 'b')
+         p2 = plt.plot(gbm.time_grid, paths_4[:, :10], 'r-.')
+         plt.grid(True)
+         l1 = plt.legend([p1[0], p2[0]],
+                         ['low intensity', 'high intensity'], loc=3)
+         plt.gca().add_artist(l1)
+         plt.xticks(rotation=30)
+----
+
+[[jd_class_fig]]
+.Simulated paths from jump diffusion simulation class
+image::images/jd_class_fig.png[]
+
+// code cell end
+
+
+==== Square-Root Diffusion
+
+A rather brief use case illustrates the use of the +square_root_diffusion+ simulation class. As usual, we need a market environment, for example, to model a volatility (index) process.
+
+// code cell start uuid: 5cee70a6-b34b-47dd-a0ca-e4a239209f9a
+[source, python]
+----
+In [40]: me_srd = market_environment('me_srd', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: cce8be97-72ab-44b8-8080-74caa746f4fe
+[source, python]
+----
+In [41]: me_srd.add_constant('initial_value', .25)
+         me_srd.add_constant('volatility', 0.05)
+         me_srd.add_constant('final_date', dt.datetime(2015, 12, 31))
+         me_srd.add_constant('currency', 'EUR')
+         me_srd.add_constant('frequency', 'W')
+         me_srd.add_constant('paths', 10000)
+----
+
+// code cell end
+
+Two components of the market environment are specific to the class.
+
+// code cell start uuid: 51da0da3-f606-4872-a44e-356ab708c1b7
+[source, python]
+----
+In [42]: # specific to simualation class
+         me_srd.add_constant('kappa', 4.0)
+         me_srd.add_constant('theta', 0.2)
+----
+
+// code cell end
+
+Although we do not need it here to implement the simulation, the generic simulation class requires a discounting object. This requirement can be justified from a risk-neutral valuation perspective which is the overarching goal of the whole +DX+ analytics library.
+
+// code cell start uuid: d88f4994-9f99-4b84-ae61-64b9ef193bfb
+[source, python]
+----
+In [43]: # required but not needed for the class
+         me_srd.add_curve('discount_curve', constant_short_rate('r', 0.0))
+----
+
+// code cell end
+
+// code cell start uuid: 9614dce2-b786-447f-b750-4ef4d78e1cd9
+[source, python]
+----
+In [44]: from square_root_diffusion import square_root_diffusion
+----
+
+// code cell end
+
+// code cell start uuid: 2ab8a1b3-0ca9-41cc-977b-a935a6f0bec8
+[source, python]
+----
+In [45]: srd = square_root_diffusion('srd', me_srd)
+----
+
+// code cell end
+
+As before, we geth simulation paths, given the +market_environmnet+ object as input, by calling the +get_instrument_values+ method.
+
+// code cell start uuid: 0ae9685b-e73c-45f5-996f-58c21843234a
+[source, python]
+----
+In [46]: srd_paths = srd.get_instrument_values()[:, :10]
+----
+
+// code cell end
+
+<<srd_class_fig>> illustrates the mean-reverting characterisic by showing how the single simulated processes on average revert to the long-term mean (dashed line).
+
+// code cell start uuid: c25fa7d4-688a-4275-9224-0bc20a8b54c0
+[source, python]
+----
+In [47]: plt.figure(figsize=(8, 4))
+         plt.plot(srd.time_grid, srd.get_instrument_values()[:, :10])
+         plt.axhline(me_srd.get_constant('theta'), color='r', ls='--', lw=2.0)
+         plt.grid(True)
+         plt.xticks(rotation=30)
+----
+
+[[srd_class_fig]]
+.Simulated paths from square-root diffusion simulation class (dashed line = long-term mean)
+image::images/srd_class_fig.png[]
+
+// code cell end
+
+
+=== Valuation Classes
+
+
+==== European Options
+
+However, before a valuation class can be instantiated, we need a simulation object, i.e. an underlying for the option to be valued. From <<model_simulation>>, we use the +geometric_brownian_motion+ class to model the underlying. We also use the example parameterization of the respective use case there.
+
+// code cell start uuid: 57252fe1-29a2-44bb-8cab-64337ea2bdc7
+[source, python]
+----
+In [48]: import sys
+         sys.path.append('../python/dx')
+         from dx_simulation import *
+----
+
+// code cell end
+
+// code cell start uuid: 9f6df028-fd97-4dc9-9960-d5202b94feb1
+[source, python]
+----
+In [49]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 527be3e7-3e98-4fe5-b41e-23af730c0921
+[source, python]
+----
+In [50]: me_gbm.add_constant('initial_value', 36.)
+         me_gbm.add_constant('volatility', 0.2)
+         me_gbm.add_constant('final_date', dt.datetime(2015, 12, 31))
+         me_gbm.add_constant('currency', 'EUR')
+         me_gbm.add_constant('frequency', 'M')
+         me_gbm.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: fc61c07b-7bb2-45ac-a10d-617a24747953
+[source, python]
+----
+In [51]: csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: 6acd3ae9-5986-4cec-9f66-407ddd79202e
+[source, python]
+----
+In [52]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+// code cell start uuid: dc0c43ae-c6f0-434e-ad6e-c3fbe91b1175
+[source, python]
+----
+In [53]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+In addition to a simulation object, we need to provide a market environment for the option itself. It has to contain at least a +maturity+ and a +currency+. Optionally, we can provide a +strike+.
+
+// code cell start uuid: 17f4b627-7fb8-43f6-bb15-26a6a4d60b0b
+[source, python]
+----
+In [54]: me_call = market_environment('me_call', me_gbm.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 838f54a8-e11c-4ab5-85ce-8393d89f957f
+[source, python]
+----
+In [55]: me_call.add_constant('strike', 40.)
+         me_call.add_constant('maturity', dt.datetime(2015, 12, 31))
+         me_call.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+A central element of course is the payoff function, provided here as a +string+ object containing +Python+ code that the +eval+ function can evaluate. We want to define a European _call_ option. Such an option has a payoff of latexmath:[$h_T = \max(S_T - K,0)$] with latexmath:[$S_T$] being the value of the underlying at maturity and latexmath:[$K$] being the strike price of the option. In +Python+ and +NumPy+--i.e. with vecotrized storage of all simulated values--this takes on the following form.
+
+// code cell start uuid: 4bfb5550-ab6b-4b56-9604-3fad05c5f334
+[source, python]
+----
+In [56]: payoff_func = 'np.maximum(maturity_value - strike, 0)'
+----
+
+// code cell end
+
+All ingredients are together to instantiate the +valuation_mcs_european+ class.
+
+// code cell start uuid: 5a331672-9004-43b0-9ba6-61622d4e1b65
+[source, python]
+----
+In [57]: from valuation_mcs_european import valuation_mcs_european
+----
+
+// code cell end
+
+// code cell start uuid: 0ba08733-7d34-488e-b460-e5abc223a85a
+[source, python]
+----
+In [58]: eur_call = valuation_mcs_european('eur_call', underlying=gbm,
+                                 mar_env=me_call, payoff_func=payoff_func)
+----
+
+// code cell end
+
+Having this valuation object available, all quantities of interest are only one method call away. Let us start with the present value of the option.
+
+// code cell start uuid: 1869f59a-2c88-4bb4-bde6-b662edbd5f62
+[source, python]
+----
+In [59]: %time eur_call.present_value()
+----
+
+----
+Out[59]: CPU times: user 12 ms, sys: 4 ms, total: 16 ms
+         Wall time: 16.1 ms
+         
+         2.140776
+----
+
+// code cell end
+
+The Delta of the option is, as expected for a European call option, positive, i.e. the present value of the option increases with increasing initial value of the underlying.
+
+// code cell start uuid: 62330fe7-0fbe-4a24-886e-a9c64b61122c
+[source, python]
+----
+In [60]: %time eur_call.delta()
+----
+
+----
+Out[60]: CPU times: user 16 ms, sys: 0 ns, total: 16 ms
+         Wall time: 12.6 ms
+         
+         0.5148
+----
+
+// code cell end
+
+The Vega is calculated similarly. Vega shows the increase in the present value of the option given an increase in the initial volatility of 1%-point, e.g. from 24% to 25%. Vega is positive for both European put and call options.
+
+// code cell start uuid: 999b5d90-57b9-46da-b7cc-981841df58b8
+[source, python]
+----
+In [61]: %time eur_call.vega()
+----
+
+----
+Out[61]: CPU times: user 24 ms, sys: 0 ns, total: 24 ms
+         Wall time: 24.8 ms
+         
+         14.2782
+----
+
+// code cell end
+
+Once we have the valuation object, a more comprehensive analysis of the present value and the Greeks is easily implemented. The following code calculates the present value, delta and vega for intial values of the underlying ranging from 34 to 46 EUR.
+
+// code cell start uuid: bf5e7430-eea7-47ae-b1a6-e335c144929b
+[source, python]
+----
+In [62]: %%time
+         s_list = np.arange(34., 46.1, 2.)
+         p_list = []; d_list = []; v_list = []
+         for s in s_list:
+             eur_call.update(initial_value=s)
+             p_list.append(eur_call.present_value(fixed_seed=True))
+             d_list.append(eur_call.delta())
+             v_list.append(eur_call.vega())
+----
+
+----
+Out[62]: CPU times: user 296 ms, sys: 0 ns, total: 296 ms
+         Wall time: 296 ms
+         
+----
+
+// code cell end
+
+Equippend with all these values, we can graphically inspect the results. To this end, we use a helper function as shown in <<plot_option_stats>>.
+
+[[plot_option_stats]]
+.Helper function to plot options statistics
+====
+[source, python]
+----
+include::python/dx/plot_option_stats.py[]
+----
+====
+
+Importing this function providing the valuation results to it generates a picture as shown in <<option_stats_1>>.
+
+// code cell start uuid: 70b7e095-a138-47bb-90b5-2a658d74b87c
+[source, python]
+----
+In [63]: from plot_option_stats import plot_option_stats
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: 2590618e-3bfd-4416-82b6-eef269a28f38
+[source, python]
+----
+In [64]: plot_option_stats(s_list, p_list, d_list, v_list)
+----
+
+[[option_stats_1]]
+.Present value, Delta and Vega estimates for European call option
+image::images/option_stats_1.png[]
+
+// code cell end
+
+This illustrates that working with the +DX+ library--although heavy numerics are involved--boils down to an approach that is comparable to having a closed-form option pricing formula available. However, this approach does not only apply to such simple payoffs as the one considered so far. With exactly the same approach, we can handle much more complex payoffs. To this end, consider the following payoff being a _mixture of a regular and an Asian payoff_.
+
+// code cell start uuid: 2d5ca812-5448-47fe-9fd3-af2ab7eca13e
+[source, python]
+----
+In [65]: payoff_func = 'np.maximum(0.33 * (maturity_value + max_value) - 40, 0)'
+           # payoff dependent on both the simulated maturity value
+           # and the maximum value
+----
+
+// code cell end
+
+Everything else shall remain the same.
+
+// code cell start uuid: 62c9340d-a2a3-477e-b640-389d81c3b8a1
+[source, python]
+----
+In [66]: eur_as_call = valuation_mcs_european('eur_as_call', underlying=gbm,
+                                     mar_env=me_call, payoff_func=payoff_func)
+----
+
+// code cell end
+
+All statistics, of course, change in this case.
+
+// code cell start uuid: 50f5cf9a-d2c7-4e69-9361-e3bf8678c4a3
+[source, python]
+----
+In [67]: %%time
+         s_list = np.arange(34., 46.1, 2.)
+         p_list = []; d_list = []; v_list = []
+         for s in s_list:
+             eur_as_call.update(s)
+             p_list.append(eur_as_call.present_value(fixed_seed=True))
+             d_list.append(eur_as_call.delta())
+             v_list.append(eur_as_call.vega())
+----
+
+----
+Out[67]: CPU times: user 280 ms, sys: 4 ms, total: 284 ms
+         Wall time: 279 ms
+         
+----
+
+// code cell end
+
+<<option_stats_2>> shows that Delta becomes 1 when the intial value of the underlying reaches the strike price of 40 in this case. Every (marginal) increase of the initial value of the underlying leads to the same (marginal) increase in the option's value from this particular point on.
+
+// code cell start uuid: a4602156-ade5-49fe-97c8-3088dc47944c
+[source, python]
+----
+In [68]: plot_option_stats(s_list, p_list, d_list, v_list)
+----
+
+[[option_stats_2]]
+.Present value, Delta and Vega estimates for European Asian call option
+image::images/option_stats_2.png[]
+
+// code cell end
+
+
+==== American Options
+
+As has become by now the means of choice, a use case shall illustrate how to work with the +valuation_mcs_american+ class. The use case replicates all American option values as presented in table 1 of the seminal paper Longstaff-Schwartz (2001). The underlying is the same as before, a +geometric_brownian_motion+ object. The starting parameterization for the underlying is as follows.
+
+// code cell start uuid: 5d69e0ae-939b-49fa-a329-2f0538f8cb20
+[source, python]
+----
+In [69]: from dx_simulation import *
+----
+
+// code cell end
+
+// code cell start uuid: 81d66ea7-15df-429a-9f87-fc2f2c881726
+[source, python]
+----
+In [70]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: f822430b-6875-4b81-9c15-4684eea1225c
+[source, python]
+----
+In [71]: me_gbm.add_constant('initial_value', 36.)
+         me_gbm.add_constant('volatility', 0.2)
+         me_gbm.add_constant('final_date', dt.datetime(2016, 12, 31))
+         me_gbm.add_constant('currency', 'EUR')
+         me_gbm.add_constant('frequency', 'W')
+           # weekly frequency
+         me_gbm.add_constant('paths', 50000)
+----
+
+// code cell end
+
+// code cell start uuid: ed806c52-2dc7-4dec-a8dc-8e0d99e18a3c
+[source, python]
+----
+In [72]: csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: 78738a9b-8f75-4710-b31d-415cdade6bb8
+[source, python]
+----
+In [73]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+// code cell start uuid: 4b0692ba-91f6-4d19-adfd-d4b31590542b
+[source, python]
+----
+In [74]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+The _option type_ is an American put option with payoff:
+
+// code cell start uuid: ab695214-a424-4ead-9c96-ef75a8f52ed0
+[source, python]
+----
+In [75]: payoff_func = 'np.maximum(strike - instrument_values, 0)'
+----
+
+// code cell end
+
+The first option in table 1 of the paper has a maturity of one year and the strike price is 40 throughout.
+
+// code cell start uuid: 558b7076-4cc6-4e45-9e04-395eb3ba8aac
+[source, python]
+----
+In [76]: me_am_put = market_environment('me_am_put', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 783eb5ab-6dd6-4561-9614-aedb4247d6ab
+[source, python]
+----
+In [77]: me_am_put.add_constant('maturity', dt.datetime(2015, 12, 31))
+         me_am_put.add_constant('strike', 40.)
+         me_am_put.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+The next step is to instantiate the valuation object based on the numerical assumptions.
+
+// code cell start uuid: dd6bc5f2-ed01-4877-a7da-dee5d9bd9c45
+[source, python]
+----
+In [78]: from valuation_mcs_american import valuation_mcs_american
+----
+
+// code cell end
+
+// code cell start uuid: a43bc735-e35e-4621-9185-5d9d415b0efd
+[source, python]
+----
+In [79]: am_put = valuation_mcs_american('am_put', underlying=gbm,
+                             mar_env=me_am_put, payoff_func=payoff_func)
+----
+
+// code cell end
+
+The valuation of the American put option takes much longer than the same task for the European options before. On the one hand, we have increased the number of paths and the frequency for the valuation. On the other hand, the algorithm is much more computationally demanding due to the backwards induction and the regressions per induction step. Our numerical value is pretty close to the _correct_ one reported in the seminal paper of 4.478.
+
+// code cell start uuid: eeb5de5d-f95b-4acd-bbab-2eae998d8f46
+[source, python]
+----
+In [80]: %time am_put.present_value(fixed_seed=True, bf=5)
+----
+
+----
+Out[80]: CPU times: user 876 ms, sys: 128 ms, total: 1 s
+         Wall time: 1 s
+         
+         4.468423
+----
+
+// code cell end
+
+Due to the very construction of the LSM Monte Carlo estimator, it represents a _lower bound_ of the mathematically correct American option value.footnote:[The main reason is that the "optimal exercise policy" based on the regression estimates of the continuation value is only "sub-optimal".] Therefore, we would expect the numerical estimate to lie under the true value in any numerically realistic case. Alternative, dual estimators can provide _upper bounds_ as well.footnote:[Cf. chapter 6 in Hilpisch (2013) for a dual algorithm leading to an upper bound and a +Python+ implementation thereof.] Taken together such two different estimators then define an interval for the true American option value.
+
+The main stated goal of this use case is to replicate all American option values of table 1 in the seminal paper. To this end, we only need to combine the valuation object with a nested loop. During the inner most loop, the valuation object has to be updated according to the then current parameterization.
+
+// code cell start uuid: 671c9254-1fa5-432c-accb-4d0610abd910
+[source, python]
+----
+In [81]: %%time
+         ls_table = []
+         for initial_value in (36., 38., 40., 42., 44.):
+             for volatility in (0.2, 0.4):
+                 for maturity in (dt.datetime(2015, 12, 31),
+                                  dt.datetime(2016, 12, 31)):
+                     am_put.update(initial_value=initial_value,
+                                   volatility=volatility,
+                                   maturity=maturity)
+                     ls_table.append([initial_value,
+                                      volatility,
+                                      maturity,
+                                      am_put.present_value(bf=5)])
+----
+
+----
+Out[81]: CPU times: user 23.7 s, sys: 1.74 s, total: 25.4 s
+         Wall time: 25.5 s
+         
+----
+
+// code cell end
+
+Below, our simplified version of table 1 in Longstaff-Schwartz (2001). Overall, our numerical values come pretty close to those reported in the paper, where some different parameters have been used (they use for example double the number of paths).
+
+// code cell start uuid: 125e9a02-1db7-4fdd-bdd8-6f0f522281d3
+[source, python]
+----
+In [82]: print "S0  | Vola | T | Value"
+         print 22 * "-"
+         for r in ls_table:
+             print "%d  | %3.1f  | %d | %5.3f" % \
+                   (r[0], r[1], r[2].year - 2014, r[3])
+----
+
+----
+Out[82]: S0  | Vola | T | Value
+         ----------------------
+         36  | 0.2  | 1 | 4.442
+         36  | 0.2  | 2 | 4.769
+         36  | 0.4  | 1 | 6.996
+         36  | 0.4  | 2 | 8.376
+         38  | 0.2  | 1 | 3.208
+         38  | 0.2  | 2 | 3.645
+         38  | 0.4  | 1 | 6.063
+         38  | 0.4  | 2 | 7.534
+         40  | 0.2  | 1 | 2.266
+         40  | 0.2  | 2 | 2.778
+         40  | 0.4  | 1 | 5.200
+         40  | 0.4  | 2 | 6.751
+         42  | 0.2  | 1 | 1.553
+         42  | 0.2  | 2 | 2.098
+         42  | 0.4  | 1 | 4.456
+         42  | 0.4  | 2 | 6.045
+         44  | 0.2  | 1 | 1.056
+         44  | 0.2  | 2 | 1.617
+         44  | 0.4  | 1 | 3.844
+         44  | 0.4  | 2 | 5.493
+         
+----
+
+// code cell end
+
+%%time
+ls_table = pd.DataFrame()
+for initial_value in (36., 38., 40., 42., 44.):
+    for volatility in (0.2, 0.4):
+        for maturity in (dt.datetime(2015, 12, 31),
+                         dt.datetime(2016, 12, 31)):
+            am_put.update(initial_value=initial_value,
+                          volatility=volatility,
+                          maturity=maturity)
+            ls_table = ls_table.append(
+                pd.DataFrame([[initial_value,
+                             volatility,
+                             maturity,
+                             am_put.present_value(bf=5)],
+                    columns=['S0', 'Vola', 'T', 'Value']))
+
+ls_table.set_index(keys=['S0', 'Vola'])
+
+To conclude the use case, note that that the estimation of Greeks for American options is formally the same as for European options--a major advantage of our approach over alternative numerical methods (like the binomial model).
+
+// code cell start uuid: 481d5438-d32b-40a2-aa8c-687b19138e29
+[source, python]
+----
+In [83]: am_put.update(initial_value=36.)
+         am_put.delta()
+----
+
+----
+Out[83]: -0.4631
+----
+
+// code cell end
+
+// code cell start uuid: 84cf9547-c8b3-4205-81e5-8949ae798394
+[source, python]
+----
+In [84]: am_put.vega()
+----
+
+----
+Out[84]: 18.4908
+----
+
+// code cell end
+
+
+=== Portfolios
+
+
+==== Position
+
+// code cell start uuid: e826f896-6999-4007-b0b2-c46750e0afc4
+[source, python]
+----
+In [1]: import sys
+        sys.path.append('../python/dx')
+        from dx_valuation import *
+----
+
+// code cell end
+
+For the definition of the derivatives position, we do not need a "full" +market_environment+ object. Missing information is provided later during the portfolio valuation when the simulation object is instantiated.
+
+// code cell start uuid: 636c1eae-142b-447f-a137-d36d81e4626b
+[source, python]
+----
+In [2]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 6e3324f6-21ee-46f4-b330-205ab3766f1f
+[source, python]
+----
+In [3]: me_gbm.add_constant('initial_value', 36.)
+        me_gbm.add_constant('volatility', 0.2)
+        me_gbm.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+However, for the portfolio valuation, one additional constant is needed for the _model_ to be used. This will become clear in the subsequent section.
+
+// code cell start uuid: 4133fd96-79aa-4df7-8dbb-328561e2267c
+[source, python]
+----
+In [4]: me_gbm.add_constant('model', 'gbm')
+----
+
+// code cell end
+
+Having the simulation object available, we can proceed and define a derivatives position as follows.
+
+// code cell start uuid: 552c207a-7c7d-4809-a5ee-64c11d7604a3
+[source, python]
+----
+In [5]: from derivatives_position import derivatives_position
+----
+
+// code cell end
+
+// code cell start uuid: d2cd3a35-f2a9-470c-a705-299172dd8887
+[source, python]
+----
+In [6]: me_am_put = market_environment('me_am_put', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: f3bd69f3-c361-44ce-9cad-3584366b459f
+[source, python]
+----
+In [7]: me_am_put.add_constant('maturity', dt.datetime(2015, 12, 31))
+        me_am_put.add_constant('strike', 40.)
+        me_am_put.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+// code cell start uuid: 70aa8500-9a8a-4d54-951e-ac820eaff24d
+[source, python]
+----
+In [8]: payoff_func = 'np.maximum(strike - instrument_values, 0)'
+----
+
+// code cell end
+
+// code cell start uuid: ce2244bd-c4c0-4386-a518-06c3373a96b1
+[source, python]
+----
+In [9]: am_put_pos = derivatives_position(
+                     name='am_put_pos',
+                     quantity=3,
+                     underlying='gbm',
+                     mar_env=me_am_put,
+                     otype='American',
+                     payoff_func=payoff_func)
+----
+
+// code cell end
+
+Information about such an object is provided by the +get_info+ method.
+
+// code cell start uuid: 9bb959eb-6ce0-48eb-9f1f-bf64eee505fe
+[source, python]
+----
+In [10]: am_put_pos.get_info()
+----
+
+----
+Out[10]: NAME
+         am_put_pos 
+         
+         QUANTITY
+         3 
+         
+         UNDERLYING
+         gbm 
+         
+         MARKET ENVIRONMENT
+         
+         **Constants**
+         strike 40.0
+         maturity 2015-12-31 00:00:00
+         currency EUR
+         
+         **Lists**
+         
+         **Curves**
+         
+         OPTION TYPE
+         American 
+         
+         PAYOFF FUNCTION
+         np.maximum(strike - instrument_values, 0)
+         
+----
+
+// code cell end
+
+
+===== Portfolio
+
+To illustrate the use of the +derivatives_portfolio+ class let us define both an additional underlying and an addition options position. First, a +jump_diffusion+ object.
+
+// code cell start uuid: a7f7a55f-cf66-457a-ba2f-9c9f15697d98
+[source, python]
+----
+In [11]: me_jd = market_environment('me_jd', me_gbm.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 4c2da9df-820c-49bb-9da0-fa212aa8ac40
+[source, python]
+----
+In [12]: # add jump diffusion specific parameters
+         me_jd.add_constant('lambda', 0.3)
+         me_jd.add_constant('mu', -0.75)
+         me_jd.add_constant('delta', 0.1)
+         # add other parameters from gbm
+         me_jd.add_environment(me_gbm)
+----
+
+// code cell end
+
+// code cell start uuid: 6f93e1aa-7ccb-4434-b79e-2357bb056fc9
+[source, python]
+----
+In [13]: # needed for portfolio valuation
+         me_jd.add_constant('model', 'jd')
+----
+
+// code cell end
+
+Second, a European call option based on this new simulation object.
+
+// code cell start uuid: 178e550a-e040-4ac8-9ad8-e3bbf4fdc50d
+[source, python]
+----
+In [14]: me_eur_call = market_environment('me_eur_call', me_jd.pricing_date)
+----
+
+// code cell end
+
+// code cell start uuid: 08c13651-9fbf-44bf-b9a9-e94409a6e891
+[source, python]
+----
+In [15]: me_eur_call.add_constant('maturity', dt.datetime(2015, 6, 30))
+         me_eur_call.add_constant('strike', 38.)
+         me_eur_call.add_constant('currency', 'EUR')
+----
+
+// code cell end
+
+// code cell start uuid: c62a77e4-a502-4ceb-a5a3-9b3ec2be7d72
+[source, python]
+----
+In [16]: payoff_func = 'np.maximum(maturity_value - strike, 0)'
+----
+
+// code cell end
+
+// code cell start uuid: f1cb96fa-385a-41d6-b68d-1f80c9590370
+[source, python]
+----
+In [17]: eur_call_pos = derivatives_position(
+                      name='eur_call_pos',
+                      quantity=5,
+                      underlying='jd',
+                      mar_env=me_eur_call,
+                      otype='European',
+                      payoff_func=payoff_func)
+----
+
+// code cell end
+
+From a portfolio perspective, the relevant market now is:
+
+// code cell start uuid: e8df55ac-a860-4dd6-88f2-c4aa15e323f9
+[source, python]
+----
+In [18]: underlyings = {'gbm': me_gbm, 'jd' : me_jd}
+         positions = {'am_put_pos' : am_put_pos, 'eur_call_pos' : eur_call_pos}
+----
+
+// code cell end
+
+For the moment we abstract from correlations between the underlyings. Compiling a +market_environment+ for the portfolio valuation is the last step before we can instantiate a +derivatives_portfolio+ class.
+
+// code cell start uuid: 38a7b06d-9923-4729-bbaf-184b55930d69
+[source, python]
+----
+In [19]: # discounting object for the valuation
+         csr = constant_short_rate('csr', 0.06)
+----
+
+// code cell end
+
+// code cell start uuid: d8ecc803-4ea8-45b4-975f-88e716a171e6
+[source, python]
+----
+In [20]: val_env = market_environment('general', me_gbm.pricing_date)
+         val_env.add_constant('frequency', 'W')
+           # monthly frequency
+         val_env.add_constant('paths', 25000)
+         val_env.add_constant('starting_date', val_env.pricing_date)
+         val_env.add_constant('final_date', val_env.pricing_date)
+           # not yet known; take pricing_date temporarily
+         val_env.add_curve('discount_curve', csr)
+           # select single discount_curve for whole portfolio
+----
+
+// code cell end
+
+// code cell start uuid: 1f533a99-c881-4628-befe-ce63bbfdaafd
+[source, python]
+----
+In [21]: from derivatives_portfolio import derivatives_portfolio
+----
+
+// code cell end
+
+// code cell start uuid: 7a231d26-ec5f-4b0f-8c2e-d5ee4b93f0c4
+[source, python]
+----
+In [22]: portfolio = derivatives_portfolio(
+                         name='portfolio',
+                         positions=positions,
+                         val_env=val_env,
+                         assets=underlyings,
+                         fixed_seed=True)
+----
+
+// code cell end
+
+Now we can harness the power of the valuation class and get a bunch of different statistics for the +derivatives_portfolio+ object just defined.
+
+// code cell start uuid: ec163641-6908-4fc8-bb75-95483021f1b4
+[source, python]
+----
+In [23]: portfolio.get_statistics()
+----
+
+----
+Out[23]:            name  quant.     value curr.  pos_value  pos_delta  pos_vega
+         0  eur_call_pos       5  1.438820   EUR   7.194100     1.8565   43.3410
+         1    am_put_pos       3  4.469816   EUR  13.409448    -2.0886   30.5031
+----
+
+// code cell end
+
+The _sum_ of the position values, Deltas and Vegas is also easily calculated. This portfolio is almost Delta neutral and long Vega.
+
+// code cell start uuid: 97aebfec-ec91-4d6b-af5f-ff36c5300122
+[source, python]
+----
+In [24]: portfolio.get_statistics()[['pos_value', 'pos_delta', 'pos_vega']].sum()
+           # aggregate over all positions
+----
+
+----
+Out[24]: pos_value    20.330888
+         pos_delta     0.146400
+         pos_vega     73.844100
+         dtype: float64
+----
+
+// code cell end
+
+A complete overview of all positions is conveniently obtained by the +get_positions+ method--such output can, for example, be used for reporting purposes (but is ommited here due to reasons of space).
+
+// code cell start uuid: 2448b331-3d97-4358-a07b-453dc15659f8
+[source, python]
+----
+In [25]: # portfolio.get_positions()
+----
+
+// code cell end
+
+Of course, you can access and use all (simulation, valuation, etc.) objects of the +derivatives_portfolio+ object also in direct fashion.
+
+// code cell start uuid: aa0c765f-2e15-4e74-a46e-ed8e7c43e825
+[source, python]
+----
+In [26]: portfolio.valuation_objects['am_put_pos'].present_value()
+----
+
+----
+Out[26]: 4.448379
+----
+
+// code cell end
+
+// code cell start uuid: ea398cfa-fb40-4ed8-b9bf-c067d135fe11
+[source, python]
+----
+In [27]: portfolio.valuation_objects['eur_call_pos'].delta()
+----
+
+----
+Out[27]: 0.4203
+----
+
+// code cell end
+
+This derivatives portfolio valuation is conducted based on the assumption that the risk factors are _not_ correlated. This is easily verified by inspecting two simulated paths, one for each simulation object.
+
+// code cell start uuid: f8a828ff-4fc9-40b4-8dee-f3b27035978b
+[source, python]
+----
+In [28]: path_no = 777
+         path_gbm = portfolio.underlying_objects['gbm'].get_instrument_values()[
+                                                                     :, path_no]
+         path_jd = portfolio.underlying_objects['jd'].get_instrument_values()[
+                                                                     :, path_no]
+----
+
+// code cell end
+
+<<dx_portfolio_1>> shows the selected paths in direct comparison--no jump occurs for the jump diffusion.
+
+// code cell start uuid: 01f6d3d3-3459-4d94-abfc-ac6fbf887671
+[source, python]
+----
+In [29]: import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: 9cd814c6-2762-489a-b926-883a078f0142
+[source, python]
+----
+In [30]: plt.figure(figsize=(7, 4))
+         plt.plot(portfolio.time_grid, path_gbm, 'r', label='gbm')
+         plt.plot(portfolio.time_grid, path_jd, 'b', label='jd')
+         plt.xticks(rotation=30)
+         plt.legend(loc=0); plt.grid(True)
+----
+
+[[dx_portfolio_1]]
+.Non-correlated risk factors
+image::images/dx_portfolio_1.png[]
+
+// code cell end
+
+Now consider the case where the two risk factors are highly positively correlated.
+
+// code cell start uuid: 873e0a44-470b-4fc6-ab12-956de039b21e
+[source, python]
+----
+In [31]: correlations = [['gbm', 'jd', 0.9]]
+----
+
+// code cell end
+
+With this additional information, a new +derivatives_portfolio+ objects is to be instantiated.
+
+// code cell start uuid: 3f517f85-6cd4-431f-9a86-51956d712576
+[source, python]
+----
+In [32]: port_corr = derivatives_portfolio(
+                         name='portfolio',
+                         positions=positions,
+                         val_env=val_env,
+                         assets=underlyings,
+                         correlations=correlations,
+                         fixed_seed=True)
+----
+
+// code cell end
+
+In this case, there is no direct influence on the values of the positions in the portfolio.
+
+// code cell start uuid: be0fe6c4-3f67-4091-aabb-110043f3b2b2
+[source, python]
+----
+In [33]: port_corr.get_statistics()
+----
+
+----
+Out[33]:            name  quant.     value curr.  pos_value  pos_delta  pos_vega
+         0  eur_call_pos       5  1.382123   EUR   6.910615     2.1740   42.9845
+         1    am_put_pos       3  4.456367   EUR  13.369101    -2.0301   30.1266
+----
+
+// code cell end
+
+However, the correlation takes place behind the scenes. For the graphical illustration, we take the same two paths as before.
+
+// code cell start uuid: c3f911fc-b3f5-4fd2-bf53-d45cbb78e67b
+[source, python]
+----
+In [34]: path_gbm = port_corr.underlying_objects['gbm'].\
+                     get_instrument_values()[:, path_no]
+         path_jd = port_corr.underlying_objects['jd'].\
+                     get_instrument_values()[:, path_no]
+----
+
+// code cell end
+
+<<dx_portfolio_2>> now shows a development almost in perfect parallelism between the two risk factors.
+
+// code cell start uuid: e2b1e218-8908-42e9-a9c7-8dc0c58a95c1
+[source, python]
+----
+In [35]: plt.figure(figsize=(7, 4))
+         plt.plot(portfolio.time_grid, path_gbm, 'r', label='gbm')
+         plt.plot(portfolio.time_grid, path_jd, 'b', label='jd')
+         plt.xticks(rotation=30)
+         plt.legend(loc=0); plt.grid(True)
+----
+
+[[dx_portfolio_2]]
+.Highly correlated risk factors
+image::images/dx_portfolio_2.png[]
+
+// code cell end
+
+As a last numerical and conceptual example, consider the _frequency distribution of the portfolio present value_. This is something impossible to generate in general with other approaches, like the application of analytical formulae or the binomial option pricing model. We get the complete set of present values per option position by a present value calculation and passing the parameter flag +full=True+.
+
+// code cell start uuid: b63e4652-8346-4869-b914-d24eb0dc2859
+[source, python]
+----
+In [36]: pv1 = 5 * port_corr.valuation_objects['eur_call_pos'].\
+                     present_value(full=True)[1]
+         pv1
+----
+
+----
+Out[36]: array([  0.        ,  22.55857473,   8.2552922 , ...,   0.        ,
+                  0.        ,   0.        ])
+----
+
+// code cell end
+
+// code cell start uuid: 576bfd63-e355-4357-b065-6118a4ed443c
+[source, python]
+----
+In [37]: pv2 = 3 * port_corr.valuation_objects['am_put_pos'].\
+                     present_value(full=True)[1]
+         pv2
+----
+
+----
+Out[37]: array([ 22.04450095,  10.90940926,  20.25092898, ...,  21.68232889,
+                 17.7583897 ,   0.        ])
+----
+
+// code cell end
+
+First, the frequency distribution of the two positions compared. The payoff profiles of the two positions as displayed in <<dx_portfolio_3>> are quite different. Note that we limit both the +x+ and +y+ axes for better readability.
+
+// code cell start uuid: 360ae17d-f0af-466e-8777-ed91c10ea9c0
+[source, python]
+----
+In [38]: plt.hist([pv1, pv2], bins=25,
+                  label=['European call', 'American put']);
+         plt.axvline(pv1.mean(), color='r', ls='dashed',
+                     lw=1.5, label='call mean = %4.2f' % pv1.mean())
+         plt.axvline(pv2.mean(), color='r', ls='dotted',
+                     lw=1.5, label='put mean = %4.2f' % pv2.mean())
+         plt.xlim(0, 80); plt.ylim(0, 10000)
+         plt.grid(); plt.legend()
+----
+
+[[dx_portfolio_3]]
+.Portfolio frequency distribution of present values
+image::images/dx_portfolio_3.png[]
+
+// code cell end
+
+The following figure finally shows the full frequency distribution of the portfolio present values. You clearly see in <<dx_portfolio_4>> the offsetting diversification effects of combining a call with a put option.
+
+// code cell start uuid: 2a8e9d9b-9ca0-4712-85e9-c60f7ccfedda
+[source, python]
+----
+In [39]: pvs = pv1 + pv2
+         plt.hist(pvs, bins=50, label='portfolio');
+         plt.axvline(pvs.mean(), color='r', ls='dashed',
+                     lw=1.5, label='mean = %4.2f' % pvs.mean())
+         plt.xlim(0, 80); plt.ylim(0, 7000)
+         plt.grid(); plt.legend()
+----
+
+[[dx_portfolio_4]]
+.Portfolio frequency distribution of present values
+image::images/dx_portfolio_4.png[]
+
+// code cell end
+
+What impact does the correlation between the two risk factors has on the risk of the portfolio, measured in the standard deviation of the  present values? The statistics for the portfolio with correlation is easily calculated as follows.
+
+// code cell start uuid: efe62b9f-d697-4df6-b24d-72e10aace480
+[source, python]
+----
+In [40]: # portfolio with correlation
+         pvs.std()
+----
+
+----
+Out[40]: 11.903735207323713
+----
+
+// code cell end
+
+Similarly, for the portfolio without correlation.
+
+// code cell start uuid: ab3fca10-4a3e-4f1b-9d07-379edf9409e9
+[source, python]
+----
+In [41]: # portfolio without correlation
+         pv1 = 5 * portfolio.valuation_objects['eur_call_pos'].\
+                     present_value(full=True)[1]
+         pv2 = 3 * portfolio.valuation_objects['am_put_pos'].\
+                     present_value(full=True)[1]
+         (pv1 + pv2).std()
+----
+
+----
+Out[41]: 16.276510275244075
+----
+
+// code cell end
+
+Although the mean value stays constant (ignoring numerical deviations), correlation obviously significantly decreases the portfolio risk when measured in this way. Again, an insight not really possible to gain when using different numerical methods or valuation approaches.
+

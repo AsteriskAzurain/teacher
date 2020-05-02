@@ -1,0 +1,2351 @@
+[[input_output]]
+
+
+== Input/Output Operations
+
+[quote, Sherlock Holmes]
+____
+[role="align_me_right"]
+It is a capital mistake to theorize before one has data.
+____
+
+(((data, storage of)))As a general rule, the majority of data, be it in a finance context or any other application area, is stored on hard disk drives (HDDs) or some other form of permanent storage device, like solid state disks (SSDs) or hybrid disk drives. Storage capacities have been steadily increasing over the years, while costs per storage unit (e.g., megabytes) have been steadily falling.
+
+At the same time, stored data volumes have been increasing at a much faster pace than the typical random access memory (RAM) available even in the largest machines. This makes it necessary not only to store data to disk for permanent storage, but also to compensate for lack of sufficient RAM by swapping data from RAM to disk and back.
+
+(((input/output operations, importance of)))Input/output (I/O) operations are therefore generally very important tasks when it comes to finance applications and data-intensive applications in general. Often they represent the bottleneck for performance-critical computations, since I/O operations cannot in general shuffle data fast enough to the RAMfootnote:[Here, we do not distinguish between different levels of RAM and processor caches. The optimal use of current memory architectures is a topic in itself.] and from the RAM to the disk. In a sense, CPUs are often "starving" due to slow I/O operations.
+
+(((big data)))(((data, big data)))(((petascale processing)))(((financial analytics, size of data sets)))(((analytics, financial, size of data sets)))Although the majority of today's financial and corporate analytics efforts are confronted with "big" data (e.g., of petascale size), single analytics tasks generally use data (sub)sets that fall in the "mid" data category. A recent study concluded:
+
+[quote, Appuswamy et al. (2013)]
+____
+Our measurements as well as other recent work shows that the majority of real-world analytic jobs process less than 100 GB of input, but popular infrastructures such as Hadoop/MapReduce were originally designed for petascale processing.
+____
+
+(((Python, benefits for finance)))In terms of frequency, single financial analytics tasks generally process data of not more than a couple of gigabytes (GB) in size--and this is a sweet spot for +Python+ and the libraries of its scientific stack, like +NumPy+, +pandas+, and +PyTables+. Data sets of such a size can also be analyzed in-memory, leading to generally high speeds with today's CPUs and GPUs. However, the data has to be read into RAM and the results have to be written to disk, meanwhile ensuring today's performance requirements are met.
+
+This chapter addresses the following areas:
+
+Basic I/O:: 
++Python+ has built-in functions to serialize and store any object on disk and to read it from disk into RAM; apart from that, +Python+ is strong when it comes to working with text files and +SQL+ databases. +NumPy+ also provides dedicated functions for fast storage and retrieval of +ndarray+ objects.
+I/O with +pandas+:: 
+The +pandas+ library provides a plentitude of convenience functions and methods to read data stored in different formats (e.g., +CSV+, +JSON+) and to write data to files in diverse formats.
+I/O with +PyTables+:: 
++PyTables+ uses the http://www.hdfgroup.org[+HDF5+ standard] to accomplish fast I/O operations for large data sets; speed often is only bound by the hardware used.
+
+
+=== Basic I/O with Python
+
++Python+ itself comes with a multitude of I/O capabilites, some optimized for performance, others more for flexibility. In general, however, they are easily used in interactive as well as in large-scale deployment settings.
+
+
+==== Writing Objects to Disk
+
+(((input-output operations, with Python, writing objects to disk)))(((Python, input-output operations, writing objects to disk)))(((pickle module)))(((serialization)))(((deserialization)))For later use, for documentation, or for sharing with others, one might want to store +Python+ objects on disk. One option is to use the +pickle+ module. This module can serialize the majority of +Python+ objects. _Serialization_ refers to the conversion of an object (hierarchy) to a byte stream; _deserialization_ is the opposite operation. In the example that follows, we work again with (pseudo)random data, this time stored in a +list+ object:
+
+// code cell start uuid: d5bf9798-386b-49b8-a703-36263d9d75d4
+[source, python]
+----
+In [1]: path = '/flash/data/'
+----
+
+// code cell end
+
+// code cell start uuid: c2722e94-01ea-4f98-804f-56fe1b666770
+[source, python]
+----
+In [2]: import numpy as np
+        from random import gauss
+----
+
+// code cell end
+
+// code cell start uuid: 7d03b06c-a907-4a16-913f-e6a8f9a05d51
+[source, python]
+----
+In [3]: a = [gauss(1.5, 2) for i in range(1000000)]
+          # generation of normally distributed randoms
+----
+
+// code cell end
+
+The task now is to write this +list+ object to disk for later retrieval. +pickle+ accomplishes this task:
+
+// code cell start uuid: 39126a87-5a20-4090-b805-b6b1eb634952
+[source, python]
+----
+In [4]: import pickle
+----
+
+// code cell end
+
+// code cell start uuid: 4aa88b7c-3155-4311-9afc-564bf3b06225
+[source, python]
+----
+In [5]: pkl_file = open(path + 'data.pkl', 'w')
+          # open file for writing
+          # Note: existing file might be overwritten
+----
+
+// code cell end
+
+The two major functions we need are +dump+, for writing objects, and +load+, for loading them into the memory:
+
+// code cell start uuid: e2611db7-97ed-4162-9cc5-127c7cd89cbd
+[source, python]
+----
+In [6]: %time pickle.dump(a, pkl_file)
+----
+
+----
+Out[6]: CPU times: user 4.3 s, sys: 43 ms, total: 4.35 s
+        Wall time: 4.36 s
+        
+----
+
+// code cell end
+
+// code cell start uuid: 1671d5b6-04cd-42ed-b7dd-ca3001521379
+[source, python]
+----
+In [7]: pkl_file
+----
+
+----
+Out[7]: <open file '/flash/data/data.pkl', mode 'w' at 0x3df0540>
+----
+
+// code cell end
+
+// code cell start uuid: f2b0c608-c399-401b-b8fa-d44d8eca54b8
+[source, python]
+----
+In [8]: pkl_file.close()
+----
+
+// code cell end
+
+We can now inspect the size of the file on disk. The +list+ object with 1,000,000 ++float++s takes about 20 megabytes (MB) of disk space:
+
+// code cell start uuid: f401db99-56f3-49a5-9c75-772fe5d00d07
+[source, python]
+----
+In [9]: ll $path*
+----
+
+----
+Out[9]: -rw-r--r-- 1 root 20970325 28. Sep 15:16 /flash/data/data.pkl
+----
+
+// code cell end
+
+Now that we have data on disk, we can read it into memory via +pickle.load+:
+
+// code cell start uuid: 8c9bd301-e980-4eb5-9021-4fde182f5eb7
+[source, python]
+----
+In [10]: pkl_file = open(path + 'data.pkl', 'r')  # open file for reading
+----
+
+// code cell end
+
+// code cell start uuid: 6c8c4ae7-1ece-4b7c-87bc-8457da4798b2
+[source, python]
+----
+In [11]: %time b = pickle.load(pkl_file)
+----
+
+----
+Out[11]: CPU times: user 3.37 s, sys: 18 ms, total: 3.38 s
+         Wall time: 3.39 s
+         
+----
+
+// code cell end
+
+// code cell start uuid: 8bf2e00b-fa06-4524-aa51-6b295fabad00
+[source, python]
+----
+In [12]: b[:5]
+----
+
+----
+Out[12]: [-3.6459230447943165,
+          1.4637510875573307,
+          2.5483218463404067,
+          0.9822259685028746,
+          3.594915396586916]
+----
+
+// code cell end
+
+Let us compare this with the first five ++float++s of the original object:
+
+// code cell start uuid: 253951a8-ecec-4fdf-a502-86cfa1d1186d
+[source, python]
+----
+In [13]: a[:5]
+----
+
+----
+Out[13]: [-3.6459230447943165,
+          1.4637510875573307,
+          2.5483218463404067,
+          0.9822259685028746,
+          3.594915396586916]
+----
+
+// code cell end
+
+To ensure that objects +a+ and +b+ are indeed the same, +NumPy+ provides the function +allclose+:
+
+// code cell start uuid: 90b9f136-8195-4f32-9907-1b88469ae55e
+[source, python]
+----
+In [14]: np.allclose(np.array(a), np.array(b))
+----
+
+----
+Out[14]: True
+----
+
+// code cell end
+
+In principle, this is the same as calculating the difference of two +ndarray+ objects and checking whether it is 0:
+
+// code cell start uuid: 066a1d61-c385-48e7-9690-fecc23e5eaf3
+[source, python]
+----
+In [15]: np.sum(np.array(a) - np.array(b))
+----
+
+----
+Out[15]: 0.0
+----
+
+// code cell end
+
+However, +allclose+ takes as a parameter a tolerance level, which by default is set to +1e-5+. 
+
+Storing and retrieving a single object with +pickle+ obviously is quite simple. What about two objects?
+
+// code cell start uuid: 7a6b9460-b5ac-4ab5-b083-9912f9dfcef8
+[source, python]
+----
+In [16]: pkl_file = open(path + 'data.pkl', 'w')  # open file for writing
+----
+
+// code cell end
+
+// code cell start uuid: bd6b8e9a-d093-4f98-b88c-27aef388957b
+[source, python]
+----
+In [17]: %time pickle.dump(np.array(a), pkl_file)
+----
+
+----
+Out[17]: CPU times: user 799 ms, sys: 47 ms, total: 846 ms
+         Wall time: 846 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: d517f9d6-8176-424c-89ef-0c892f9fd61c
+[source, python]
+----
+In [18]: %time pickle.dump(np.array(a) ** 2, pkl_file)
+----
+
+----
+Out[18]: CPU times: user 742 ms, sys: 41 ms, total: 783 ms
+         Wall time: 784 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 5f558934-6f53-472e-9040-a5c96ee1718d
+[source, python]
+----
+In [19]: pkl_file.close()
+----
+
+// code cell end
+
+// code cell start uuid: b129b0ae-6bcc-4946-817a-ff01c155eacb
+[source, python]
+----
+In [20]: ll $path*
+----
+
+----
+Out[20]: -rw-r--r-- 1 root 44098737 28. Sep 15:16 /flash/data/data.pkl
+----
+
+// code cell end
+
+What has happened? Mainly the following:
+
+* We have written an +ndarray+ version of the original object to disk.
+* We have also written a squared +ndarray+ version to disk, into the same file.
+* Both operations were faster than the original operation (due to the use of +ndarray+ objects).
+* The file is approximately double the size as before, since we have stored double the amount of data.
+
+Let us read the two +ndarray+ objects back into memory:
+
+// code cell start uuid: 59d5dceb-8779-46ff-b2ae-c2e43a7d2c10
+[source, python]
+----
+In [21]: pkl_file = open(path + 'data.pkl', 'r')  # open file for reading
+----
+
+// code cell end
+
++pickle.load+ does the job. However, notice that it only returns a single +ndarray+ object:
+
+// code cell start uuid: 0f981d7b-0a68-412d-bb9b-a377524e0f2c
+[source, python]
+----
+In [22]: x = pickle.load(pkl_file)
+         x
+----
+
+----
+Out[22]: array([-3.64592304,  1.46375109,  2.54832185, ...,  2.87048515,
+                 0.66186994, -1.38532837])
+----
+
+// code cell end
+
+Calling +pickle.load+ for the second time returns the second object:
+
+// code cell start uuid: 1a9cb2b5-a180-43f3-b2ed-20de3148b8a6
+[source, python]
+----
+In [23]: y = pickle.load(pkl_file)
+         y
+----
+
+----
+Out[23]: array([ 13.29275485,   2.14256725,   6.49394423, ...,   8.23968501,
+                  0.43807181,   1.9191347 ])
+----
+
+// code cell end
+
+// code cell start uuid: 6beb0285-c53c-4f56-ac42-62000ef75257
+[source, python]
+----
+In [24]: pkl_file.close()
+         
+----
+
+// code cell end
+
+((("first in, first out (FIFO) principle")))Obviously, +pickle+ stores objects according to the _first in, first out_ (FIFO) principle. There is one major problem with this: there is no meta-information available to the user to know beforehand what is stored in a +pickle+ file. A sometimes helpful workaround is to not store single objects, but a +dict+ object containing all the other objects:
+
+// code cell start uuid: df469b3f-55c4-43e8-a01d-f850f2153871
+[source, python]
+----
+In [25]: pkl_file = open(path + 'data.pkl', 'w')  # open file for writing
+         pickle.dump({'x' : x, 'y' : y}, pkl_file)
+         pkl_file.close()
+----
+
+// code cell end
+
+Using this approach allows us to read the whole set of objects at once and, for example, to iterate over the +dict+ object's key values:
+
+// code cell start uuid: e6f0219a-ceb4-481d-b033-065e122493c8
+[source, python]
+----
+In [26]: pkl_file = open(path + 'data.pkl', 'r')  # open file for writing
+         data = pickle.load(pkl_file)
+         pkl_file.close()
+         for key in data.keys():
+             print key, data[key][:4]
+----
+
+----
+Out[26]: y [ 13.29275485   2.14256725   6.49394423   0.96476785]
+         x [-3.64592304  1.46375109  2.54832185  0.98222597]
+         
+----
+
+// code cell end
+
+// code cell start uuid: dc3181d1-7c8c-4960-8a9a-8a4d64c58a3f
+[source, python]
+----
+In [27]: !rm -f $path*
+----
+
+// code cell end
+
+This approach, however, requires us to write and read all objects at once. This is a compromise one can probably live with in many circumstances given the much higher convenience it brings along.
+
+
+[[reading_and_writing_text_files]]
+==== Reading and Writing Text Files
+
+(((text, reading/writing text files)))(((Python, input-output operations, reading/writing text files)))(((input-output operations, with Python, reading/writing text files)))Text processing can be considered a strength of +Python+. In fact, many corporate and scientific users use +Python+ for exactly this task. With +Python+ you have a multitude of options to work with +string+ objects, as well as with text files in general.
+
+((("comma-separated value (CSV) files", "reading/writing")))Suppose we have generated quite a large set of data that we want to save and share as a comma-separated value (+CSV+) file. Although they have a special structure, such files are basically plain text files:
+
+// code cell start uuid: 5124219c-e041-4b36-af62-03faea5c0df1
+[source, python]
+----
+In [28]: rows = 5000
+         a = np.random.standard_normal((rows, 5))  # dummy data
+----
+
+// code cell end
+
+// code cell start uuid: 5942c6e2-877a-4c0c-acca-11390e9a02f5
+[source, python]
+----
+In [29]: a.round(4)
+----
+
+----
+Out[29]: array([[ 1.381 , -1.1236,  1.0622, -1.3997, -0.7374],
+                [ 0.15  ,  0.967 ,  1.8391,  0.5633,  0.0569],
+                [-0.9504,  0.4779,  1.8636, -1.9152, -0.3005],
+                ..., 
+                [ 0.8843, -1.3932, -0.0506,  0.2717, -1.4921],
+                [-1.0352,  1.0368,  0.4562, -0.0667, -1.3391],
+                [ 0.9952, -0.6398,  0.8467, -1.6951,  1.122 ]])
+----
+
+// code cell end
+
+To make the case a bit more realistic, we add date-time information to the mix and use the +pandas+ +date_range+ function to generate a series of hourly date-time points (for details, see <<fin_time_series>> and <<dates_times>>):
+
+// code cell start uuid: 32f5b082-2fcb-4090-80ba-174cc347e519
+[source, python]
+----
+In [30]: import pandas as pd
+         t = pd.date_range(start='2014/1/1', periods=rows, freq='H')
+             # set of hourly datetime objects
+----
+
+// code cell end
+
+// code cell start uuid: d52b1a47-3bca-4870-9829-1aef62f0952a
+[source, python]
+----
+In [31]: t
+----
+
+----
+Out[31]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2014-01-01 00:00:00, ..., 2014-07-28 07:00:00]
+         Length: 5000, Freq: H, Timezone: None
+----
+
+// code cell end
+
+To write the data, we need to open a new +file+ object on disk:
+
+// code cell start uuid: 39075f54-64cb-42c2-9798-be6638636a15
+[source, python]
+----
+In [32]: csv_file = open(path + 'data.csv', 'w')  # open file for writing
+----
+
+// code cell end
+
+The first line of a +CSV+ file generally contains the names for each data column stored in the file, so we write this first:
+
+// code cell start uuid: 3804898d-dae7-4de0-b0a1-976cd8e43cb3
+[source, python]
+----
+In [33]: header = 'date,no1,no2,no3,no4,no5\n'
+         csv_file.write(header)
+----
+
+// code cell end
+
+The actual data is then written row by row, merging the date-time information with the (pseudo)random numbers:
+
+// code cell start uuid: 00c96e45-bf91-42d8-b6c9-eb343ee537b7
+[source, python]
+----
+In [34]: for t_, (no1, no2, no3, no4, no5) in zip(t, a):
+             s = '%s,%f,%f,%f,%f,%f\n' % (t_, no1, no2, no3, no4, no5)
+             csv_file.write(s)
+         csv_file.close()
+----
+
+// code cell end
+
+// code cell start uuid: 03523876-01c1-410f-aac5-55fcf8aa0604
+[source, python]
+----
+In [35]: ll $path*
+----
+
+----
+Out[35]: -rw-r--r-- 1 root 337664 28. Sep 15:16 /flash/data/data.csv
+----
+
+// code cell end
+
+The other way around works quite similarly. First, open the now-existing +CSV+ file. Second, read its content line by line using the +readline+ method of the +file+ object:
+
+// code cell start uuid: b290e5d3-8e56-4d53-acae-51accd08c4f7
+[source, python]
+----
+In [36]: csv_file = open(path + 'data.csv', 'r')  # open file for reading
+----
+
+// code cell end
+
+// code cell start uuid: 7b1242f5-5892-44bd-a305-addf9daff316
+[source, python]
+----
+In [37]: for i in range(5):
+             print csv_file.readline(),
+----
+
+----
+Out[37]: date,no1,no2,no3,no4,no5
+         2014-01-01 00:00:00,1.381035,-1.123613,1.062245,-1.399746,-0.737369
+         2014-01-01 01:00:00,0.149965,0.966987,1.839130,0.563322,0.056906
+         2014-01-01 02:00:00,-0.950360,0.477881,1.863646,-1.915203,-0.300522
+         2014-01-01 03:00:00,-0.503429,-0.895489,-0.240227,-0.327176,0.123498
+         
+----
+
+// code cell end
+
+You can also read all the  content at once by using the +readlines+ method:
+
+// code cell start uuid: 00148061-9d3a-4459-b8b8-63c98f14194b
+[source, python]
+----
+In [38]: csv_file = open(path + 'data.csv', 'r')
+         content = csv_file.readlines()
+         for line in content[:5]:
+             print line,
+----
+
+----
+Out[38]: date,no1,no2,no3,no4,no5
+         2014-01-01 00:00:00,1.381035,-1.123613,1.062245,-1.399746,-0.737369
+         2014-01-01 01:00:00,0.149965,0.966987,1.839130,0.563322,0.056906
+         2014-01-01 02:00:00,-0.950360,0.477881,1.863646,-1.915203,-0.300522
+         2014-01-01 03:00:00,-0.503429,-0.895489,-0.240227,-0.327176,0.123498
+         
+----
+
+// code cell end
+
+We finish with some closing operations in this example:
+
+// code cell start uuid: 2b2384ca-8927-49e1-8070-33ef0c21a1a9
+[source, python]
+----
+In [39]: csv_file.close()
+         !rm -f $path*
+----
+
+// code cell end
+
+
+==== SQL Databases
+
+(((SQL databases, input-output operations with Python)))(((Python, input-output operations, SQL databases)))(((input-output operations, with Python, SQL databases)))+Python+ can work with any kind of +SQL+ database and in general also with any kind of +NoSQL+ database. One database that is delivered with +Python+ by default is http://www.sqlite.org[+SQLite3+]. With it, the basic +Python+ approach to +SQL+ databases can be easily illustrated:footnote:[Another first-class citizen in the database world is +MySQL+, with which +Python+ also integrates very well. While many web projects are implemented on the basis of the so-called +LAMP+ stack, which generally stands for +Linux, Apache Web server, MySQL, PHP+, there are also a large number of stacks where +Python+ replaces +PHP+ for the +P+ in the stack. For an overview of available database connectors, visit https://wiki.python.org/moin/DatabaseInterfaces[].]
+
+// code cell start uuid: 39c9650b-0430-4e66-b461-faecdb511537
+[source, python]
+----
+In [40]: import sqlite3 as sq3
+----
+
+// code cell end
+
++SQL+ queries are formulated as +string+ objects. The syntax, data types, etc. of course depend on the database in use:
+
+// code cell start uuid: 9e163352-767b-4888-a286-9a79265bb19b
+[source, python]
+----
+In [41]: query = 'CREATE TABLE numbs (Date date, No1 real, No2 real)'
+----
+
+// code cell end
+
+Open a database connection. In this case, we generate a new database file on disk:
+
+// code cell start uuid: cc01fd41-a6c6-426b-b235-42c903ff6c00
+[source, python]
+----
+In [42]: con = sq3.connect(path + 'numbs.db')
+----
+
+// code cell end
+
+Then execute the query statement to create the table by using the method +execute+:
+
+// code cell start uuid: d97dad1a-10cc-43c0-a04a-a5da9b98396b
+[source, python]
+----
+In [43]: con.execute(query)
+----
+
+----
+Out[43]: <sqlite3.Cursor at 0xb8a4490>
+----
+
+// code cell end
+
+To make the query effective, call the method +commit+:
+
+// code cell start uuid: cc2e7d31-8239-48b0-b032-f11a514d9349
+[source, python]
+----
+In [44]: con.commit()
+----
+
+// code cell end
+
+Now that we have a database file with a table, we can populate that table with data. Each row consists of date-time information and two ++float++s:
+
+// code cell start uuid: 6d76f99f-f6bb-4aad-b386-06946366bbe6
+[source, python]
+----
+In [45]: import datetime as dt
+----
+
+// code cell end
+
+A single data row can be written with the respective +SQL+ statement, as follows:
+
+// code cell start uuid: a37b7780-d824-4558-b12e-9e5dec6b3056
+[source, python]
+----
+In [46]: con.execute('INSERT INTO numbs VALUES(?, ?, ?)',
+                     (dt.datetime.now(), 0.12, 7.3))
+----
+
+----
+Out[46]: <sqlite3.Cursor at 0xb8a4570>
+----
+
+// code cell end
+
+However, you usually have to (or want to) write a larger data set in bulk:
+
+// code cell start uuid: 5d882442-b6fb-4788-81b8-9f7814a352ae
+[source, python]
+----
+In [47]: data = np.random.standard_normal((10000, 2)).round(5)
+----
+
+// code cell end
+
+// code cell start uuid: 58b51e61-ed1a-4c5e-999a-0f55072e5d32
+[source, python]
+----
+In [48]: for row in data:
+             con.execute('INSERT INTO numbs VALUES(?, ?, ?)',
+                         (dt.datetime.now(), row[0], row[1]))
+         con.commit()
+----
+
+// code cell end
+
+There is also a method called +executemany+. Since we have combined current date-time information with our pseudorandom number data set, we cannot use it here. What we can use, however, is +fetchmany+ to retrieve a certain number of rows at once from the database:
+
+// code cell start uuid: 667cbd3a-e001-4548-8679-10aec0d31354
+[source, python]
+----
+In [49]: con.execute('SELECT * FROM numbs').fetchmany(10)
+----
+
+----
+Out[49]: [(u'2014-09-28 15:16:19.486021', 0.12, 7.3),
+          (u'2014-09-28 15:16:19.762476', 0.30736, -0.21114),
+          (u'2014-09-28 15:16:19.762640', 0.95078, 0.50106),
+          (u'2014-09-28 15:16:19.762702', 0.95896, 0.15812),
+          (u'2014-09-28 15:16:19.762774', -0.42919, -1.45132),
+          (u'2014-09-28 15:16:19.762825', -0.99502, -0.91755),
+          (u'2014-09-28 15:16:19.762862', 0.25416, -0.85317),
+          (u'2014-09-28 15:16:19.762890', -0.55879, -0.36144),
+          (u'2014-09-28 15:16:19.762918', -1.61041, -1.29589),
+          (u'2014-09-28 15:16:19.762945', -2.04225, 0.43446)]
+----
+
+// code cell end
+
+Or we can just read a single data row at a time:
+
+// code cell start uuid: c9217058-4cb9-49b9-b81b-a4c370fce834
+[source, python]
+----
+In [50]: pointer = con.execute('SELECT * FROM numbs')
+----
+
+// code cell end
+
+// code cell start uuid: 7088d1c6-aed9-457a-a84a-58b1718ad164
+[source, python]
+----
+In [51]: for i in range(3):
+             print pointer.fetchone()
+----
+
+----
+Out[51]: (u'2014-09-28 15:16:19.486021', 0.12, 7.3)
+         (u'2014-09-28 15:16:19.762476', 0.30736, -0.21114)
+         (u'2014-09-28 15:16:19.762640', 0.95078, 0.50106)
+         
+----
+
+// code cell end
+
+// code cell start uuid: 3f80d448-2ff3-4e07-80ce-d8971f367a2c
+[source, python]
+----
+In [52]: con.close()
+         !rm -f $path*
+----
+
+// code cell end
+
++SQL+ databases are a rather broad topic; indeed, too broad and complex to be covered in any significant way in this chapter. The basic messages only are:
+
+* +Python+ integrates pretty well with almost any database technology.
+* The basic +SQL+ syntax is mainly determined by the database in use; the rest is, as we say, real +Pythonic+.
+
+
+==== Writing and Reading NumPy Arrays
+
+(((input-output operations, with Python, writing/reading Numpy arrays)))(((Python, input-output operations, writing/reading Numpy arrays)))(((NumPy, writing/reading arrays)))(((arrays, writing/reading NumPy)))+NumPy+ itself has functions to write and read +ndarray+ objects in a convenient and performant fashion. This saves a lot of effort in some circumstances, such as when you have to convert +NumPy+ ++dtype++s into specific database types (e.g., for +SQLite3+). To illustrate that +NumPy+ can sometimes be an efficient replacement for a +SQL+-based approach, we replicate the example from before, this time only using +NumPy+:
+
+// code cell start uuid: 55cb3a69-0ad9-41eb-9e4f-33ce8a87cf3c
+[source, python]
+----
+In [53]: import numpy as np
+----
+
+// code cell end
+
+Instead of +pandas+, we use the +arange+ function of +NumPy+ to generate an +array+ object with +datetime+ objects stored:footnote:[Cf. http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html.]
+
+// code cell start uuid: 4e65636e-de0f-49d1-bd67-b63868fb3a3a
+[source, python]
+----
+In [54]: dtimes = np.arange('2015-01-01 10:00:00', '2021-12-31 22:00:00',
+                           dtype='datetime64[m]')  # minute intervals
+         len(dtimes)
+----
+
+----
+Out[54]: 3681360
+----
+
+// code cell end
+
+What is a table in a +SQL+ database is a structured array with +NumPy+. We use a special +dtype+ object mirroring the +SQL+ table from before:
+
+// code cell start uuid: d5d873f2-4ffa-4fad-a802-9c12a9e30046
+[source, python]
+----
+In [55]: dty = np.dtype([('Date', 'datetime64[m]'), ('No1', 'f'), ('No2', 'f')])
+         data = np.zeros(len(dtimes), dtype=dty)
+----
+
+// code cell end
+
+With the +dates+ object, we populate the +Date+ column:
+
+// code cell start uuid: d8cd7ec4-a323-44db-91ba-9a8a9edde1b4
+[source, python]
+----
+In [56]: data['Date'] = dtimes
+----
+
+// code cell end
+
+The other two columns are populated as before with pseudorandom numbers:
+
+// code cell start uuid: 3f9e6dc3-23c8-46b2-b776-c5f73d22ce04
+[source, python]
+----
+In [57]: a = np.random.standard_normal((len(dtimes), 2)).round(5)
+         data['No1'] = a[:, 0]
+         data['No2'] = a[:, 1]
+----
+
+// code cell end
+
+Saving of +ndarray+ objects is highly optimized and therefore quite fast. Almost 60 MB of data takes less than 0.1 seconds to save on disk (here using an SSD):
+
+// code cell start uuid: d783e0e3-0238-49f0-b3cf-655012d25ff3
+[source, python]
+----
+In [58]: %time np.save(path + 'array', data)  # suffix .npy is added
+----
+
+----
+Out[58]: CPU times: user 0 ns, sys: 77 ms, total: 77 ms
+         Wall time: 77.1 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 329fb352-9724-4f9b-98e9-3d0d144c9cf9
+[source, python]
+----
+In [59]: ll $path*
+----
+
+----
+Out[59]: -rw-r--r-- 1 root 58901888 28. Sep 15:16 /flash/data/array.npy
+----
+
+// code cell end
+
+Reading is even faster:
+
+// code cell start uuid: b5f60285-80a3-4caa-b528-064b5302464b
+[source, python]
+----
+In [60]: %time np.load(path + 'array.npy')
+----
+
+----
+Out[60]: CPU times: user 10 ms, sys: 29 ms, total: 39 ms
+         Wall time: 37.8 ms
+         
+         array([ (datetime.datetime(2015, 1, 1, 9, 0), -1.4985100030899048,
+         0.9664400219917297),
+                (datetime.datetime(2015, 1, 1, 9, 1), -0.2501699924468994,
+         -0.9184499979019165),
+                (datetime.datetime(2015, 1, 1, 9, 2), 1.2026900053024292,
+         0.49570000171661377),
+                ...,
+                (datetime.datetime(2021, 12, 31, 20, 57), 0.8927800059318542,
+         -1.0334899425506592),
+                (datetime.datetime(2021, 12, 31, 20, 58), 1.0062999725341797,
+         -1.3476499915122986),
+                (datetime.datetime(2021, 12, 31, 20, 59), -0.08011999726295471, 
+         0.4992400109767914)], 
+               dtype=[('Date', '<M8[m]'), ('No1', '<f4'), ('No2', '<f4')])
+----
+
+// code cell end
+
+A data set of 60 MB is not that large. Therefore, let us try a somewhat larger +ndarray+ object:
+
+// code cell start uuid: d10836fb-aa11-4fb9-8c2c-24d46f48b46b
+[source, python]
+----
+In [61]: data = np.random.standard_normal((10000, 6000))
+----
+
+// code cell end
+
+// code cell start uuid: 2b48a768-2abb-46c1-9499-946e4e43f26e
+[source, python]
+----
+In [62]: %time np.save(path + 'array', data) 
+----
+
+----
+Out[62]: CPU times: user 0 ns, sys: 631 ms, total: 631 ms
+         Wall time: 633 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: c0de71b2-0d43-4752-82e4-982cc40fc47a
+[source, python]
+----
+In [63]: ll $path*
+----
+
+----
+Out[63]: -rw-r--r-- 1 root 480000080 28. Sep 15:16 /flash/data/array.npy
+----
+
+// code cell end
+
+In this case, the file on disk is about 480 MB large and it is written in less than a second. This illustrates that writing to disk in this case is mainly hardware-bound, since 480 MB/s represents roughly the advertised writing speed of better SSDs at the time of this writing (512 MB/s). Reading the file/object from disk is even faster (note that caching techniques might also play a role here):
+
+// code cell start uuid: 3bedfde2-d212-40e6-a043-379e416fcc08
+[source, python]
+----
+In [64]: %time np.load(path + 'array.npy')
+----
+
+----
+Out[64]: CPU times: user 2 ms, sys: 216 ms, total: 218 ms
+         Wall time: 216 ms
+         
+         array([[ 0.10989742, -0.48626177, -0.60849881, ..., -0.99051776,
+                  0.88124291, -1.34261656],
+                [-0.42301145,  0.29831708,  1.29729826, ..., -0.73426192,
+                 -0.13484905,  0.91787421],
+                [ 0.12322789, -0.28728811,  0.85956891, ...,  1.47888978,
+                 -1.12452641, -0.528133  ],
+                ..., 
+                [ 0.06507559, -0.37130379,  1.35427048, ..., -1.4457718 ,
+                  0.49509821,  0.0738847 ],
+                [ 1.76525714, -0.07876135, -2.94133788, ..., -0.62581084,
+                  0.0933164 ,  1.55788205],
+                [-1.18439949, -0.73210571, -0.45845113, ...,  0.0528656 ,
+                 -0.39526633, -0.5964333 ]])
+----
+
+// code cell end
+
+// code cell start uuid: b5de422d-014e-4f1f-b80c-4c1333920a57
+[source, python]
+----
+In [65]: data = 0.0
+         !rm -f $path*
+----
+
+// code cell end
+
+In any case, you can expect that this form of data storage and retrieval is much, much faster as compared to +SQL+ databases or using the standard +pickle+ library for serialization. Of course, you do not have the functionality of a +SQL+ database available with this approach, but +PyTables+ will help in this regard, as subsequent sections show.
+
+
+=== I/O with pandas
+
+(((pandas library, data formats supported)))(((data, formats supported by pandas library)))One of the major strengths of the +pandas+ library is that it can read and write different data formats natively, including among others:
+
+* +CSV+ (comma-separated value)
+* +SQL+ (+Structured Query Language+)
+* +XLS/XSLX+ (Microsoft +Excel+ files)
+* +JSON+ (+JavaScript+ +Object Notation+)
+* +HTML+ (+HyperText Markup Language+)
+
+(((DataFrame class, parameters of DataFrame function)))<<io_pandas>> lists all the supported formats and the corresponding import and export functions/methods of +pandas+. The parameters that the import functions take are listed and described in <<read_csv_params>> (depending on the functions, some other conventions might apply).
+
+[[io_pandas]]
+.Parameters of DataFrame function
+[options="header, unbreakable"]
+|=======
+|Format     |Input                  | Output | Remark
+|+CSV+      |+read_csv+            |+to_csv+| Text file
+|+XLS/XLSX+  |+read_excel+         |+to_excel+| Spreadsheet
+|+HDF+      |+read_hdf+           |+to_hdf+| +HDF5+ database
+|+SQL+      |+read_sql+           |+to_sql+| +SQL+ table
+|+JSON+     |+read_json+          |+to_json+| +JavaScript Object Notation+
+|+MSGPACK+   |+read_msgpack+        |+to_msgpack+|Portable binary format
+|+HTML+     |+read_html+            |+to_html+| +HTML+ code
+|+GBQ+      |+read_gbq+             |+to_gbq+| +Google Big Query+ format
+|+DTA+      |+read_stata+            |+to_stata+ | Formats 104, 105, 108, 113-115, 117
+|Any        |+read_clipboard+        |+to_clipboard+|E.g., from +HTML+ page
+|Any        |+read_pickle+           |+to_pickle+|(Structured) +Python+ object
+|=======
+
+Our test case will again be a large set of floating-point numbers:
+
+// code cell start uuid: e0ba11e0-7bdf-4e1f-b8a2-0566cb5ab7a7
+[source, python]
+----
+In [66]: import numpy as np
+         import pandas as pd
+         data = np.random.standard_normal((1000000, 5)).round(5)
+                 # sample data set
+----
+
+// code cell end
+
+// code cell start uuid: 366021ec-1265-4fef-ae96-b280c7f3cd2b
+[source, python]
+----
+In [67]: filename = path + 'numbs'
+----
+
+// code cell end
+
+To this end, we will also revisit +SQLite3+ and will compare the performance with alternative approaches using +pandas+.
+
+==== SQL Database
+
+(((input-output operations, with pandas, SQL databases)))(((SQL databases, input-output operations with pandas)))(((pandas library, input-output operations, SQL databases)))All that follows with regard to +SQLite3+ should be known by now:
+
+// code cell start uuid: ec2ee399-b7d1-4900-b9d8-f4e76492954e
+[source, python]
+----
+In [68]: import sqlite3 as sq3
+----
+
+// code cell end
+
+// code cell start uuid: 296ae8af-8da3-4f6d-98bd-2816374d8526
+[source, python]
+----
+In [69]: query = 'CREATE TABLE numbers (No1 real, No2 real,\
+                 No3 real, No4 real, No5 real)'
+----
+
+// code cell end
+
+// code cell start uuid: 41eac653-cff4-4bab-b27a-18982f4b6159
+[source, python]
+----
+In [70]: con = sq3.Connection(filename + '.db')
+----
+
+// code cell end
+
+// code cell start uuid: 8c1f7339-7383-4716-b1dc-d18bdd651bfe
+[source, python]
+----
+In [71]: con.execute(query)
+----
+
+----
+Out[71]: <sqlite3.Cursor at 0x9d59c00>
+----
+
+// code cell end
+
+This time, +executemany+ can be applied since we write from a single +ndarray+ object:
+
+// code cell start uuid: c9bd1eba-510d-4b60-89bf-88dd90e96b4f
+[source, python]
+----
+In [72]: %%time
+         con.executemany('INSERT INTO numbers VALUES (?, ?, ?, ?, ?)', data)
+         con.commit()
+----
+
+----
+Out[72]: CPU times: user 13.9 s, sys: 229 ms, total: 14.2 s
+         Wall time: 14.9 s
+         
+----
+
+// code cell end
+
+// code cell start uuid: f2331de4-877b-48fe-aac1-fd823af82b24
+[source, python]
+----
+In [73]: ll $path*
+----
+
+----
+Out[73]: -rw-r--r-- 1 root 54446080 28. Sep 15:16 /flash/data/numbs.db
+----
+
+// code cell end
+
+Writing the whole data set of 1,000,000 rows takes quite a while. The reading of the whole table into a +list+ object is much faster:
+
+// code cell start uuid: 36c34da0-f8d8-4bf5-8241-45266a118747
+[source, python]
+----
+In [74]: %%time
+         temp = con.execute('SELECT * FROM numbers').fetchall()
+         print temp[:2]
+         temp = 0.0
+----
+
+----
+Out[74]: [(-1.67378, -0.58292, -1.10616, 1.14929, -0.0393), (1.38006, 0.82665, 0
+         .34168, -1.1676, -0.53274)]
+         CPU times: user 1.54 s, sys: 138 ms, total: 1.68 s
+         Wall time: 1.68 s
+         
+----
+
+// code cell end
+
+Reading +SQL+ query results directly into a +NumPy+ +ndarray+ object is easily accomplished. Accordingly, you can also easily plot the results of such a query, as shown by the following code and the output in <<scatter_query>>:
+
+// code cell start uuid: 1ed09d3f-24a5-4936-b64c-a205182b5910
+[source, python]
+----
+In [75]: %%time
+         query = 'SELECT * FROM numbers WHERE No1 > 0 AND No2 < 0'
+         res = np.array(con.execute(query).fetchall()).round(3)
+----
+
+----
+Out[75]: CPU times: user 766 ms, sys: 34 ms, total: 800 ms
+         Wall time: 799 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: d3100151-5563-48ca-8ba6-cc9a623d03cc
+[source, python]
+----
+In [76]: res = res[::100]  # every 100th result
+         import matplotlib.pyplot as plt
+         %matplotlib inline
+         plt.plot(res[:, 0], res[:, 1], 'ro')
+         plt.grid(True); plt.xlim(-0.5, 4.5); plt.ylim(-4.5, 0.5)
+----
+
+[[scatter_query]]
+.Plot of the query result
+image::images/pyfi_0701.png[]
+
+// code cell end
+
+
+==== From SQL to pandas
+
+(((pandas library, input-output operations, from SQL to pandas)))(((input-output operations, with pandas, from SQL to pandas)))A generally more efficient approach, however, is the reading of either whole tables or query results with +pandas+. When you are able to read a whole table into memory, analytical queries can generally be executed much faster than when using the +SQL+ disk-based approach. The sublibrary +pandas.io.sql+ contains functions to handle data stored in +SQL+ databases:
+
+// code cell start uuid: 300b95ab-eeff-46e7-a257-80e8fdf37ee6
+[source, python]
+----
+In [77]: import pandas.io.sql as pds
+----
+
+// code cell end
+
+Reading the whole table with +pandas+ takes roughly the same amount of time as reading it into a +NumPy+ +ndarray+ object. There as here, the bottleneck is the +SQL+ database:
+
+// code cell start uuid: d446ef85-a7d0-4aba-8b93-d2d60a1aee9b
+[source, python]
+----
+In [78]: %time data = pds.read_sql('SELECT * FROM numbers', con)
+----
+
+----
+Out[78]: CPU times: user 2.16 s, sys: 60 ms, total: 2.22 s
+         Wall time: 2.23 s
+         
+----
+
+// code cell end
+
+// code cell start uuid: 052c40c0-6bb7-4084-9e84-da330dca43db
+[source, python]
+----
+In [79]: data.head()
+----
+
+----
+Out[79]:        No1      No2      No3      No4      No5
+         0 -1.67378 -0.58292 -1.10616  1.14929 -0.03930
+         1  1.38006  0.82665  0.34168 -1.16760 -0.53274
+         2  0.79329  0.11947  2.06403 -0.36208  1.77442
+         3 -0.33507 -0.00715 -1.01193  0.23157  1.30225
+         4 -0.35292  0.67483  1.59507 -1.21263  0.14745
+         
+         [5 rows x 5 columns]
+----
+
+// code cell end
+
+The data is now in-memory. This allows for much faster analytics. The +SQL+ query that takes a few seconds with +SQLite3+ finishes in less than 0.1 seconds with +pandas+ pass:[<phrase role='keep-together'>in-memory:</phrase>]
+
+// code cell start uuid: a5f5d023-dfbb-4b54-a622-38a48b3d00a1
+[source, python]
+----
+In [80]: %time data[(data['No1'] > 0) & (data['No2'] < 0)].head()
+----
+
+----
+Out[80]: CPU times: user 50 ms, sys: 0 ns, total: 50 ms
+         Wall time: 49.9 ms
+         
+                 No1      No2      No3      No4      No5
+         6   1.17749 -1.13017 -0.24176 -0.64047  1.58002
+         8   0.18625 -0.99949  2.29854  0.91816 -0.92661
+         9   1.09481 -0.26301  1.11341  0.68716 -0.71524
+         18  0.31836 -0.33039 -1.50109  0.52961  0.96595
+         20  0.40261 -0.45917  0.37339 -1.09515  0.23972
+         
+         [5 rows x 5 columns]
+----
+
+// code cell end
+
+++pandas++ can master even more complex queries, although it is neither meant nor able to replace +SQL+ databases when it comes to complex, relational data structures. The result of the next query is shown in <<data_scatter_1>>:
+
+// code cell start uuid: 2aa6d1e0-e157-4d5b-8a43-3fc696679511
+[source, python]
+----
+In [81]: %%time
+         res = data[['No1', 'No2']][((data['No1'] > 0.5) | (data['No1'] < -0.5))
+                              & ((data['No2'] < -1) | (data['No2'] > 1))]
+----
+
+----
+Out[81]: CPU times: user 49 ms, sys: 0 ns, total: 49 ms
+         Wall time: 48.7 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: d46cc119-c34b-4d3f-becd-f625c1a70f78
+[source, python]
+----
+In [82]: plt.plot(res.No1, res.No2, 'ro')
+         plt.grid(True); plt.axis('tight')
+----
+
+[[data_scatter_1]]
+.Scatter plot of complex query result
+image::images/pyfi_0702.png[]
+
+
+// code cell end
+
+As expected, using the in-memory analytics capabilities of +pandas+ leads to a significant speedup, provided +pandas+ is able to replicate the respective +SQL+ statement. This is not the only advantage of using +pandas+, though +pandas+ is tightly integrated with +PyTables+, which is the topic of the next section. Here, it suffices to know that the combination of both can speed up I/O operations considerably. This is shown in the following:
+
+// code cell start uuid: 7017f5f6-2a19-4d1e-b256-4936081ab91a
+[source, python]
+----
+In [83]: h5s = pd.HDFStore(filename + '.h5s', 'w')
+----
+
+// code cell end
+
+// code cell start uuid: eec6ad05-c74e-49e9-bd35-965d56ba3bc9
+[source, python]
+----
+In [84]: %time h5s['data'] = data
+----
+
+----
+Out[84]: CPU times: user 43 ms, sys: 60 ms, total: 103 ms
+         Wall time: 161 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 69057178-872b-4080-8d36-3ea1d9b56b18
+[source, python]
+----
+In [85]: h5s
+----
+
+----
+Out[85]: <class 'pandas.io.pytables.HDFStore'>
+         File path: /flash/data/numbs.h5s
+         /data            frame        (shape->[1000000,5])
+----
+
+// code cell end
+
+// code cell start uuid: 179c2cf9-9505-4e1a-b6fc-f71429bbfd6d
+[source, python]
+----
+In [86]: h5s.close()
+----
+
+// code cell end
+
+The whole +DataFrame+ with all the data from the original +SQL+ table is written in well below 1 second. Reading is even faster, as is to be expected:
+
+// code cell start uuid: f13d24ff-afa4-453c-b098-ce986f0ec341
+[source, python]
+----
+In [87]: %%time
+         h5s = pd.HDFStore(filename + '.h5s', 'r')
+         temp = h5s['data']
+         h5s.close()
+----
+
+----
+Out[87]: CPU times: user 13 ms, sys: 22 ms, total: 35 ms
+         Wall time: 32.7 ms
+         
+----
+
+// code cell end
+
+A brief check of whether the data sets are indeed the same:
+
+// code cell start uuid: 96b612da-9d26-498d-9b79-716d0bc9c5fa
+[source, python]
+----
+In [88]: np.allclose(np.array(temp), np.array(data))
+----
+
+----
+Out[88]: True
+----
+
+// code cell end
+
+// code cell start uuid: 1e46b72f-22e2-4cc1-84a9-3c238f47c128
+[source, python]
+----
+In [89]: temp = 0.0
+----
+
+// code cell end
+
+Also, a look at the two files now on disk, showing that the +HDF5+ format consumes somewhat less disk space:
+
+// code cell start uuid: 8d68e5ac-7434-4e1c-b5b8-0c6f03171826
+[source, python]
+----
+In [90]: ll $path*
+----
+
+----
+Out[90]: -rw-r--r-- 1 root 54446080 28. Sep 15:16 /flash/data/numbs.db
+         -rw-r--r-- 1 root 48007368 28. Sep 15:16 /flash/data/numbs.h5s
+----
+
+// code cell end
+
+As a summary, we can state the following with regard to our dummy data set, which is roughly 50 MB in size:
+
+* Writing the data with +SQLite3+ takes _multiple seconds_, with +pandas+ taking much _less than a second_.
+* Reading the data from the +SQL+ database takes a bit more than _a few seconds_, with +pandas+ taking less than _0.1 second_.
+
+
+==== Data as CSV File
+
+(((comma-separated value (CSV) files, input-output operations with pandas)))(((pandas library, input-output operations, data as CSV file)))(((input-output operations, with pandas, data as CSV file)))One of the most widely used formats to exchange data is the +CSV+ format. Although it is not really standardized, it can be processed by any platform and the vast majority of applications concerned with data and financial analytics. The previous section shows how to write and read data to and from +CSV+ files step by step with standard +Python+ functionality (cf. <<reading_and_writing_text_files>>). +pandas+ makes this whole procedure a bit more convenient, the code more concise, and the execution in general faster:
+
+// code cell start uuid: 7925d095-cbde-430b-b2ef-f0f143df15b8
+[source, python]
+----
+In [91]: %time data.to_csv(filename + '.csv')
+----
+
+----
+Out[91]: CPU times: user 5.55 s, sys: 137 ms, total: 5.69 s
+         Wall time: 5.87 s
+         
+----
+
+// code cell end
+
+Reading the data now stored in the +CSV+ file and plotting it is accomplished with the +read_csv+ function (cf. <<data_hist_3>> for the result):
+
+// code cell start uuid: 074e493b-576f-4a3d-a9b5-cafd2045c75c
+[source, python]
+----
+In [92]: %%time
+         pd.read_csv(filename + '.csv')[['No1', 'No2',
+                                         'No3', 'No4']].hist(bins=20)
+----
+
+----
+Out[92]: CPU times: user 1.72 s, sys: 54 ms, total: 1.77 s
+         Wall time: 1.78 s
+         
+----
+
+[[data_hist_3]]
+.Histogram of four data sets
+image::images/pyfi_0703.png[]
+
+// code cell end
+
+
+==== Data as Excel File
+
+(((Excel, file input-output operations)))(((pandas library, input-output operations, data as Excel file)))(((input-output operations, with pandas, data as Excel file)))Although working with +Excel+ spreadsheets is the topic of a later chapter, we want to briefly demonstrate how +pandas+ can write data in +Excel+ format and read data from +Excel+ spreadsheets. We restrict the data set to 100,000 rows in this case:
+
+// code cell start uuid: 735350dc-e6af-4ee7-8f27-2505b3454682
+[source, python]
+----
+In [93]: %time data[:100000].to_excel(filename + '.xlsx')
+----
+
+----
+Out[93]: CPU times: user 27.5 s, sys: 131 ms, total: 27.6 s
+         Wall time: 27.7 s
+         
+----
+
+// code cell end
+
+Generating the ++Excel++ spreadsheet with this small subset of the data takes quite a while. This illustrates what kind of overhead the spreadsheet structure brings along with it. Reading (and plotting) the data is a faster procedure (cf. <<data_paths>>):
+
+// code cell start uuid: 0d2365b9-28b2-4bb5-8515-4c9ca628ec00
+[source, python]
+----
+In [94]: %time pd.read_excel(filename + '.xlsx', 'Sheet1').cumsum().plot()
+----
+
+----
+Out[94]: CPU times: user 12.9 s, sys: 6 ms, total: 12.9 s
+         Wall time: 12.9 s
+         
+----
+
+[[data_paths]]
+.Paths of random data from Excel file
+image::images/pyfi_0704.png[]
+
+// code cell end
+
+Inspection of the generated files reveals that the +DataFrame+ with +HDFStore+ combination is the most compact alternative (using compression, as described later in this chapter, further increases the benefits). The same amount of data as a +CSV+ file--i.e., as a text file--is somewhat larger in size. This is one reason for the slower performance when working with +CSV+ files, the other being the very fact that they are "only" general text files:
+
+// code cell start uuid: 0f0f0a19-994c-43ff-940f-9cd05b94a0cd
+[source, python]
+----
+In [95]: ll $path*
+----
+
+----
+Out[95]: -rw-r--r-- 1 root 48831681 28. Sep 15:17 /flash/data/numbs.csv
+         -rw-r--r-- 1 root 54446080 28. Sep 15:16 /flash/data/numbs.db
+         -rw-r--r-- 1 root 48007368 28. Sep 15:16 /flash/data/numbs.h5s
+         -rw-r--r-- 1 root  4311424 28. Sep 15:17 /flash/data/numbs.xlsx
+----
+
+// code cell end
+
+// code cell start uuid: 638a2e35-0a12-41be-9743-c7f4f4afcb23
+[source, python]
+----
+In [96]: rm -f $path*
+----
+
+// code cell end
+
+
+=== Fast I/O with PyTables
+
+(((PyTables, importing)))(((PyTables, benefits of)))+PyTables+ is a +Python+ binding for the +HDF5+ database/file standard (cf. http://www.hdfgroup.org). It is specifically designed to optimize the performance of I/O operations and make best use of the available hardware. The library's import name is +tables+. Similar to +pandas+ when it comes to in-memory analytics, +PyTables+ is neither able nor meant to be a full replacement for +SQL+ databases. However, it brings along some features that further close the gap. For example, a +PyTables+ database can have many tables, and it supports compression and indexing and also nontrivial queries on tables. In addition, it can store +NumPy+ arrays efficiently and has its own flavor of array-like data structures.
+
+We begin with a few imports:
+
+// code cell start uuid: b671c317-5247-4a6b-94c9-0ee2850decba
+[source, python]
+----
+In [97]: import numpy as np
+         import tables as tb
+         import datetime as dt
+         import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+
+==== Working with Tables
+
+(((input-output operations, with PyTables, working with tables)))(((tables, working with)))(((PyTables, input-output operations, working with tables)))+PyTables+ provides a file-based database format:
+
+// code cell start uuid: 4f7391d1-2f86-4913-af4d-2c603c970605
+[source, python]
+----
+In [98]: filename = path + 'tab.h5'
+         h5 = tb.open_file(filename, 'w') 
+----
+
+// code cell end
+
+For our example case, we generate a table with 2,000,000 rows of data:
+
+// code cell start uuid: 28c4dabe-bfbe-4a90-bd60-072c2e8f1aa1
+[source, python]
+----
+In [99]: rows = 2000000
+----
+
+// code cell end
+
+The table itself has a +datetime+ column, two +int+ columns, and two +float+ columns:
+
+// code cell start uuid: 60a374d2-b78c-4473-b17a-69982fd27a4c
+[source, python]
+----
+In [100]: row_des = {
+              'Date': tb.StringCol(26, pos=1),
+              'No1': tb.IntCol(pos=2),
+              'No2': tb.IntCol(pos=3),
+              'No3': tb.Float64Col(pos=4),
+              'No4': tb.Float64Col(pos=5)
+              }
+----
+
+// code cell end
+
+When creating the table, we choose no compression. A later example will add compression as well:
+
+// code cell start uuid: 027696b8-2e1b-489f-8cb6-c24c6c3702ee
+[source, python]
+----
+In [101]: filters = tb.Filters(complevel=0)  # no compression
+          tab = h5.create_table('/', 'ints_floats', row_des,
+                                title='Integers and Floats',
+                                expectedrows=rows, filters=filters)
+----
+
+// code cell end
+
+// code cell start uuid: 71ce6940-bde4-437f-9daa-f2f577f3cd7e
+[source, python]
+----
+In [102]: tab
+----
+
+----
+Out[102]: /ints_floats (Table(0,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+----
+
+// code cell end
+
+// code cell start uuid: 3830afd0-0a7b-439a-81b2-c81194deb7a5
+[source, python]
+----
+In [103]: pointer = tab.row
+----
+
+// code cell end
+
+Now we generate the sample data:
+
+// code cell start uuid: 493096c9-7a8e-4342-b7c3-9390cbc03c6b
+[source, python]
+----
+In [104]: ran_int = np.random.randint(0, 10000, size=(rows, 2))
+          ran_flo = np.random.standard_normal((rows, 2)).round(5)
+----
+
+// code cell end
+
+The sample data set is written row-by-row to the table:
+
+// code cell start uuid: a15c64b5-17f2-4e11-b051-a6d68ba4bf7f
+[source, python]
+----
+In [105]: %%time
+          for i in range(rows):
+              pointer['Date'] = dt.datetime.now()
+              pointer['No1'] = ran_int[i, 0]
+              pointer['No2'] = ran_int[i, 1]
+              pointer['No3'] = ran_flo[i, 0]
+              pointer['No4'] = ran_flo[i, 1]
+              pointer.append()
+                # this appends the data and
+                # moves the pointer one row forward
+          tab.flush()
+----
+
+----
+Out[105]: CPU times: user 15.7 s, sys: 3.53 s, total: 19.2 s
+          Wall time: 19.4 s
+          
+----
+
+// code cell end
+
+Always remember to commit your changes. What the +commit+ method is for the +SQLite3+ database, the +flush+ method is for +PyTables+. We can now inspect the data on disk, first logically via our +Table+ object and second physically via the file information:
+
+++++
+<?hard-pagebreak?>
+++++
+
+// code cell start uuid: 0d0739a9-79a3-410a-abf0-20f6b8cef8c5
+[source, python]
+----
+In [106]: tab
+----
+
+----
+Out[106]: /ints_floats (Table(2000000,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+----
+
+// code cell end
+
+// code cell start uuid: cff18aaa-9959-41a9-8f05-8ba42192368c
+[source, python]
+----
+In [107]: ll $path*
+----
+
+----
+Out[107]: -rw-r--r-- 1 root 100156256 28. Sep 15:18 /flash/data/tab.h5
+----
+
+// code cell end
+
+There is a more performant and +Pythonic+ way to accomplish the same result, by the use of +NumPy+ structured arrays:
+
+// code cell start uuid: 2b81e6f0-86a1-429f-8d7c-ac4bbdcdd616
+[source, python]
+----
+In [108]: dty = np.dtype([('Date', 'S26'), ('No1', '<i4'), ('No2', '<i4'),
+                                           ('No3', '<f8'), ('No4', '<f8')])
+          sarray = np.zeros(len(ran_int), dtype=dty)
+----
+
+// code cell end
+
+// code cell start uuid: 15ef6c1c-c760-4bdd-9e1b-fe46c108abf8
+[source, python]
+----
+In [109]: sarray
+----
+
+----
+Out[109]: array([('', 0, 0, 0.0, 0.0), ('', 0, 0, 0.0, 0.0),
+          ('', 0, 0, 0.0, 0.0),
+                 ..., ('', 0, 0, 0.0, 0.0), ('', 0, 0, 0.0, 0.0),
+                 ('', 0, 0, 0.0, 0.0)], 
+                dtype=[('Date', 'S26'), ('No1', '<i4'), ('No2', '<i4'), ('No3', 
+          '<f8'), ('No4', '<f8')])
+----
+
+// code cell end
+
+// code cell start uuid: 87071ae4-4ff2-402e-8746-037fee04b07c
+[source, python]
+----
+In [110]: %%time
+          sarray['Date'] = dt.datetime.now()
+          sarray['No1'] = ran_int[:, 0]
+          sarray['No2'] = ran_int[:, 1]
+          sarray['No3'] = ran_flo[:, 0]
+          sarray['No4'] = ran_flo[:, 1]
+----
+
+----
+Out[110]: CPU times: user 113 ms, sys: 18 ms, total: 131 ms
+          Wall time: 131 ms
+          
+----
+
+// code cell end
+
+Equipped with the complete data set now stored in the structured array, the creation of the table boils down to the following line of code. Note that the row description is not needed anymore; +PyTables+ uses the +NumPy+ +dtype+ instead:
+
+// code cell start uuid: 992c3894-7eb7-4699-9e6b-2a6fb4e6eabf
+[source, python]
+----
+In [111]: %%time
+          h5.create_table('/', 'ints_floats_from_array', sarray,
+                                title='Integers and Floats',
+                                expectedrows=rows, filters=filters)
+----
+
+----
+Out[111]: CPU times: user 38 ms, sys: 117 ms, total: 155 ms
+          Wall time: 154 ms
+          
+          /ints_floats_from_array (Table(2000000,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+----
+
+// code cell end
+
+Being an order of magnitude faster than the previous approach, this approach achieves the same result and also needs less code:
+
+// code cell start uuid: a7616365-19cf-4cbb-a6a0-01c3b88cb457
+[source, python]
+----
+In [112]: h5
+----
+
+----
+Out[112]: File(filename=/flash/data/tab.h5, title=u'', mode='w', root_uep='/',
+          filters=Filters(complevel=0, shuffle=False, fletcher32=False,
+          least_significant_digit=None))
+          / (RootGroup) u''
+          /ints_floats (Table(2000000,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+          /ints_floats_from_array (Table(2000000,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+----
+
+// code cell end
+
+We can now delete the duplicate table, since it is no longer needed:
+
+// code cell start uuid: f498bb1c-ef46-4ee9-956d-21f292687323
+[source, python]
+----
+In [113]: h5.remove_node('/', 'ints_floats_from_array')
+----
+
+// code cell end
+
+The +Table+ object behaves like typical +Python+ and +NumPy+ objects when it comes to slicing, for example:
+
+// code cell start uuid: e99634bc-effd-43ee-ac2e-4b66b925433b
+[source, python]
+----
+In [114]: tab[:3]
+----
+
+----
+Out[114]: array([('2014-09-28 15:17:57.631234', 4342, 1672, -0.9293, 0.06343),
+                 ('2014-09-28 15:17:57.631368', 3839, 1563, -2.02808, 0.3964),
+                 ('2014-09-28 15:17:57.631383', 5100, 1326, 0.03401, 0.46742)], 
+                dtype=[('Date', 'S26'), ('No1', '<i4'), ('No2', '<i4'), ('No3', 
+          '<f8'), ('No4', '<f8')])
+----
+
+// code cell end
+
+Similarly, we can select single columns only:
+
+++++
+<?hard-pagebreak?>
+++++
+
+// code cell start uuid: d84a41bd-36d3-4e11-8a4d-44440551a493
+[source, python]
+----
+In [115]: tab[:4]['No4']
+----
+
+----
+Out[115]: array([ 0.06343,  0.3964 ,  0.46742, -0.56959])
+----
+
+// code cell end
+
+Even more convenient and important: we can apply +NumPy+ universal functions to tables or subsets of the table:
+
+// code cell start uuid: f7616601-4e98-42cc-9935-c855877d178c
+[source, python]
+----
+In [116]: %time np.sum(tab[:]['No3'])
+----
+
+----
+Out[116]: CPU times: user 31 ms, sys: 58 ms, total: 89 ms
+          Wall time: 88.3 ms
+          
+          -115.34513999999896
+----
+
+// code cell end
+
+// code cell start uuid: 9061ed32-44db-4c13-a44a-92b313b4af40
+[source, python]
+----
+In [117]: %time np.sum(np.sqrt(tab[:]['No1']))
+----
+
+----
+Out[117]: CPU times: user 53 ms, sys: 48 ms, total: 101 ms
+          Wall time: 101 ms
+          
+          133360523.08794475
+----
+
+// code cell end
+
+When it comes to plotting, the +Table+ object also behaves very similarly to an +ndarray+ object (cf. <<data_hist>>):
+
+// code cell start uuid: 558b4627-15f8-4a8f-8d5a-fc7213ee074e
+[source, python]
+----
+In [118]: %%time
+          plt.hist(tab[:]['No3'], bins=30)
+          plt.grid(True)
+          print len(tab[:]['No3'])
+----
+
+----
+Out[118]: 2000000
+          CPU times: user 396 ms, sys: 89 ms, total: 485 ms
+          Wall time: 485 ms
+          
+----
+
+[[data_hist]]
+.Histogram of data
+image::images/pyfi_0705.png[]
+
+// code cell end
+
+And, of course, we have rather flexible tools to query data via typical +SQL+-like statements, as in the following example (the result of which is neatly illustrated in <<scatter_data>>; compare it with <<data_scatter_1>>, based on a +pandas+ query):
+
+// code cell start uuid: 62ea755e-493b-4230-96ad-0ce7a0a33acc
+[source, python]
+----
+In [119]: %%time
+          res = np.array([(row['No3'], row['No4']) for row in
+                  tab.where('((No3 < -0.5) | (No3 > 0.5)) \
+                           & ((No4 < -1) | (No4 > 1))')])[::100]
+----
+
+----
+Out[119]: CPU times: user 530 ms, sys: 52 ms, total: 582 ms
+          Wall time: 469 ms
+          
+----
+
+// code cell end
+
+// code cell start uuid: 705d91ca-dc94-4db1-84d7-164fb5f5f1af
+[source, python]
+----
+In [120]: plt.plot(res.T[0], res.T[1], 'ro')
+          plt.grid(True)
+----
+
+[[scatter_data]]
+.Scatter plot of query result
+image::images/pyfi_0706.png[]
+
+// code cell end
+
+.Fast Complex Queries
+[TIP]
+====
+(((queries)))Both +pandas+ and +PyTables+ are able to process complex, +SQL+-like queries and selections. They are both optimized for speed when it comes to such operations.
+====
+
+As the following examples show, working with data stored in +PyTables+ as a +Table+ object makes you feel like you are working with +NumPy+ and in-memory, both from a _syntax_ and a _performance_ point of view:
+
+// code cell start uuid: a9e8e16c-9af5-48dc-bf5c-39b353f5c09b
+[source, python]
+----
+In [121]: %%time
+          values = tab.cols.No3[:]
+          print "Max %18.3f" % values.max()
+          print "Ave %18.3f" % values.mean()
+          print "Min %18.3f" % values.min()
+          print "Std %18.3f" % values.std()
+----
+
+----
+Out[121]: Max              5.152
+          Ave             -0.000
+          Min             -5.537
+          Std              1.000
+          CPU times: user 44 ms, sys: 39 ms, total: 83 ms
+          Wall time: 82.6 ms
+          
+----
+
+// code cell end
+
+// code cell start uuid: 6cfb0992-c393-45b0-999b-b242ea9c1ce6
+[source, python]
+----
+In [122]: %%time
+          results = [(row['No1'], row['No2']) for row in
+                     tab.where('((No1 > 9800) | (No1 < 200)) \
+                              & ((No2 > 4500) & (No2 < 5500))')]
+          for res in results[:4]:
+              print res
+----
+
+----
+Out[122]: (9987, 4965)
+          (9934, 5263)
+          (9960, 4729)
+          (130, 5023)
+          CPU times: user 167 ms, sys: 37 ms, total: 204 ms
+          Wall time: 118 ms
+          
+----
+
+// code cell end
+
+// code cell start uuid: 399c76db-4f79-4264-b25f-50eab32303e0
+[source, python]
+----
+In [123]: %%time
+          results = [(row['No1'], row['No2']) for row in
+                     tab.where('(No1 == 1234) & (No2 > 9776)')]
+          for res in results:
+              print res
+----
+
+----
+Out[123]: (1234, 9805)
+          (1234, 9785)
+          (1234, 9821)
+          CPU times: user 93 ms, sys: 40 ms, total: 133 ms
+          Wall time: 90.1 ms
+          
+----
+
+// code cell end
+
+
+==== Working with Compressed Tables
+
+(((input-output operations, with PyTables, working with compressed tables)))(((PyTables, input-output operations, working with compressed tables)))((("compressed tables, working with")))(((tables, compressed)))A major advantage of working with +PyTables+ is the approach it takes to compression. It uses compression not only to save space on disk, but also to improve the performance of I/O operations. How does this work? When I/O is the bottleneck and the CPU is able to (de)compress data fast, the net effect of compression in terms of speed might be positive. Since the following examples are based on the I/O of a state-of-the-art (at the time of this writing) SSD, there is no speed advantage of compression to be observed. However, there is also almost no _disadvantage_ of using compression:
+
+// code cell start uuid: 4e6ac124-2500-47c5-9478-2eaaba25ea00
+[source, python]
+----
+In [124]: filename = path + 'tab.h5c'
+          h5c = tb.open_file(filename, 'w') 
+----
+
+// code cell end
+
+// code cell start uuid: 830338b0-ec10-4f95-8058-62b1858b46b7
+[source, python]
+----
+In [125]: filters = tb.Filters(complevel=4, complib='blosc')
+----
+
+// code cell end
+
+// code cell start uuid: d11f1cdc-c54a-49f3-992d-b76f7cad5a4a
+[source, python]
+----
+In [126]: tabc = h5c.create_table('/', 'ints_floats', sarray,
+                                  title='Integers and Floats',
+                                expectedrows=rows, filters=filters)
+----
+
+// code cell end
+
+// code cell start uuid: a173ee6b-7dc3-4071-b995-842a46c46e97
+[source, python]
+----
+In [127]: %%time
+          res = np.array([(row['No3'], row['No4']) for row in
+                       tabc.where('((No3 < -0.5) | (No3 > 0.5)) \
+                                 & ((No4 < -1) | (No4 > 1))')])[::100]
+----
+
+----
+Out[127]: CPU times: user 670 ms, sys: 41 ms, total: 711 ms
+          Wall time: 602 ms
+          
+----
+
+// code cell end
+
+Generating the table with the original data and doing analytics on it is slightly slower compared to the uncompressed table. What about reading the data into an +ndarray+? Let's check:
+
+// code cell start uuid: f4e1df40-c747-49a2-815c-f1cbd33f621d
+[source, python]
+----
+In [128]: %time arr_non = tab.read()
+----
+
+----
+Out[128]: CPU times: user 13 ms, sys: 49 ms, total: 62 ms
+          Wall time: 61.3 ms
+          
+----
+
+// code cell end
+
+// code cell start uuid: f7428798-5946-49be-88b1-d67d26a41e70
+[source, python]
+----
+In [129]: %time arr_com = tabc.read()
+----
+
+----
+Out[129]: CPU times: user 161 ms, sys: 33 ms, total: 194 ms
+          Wall time: 193 ms
+          
+----
+
+// code cell end
+
+This indeed takes much longer than before. However, the compression ratio is about 20%, saving 80% of the space on disk. This may be of importance for backup routines or when shuffling large data sets between servers or even data centers:
+
+// code cell start uuid: e21f417f-f123-41b5-b26b-ecebbbaa5c85
+[source, python]
+----
+In [130]: ll $path*
+----
+
+----
+Out[130]: -rw-r--r-- 1 root 200313168 28. Sep 15:18 /flash/data/tab.h5
+          -rw-r--r-- 1 root  41335178 28. Sep 15:18 /flash/data/tab.h5c
+----
+
+// code cell end
+
+// code cell start uuid: ea7dd80f-44d8-4cd9-a16f-308a302dd460
+[source, python]
+----
+In [131]: h5c.close()
+----
+
+// code cell end
+
+
+==== Working with Arrays
+
+(((input-output operations, with PyTables, working with arrays)))(((arrays, input-output operations with PyTables)))(((PyTables, input-output operations, working with arrays)))We have already seen that +NumPy+ has built-in fast writing and reading capabilities for +ndarray+ objects. +PyTables+ is also quite fast and efficient when it comes to storing and retrieving +ndarray+ objects:
+
+// code cell start uuid: ee67fc74-5820-4037-b8d9-281c74435160
+[source, python]
+----
+In [132]: %%time
+          arr_int = h5.create_array('/', 'integers', ran_int)
+          arr_flo = h5.create_array('/', 'floats', ran_flo)
+----
+
+----
+Out[132]: CPU times: user 2 ms, sys: 33 ms, total: 35 ms
+          Wall time: 35 ms
+          
+----
+
+// code cell end
+
+Writing these objects directly to an +HDF5+ database is of course much faster than looping over the objects and writing the data row-by-row to a +Table+ object. A final inspection of the database shows now three objects in it, the table and the two arrays:
+
+// code cell start uuid: c91c089b-4727-4928-8069-2f74ab1f2c61
+[source, python]
+----
+In [133]: h5
+----
+
+----
+Out[133]: File(filename=/flash/data/tab.h5, title=u'', mode='w', root_uep='/', f
+          ilters=Filters(complevel=0, shuffle=False, fletcher32=False, least_sig
+          nificant_digit=None))
+          / (RootGroup) u''
+          /floats (Array(2000000, 2)) ''
+            atom := Float64Atom(shape=(), dflt=0.0)
+            maindim := 0
+            flavor := 'numpy'
+            byteorder := 'little'
+            chunkshape := None
+          /integers (Array(2000000, 2)) ''
+            atom := Int64Atom(shape=(), dflt=0)
+            maindim := 0
+            flavor := 'numpy'
+            byteorder := 'little'
+            chunkshape := None
+          /ints_floats (Table(2000000,)) 'Integers and Floats'
+            description := {
+            "Date": StringCol(itemsize=26, shape=(), dflt='', pos=0),
+            "No1": Int32Col(shape=(), dflt=0, pos=1),
+            "No2": Int32Col(shape=(), dflt=0, pos=2),
+            "No3": Float64Col(shape=(), dflt=0.0, pos=3),
+            "No4": Float64Col(shape=(), dflt=0.0, pos=4)}
+            byteorder := 'little'
+            chunkshape := (2621,)
+----
+
+// code cell end
+
+// code cell start uuid: 5bf3d20c-0dd1-447f-b7ca-34adb0e9a2c6
+[source, python]
+----
+In [134]: ll $path*
+----
+
+----
+Out[134]: -rw-r--r-- 1 root 200313168 28. Sep 15:18 /flash/data/tab.h5
+          -rw-r--r-- 1 root  41335178 28. Sep 15:18 /flash/data/tab.h5c
+----
+
+// code cell end
+
+// code cell start uuid: 3dfffbc8-ab8e-4c6e-9e18-316d220e51a0
+[source, python]
+----
+In [135]: h5.close()
+----
+
+// code cell end
+
+// code cell start uuid: 2a157cb2-dcc1-44fe-b4da-658bbe2b6ebb
+[source, python]
+----
+In [136]: !rm -f $path*
+----
+
+// code cell end
+
+.HDF5-Based Data Storage
+[TIP]
+====
+(((HDF5 database format)))The +HDF5+ database (file) format is a powerful alternative to, for example, relational databases when it comes to structured numerical and financial data. Both on a standalone basis when using +PyTables+ directly and when combining it with the capabilities of +pandas+, you can expect to get almost the maximum I/O performance that the available hardware allows.
+====
+
+
+==== Out-of-Memory Computations
+
+(((input-output operations, with PyTables, out-of-memory computations)))(((PyTables, input-output operations, out-of-memory computations)))(((out-of-memory computations)))+PyTables+ supports out-of-memory operations, which makes it possible to implement array-based computations that do not fit into the memory:
+
+// code cell start uuid: e241b3b2-bfe1-45b4-9e85-0b39586ca42a
+[source, python]
+----
+In [137]: filename = path + 'array.h5'
+          h5 = tb.open_file(filename, 'w') 
+----
+
+// code cell end
+
+We create an +EArray+ object that is extendable in the first dimension and has a fixed width of 1,000 in the second dimension:
+
+// code cell start uuid: dd0e24b0-d0cc-4cb0-90e0-7c6445dcb1d2
+[source, python]
+----
+In [138]: n = 1000
+          ear = h5.createEArray(h5.root, 'ear',
+                                atom=tb.Float64Atom(),
+                                shape=(0, n))
+----
+
+// code cell end
+
+Since it is extendable, such an object can be populated chunk-wise:
+
+// code cell start uuid: 4dabef84-39ca-4dd4-a8ab-edc65d340965
+[source, python]
+----
+In [139]: %%time
+          rand = np.random.standard_normal((n, n))
+          for i in range(750):
+              ear.append(rand)
+          ear.flush()
+----
+
+----
+Out[139]: CPU times: user 2.42 s, sys: 7.29 s, total: 9.71 s
+          Wall time: 20.6 s
+          
+----
+
+// code cell end
+
+To check how much data we have generated logically and physically, we can inspect the meta-information provided for the object as well as the disk space consumption:
+
+// code cell start uuid: 4dd0218f-b9ca-4ee5-8a1f-af071e346c55
+[source, python]
+----
+In [140]: ear
+----
+
+----
+Out[140]: /ear (EArray(750000, 1000)) ''
+            atom := Float64Atom(shape=(), dflt=0.0)
+            maindim := 0
+            flavor := 'numpy'
+            byteorder := 'little'
+            chunkshape := (8, 1000)
+----
+
+// code cell end
+
+// code cell start uuid: 58694407-5d44-400d-99a1-252ea1595514
+[source, python]
+----
+In [141]: ear.size_on_disk
+----
+
+----
+Out[141]: 6000000000L
+----
+
+// code cell end
+
+The +EArray+ object is 6 GB large. For an out-of-memory computation, we need a target +EArray+ object in the database:
+
+// code cell start uuid: f29bef2e-37fb-4f47-83fd-ef09041f2f77
+[source, python]
+----
+In [142]: out = h5.createEArray(h5.root, 'out',
+                                atom=tb.Float64Atom(),
+                                shape=(0, n))
+----
+
+// code cell end
+
++PyTables+ has a special module to cope with numerical expressions efficiently. It is called +Expr+ and is based on the numerical expression library http://code.google.com/p/numexpr/[+numexpr+]. This is what we want to use to calculate the mathematical expression in <<tab_expr>> on the whole +EArray+ object that we generated before.
+
+[[tab_expr]]
+[latexmath]
+.Example mathematical expression
+++++
+\begin{equation}
+y = 3 \sin (x) + \sqrt{|x|}
+\end{equation}
+++++
+
+The following code shows the capabilities for out-of-memory calculations in action:
+
+// code cell start uuid: aedc7c36-5839-4df5-8391-f0620b2c1381
+[source, python]
+----
+In [143]: expr = tb.Expr('3 * sin(ear) + sqrt(abs(ear))')
+            # the numerical expression as a string object
+          expr.setOutput(out, append_mode=True)
+            # target to store results is disk-based array
+----
+
+// code cell end
+
+// code cell start uuid: 79542d3f-60fe-4303-abb8-2a21ce9512f2
+[source, python]
+----
+In [144]: %time expr.eval()
+            # evaluation of the numerical expression
+            # and storage of results in disk-based array
+----
+
+----
+Out[144]: CPU times: user 34.4 s, sys: 11.6 s, total: 45.9 s
+          Wall time: 1min 41s
+          
+          /out (EArray(750000, 1000)) ''
+            atom := Float64Atom(shape=(), dflt=0.0)
+            maindim := 0
+            flavor := 'numpy'
+            byteorder := 'little'
+            chunkshape := (8, 1000)
+----
+
+// code cell end
+
+// code cell start uuid: 19d61e69-3488-4556-8d2b-cc06edb9c39e
+[source, python]
+----
+In [145]: out[0, :10]
+----
+
+----
+Out[145]: array([-0.95979563, -1.21530335,  0.02687751,  2.88229293, -0.05596624,
+                 -1.70266651, -0.58575264,  1.70317385,  3.54571202,  2.81602673
+          ])
+----
+
+// code cell end
+
+Given that the whole operation takes place out-of-memory, it can be considered quite fast, in particular as it is executed on standard hardware. Let us briefly compare this to the in-memory performance of the +numexpr+ module (see also <<performance_python>>):
+
+// code cell start uuid: 2409ddc9-2963-4599-9d8c-a3abc1e010d3
+[source, python]
+----
+In [146]: %time imarray = ear.read()
+            # read whole array into memory
+----
+
+----
+Out[146]: CPU times: user 1.26 s, sys: 4.11 s, total: 5.37 s
+          Wall time: 5.39 s
+          
+----
+
+// code cell end
+
+// code cell start uuid: 65d5272f-66d9-4fdd-a16a-ae900f2842c4
+[source, python]
+----
+In [147]: import numexpr as ne
+          expr = '3 * sin(imarray) + sqrt(abs(imarray))'
+----
+
+// code cell end
+
+// code cell start uuid: d58a70be-dc0f-444f-895d-9115864059c8
+[source, python]
+----
+In [148]: ne.set_num_threads(16)
+          %time ne.evaluate(expr)[0, :10]
+----
+
+----
+Out[148]: CPU times: user 24.2 s, sys: 29.1 s, total: 53.3 s
+          Wall time: 3.81 s
+          
+          array([-0.95979563, -1.21530335,  0.02687751,  2.88229293, -0.05596624,
+                 -1.70266651, -0.58575264,  1.70317385,  3.54571202,  2.81602673
+          ])
+----
+
+// code cell end
+
+// code cell start uuid: d0c3ef43-f285-4dc1-b0ab-af206e6b3dd6
+[source, python]
+----
+In [149]: h5.close()
+----
+
+// code cell end
+
+// code cell start uuid: 4343a20a-8132-4fbf-9360-3a627da7d0cf
+[source, python]
+----
+In [150]: !rm -f $path*
+----
+
+// code cell end
+
+
+=== Conclusions
+
++SQL+-based (i.e., relational) databases have advantages when it comes to complex data structures that exhibit lots of relations between single objects/tables. This might justify in some circumstances their performance disadvantage over pure +NumPy+ +ndarray+-based or +pandas+ +DataFrame+-based approaches.
+
+However, many application areas in finance or science in general, can succeed with a mainly array-based data modeling approach. In these cases, huge performance improvements can be realized by making use of native +NumPy+ I/O capabilities, a combination of +NumPy+ and +PyTables+ capabilities, or of the +pandas+ approach via +HDF5+-based stores.
+
+While a recent trend has been to use cloud-based solutions--where the cloud is made up of a large number of computing nodes based on commodity hardware--one should carefully consider, especially in a financial context, which hardware architecture best serves the analytics requirements. A recent study by Microsoft sheds some light on this topic:
+
+[quote, Appuswamy et al. (2013)]
+____
+We claim that a single "scale-up" server can process each of these jobs and do as well or better than a cluster in terms of performance, cost, power, and server density.
+____
+
+Companies, research institutions, and others involved in data analytics should therefore analyze first what specific tasks have to be accomplished in general and then decide on the hardware/software architecture, in terms of:
+
+Scaling out:: 
+Using a cluster with many commodity nodes with standard CPUs and relatively low memory
+Scaling up:: 
+Using one or a few powerful servers with many-core CPUs, possibly a GPU, and large amounts of memory
+
+Our out-of-memory analytics example in this chapter underpins the observation. The out-of-memory calculation of the numerical expression with +PyTables+ takes roughly 1.5 minutes on standard hardware. The same task executed in-memory (using the +numexpr+ library) takes about 4 seconds, while reading the whole data set from disk takes just over 5 seconds. This value is from an eight-core server with enough memory (in this particular case, 64 GB of RAM) and an SSD drive. Therefore, scaling up hardware and applying different implementation approaches might significantly influence performance. More on this in the next chapter.
+
+
+=== Further Reading
+
+The paper cited at the beginning of the chapter as well as in the "Conclusions" section is a good read, and a good starting point to think about hardware architecture for financial analytics:
+
+* Appuswamy, Raja et al. (2013): "Nobody Ever Got Fired for Buying a Cluster." Microsoft Research, Cambridge, England, http://research.microsoft.com/apps/pubs/default.aspx?id=179615.
+
+As usual, the Web provides many valuable resources with regard to the topics covered in this chapter:
+
+* For serialization of +Python+ objects with +pickle+, refer to the documentation: http://docs.python.org/2/library/pickle.html.
+* An overview of the I/O capabilities of +NumPy+ is provided on the +SciPy+ website: http://docs.scipy.org/doc/numpy/reference/routines.io.html.
+* For I/O with +pandas+ see the respective section in the online documentation: http://pandas.pydata.org/pandas-docs/stable/io.html.
+* The +PyTables+ home page provides both tutorials and detailed documentation: http://www.pytables.org.
+

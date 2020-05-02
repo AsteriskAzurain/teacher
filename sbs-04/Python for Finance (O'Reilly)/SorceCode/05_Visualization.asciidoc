@@ -1,0 +1,1033 @@
+[[visualization]]
+
+
+== Data Visualization
+
+[quote, Arthur Brisbane (1911)]
+____
+[role="align_me_right"]
+Use a picture. It's worth a thousand words.
+____
+
+((("visualization", see="data visualization")))This chapter is about basic visualization capabilities of the http://www.matplotlib.org[+matplotlib+ library]. Although there are many other visualization libraries available, +matplotlib+ has established itself as the benchmark and, in many situations, a robust and reliable visualization tool. It is both easy to use for standard plots and flexible when it comes to more complex plots and customizations. In addition, it is tightly integrated with +NumPy+ and the data structures that it provides.
+
+This chapter mainly covers the following topics:
+
+2D plotting:: 
+From the most simple to some more advanced plots with two scales or different subplots; typical financial plots, like candlestick charts, are also covered.
+3D plotting:: 
+A selection of 3D plots useful for financial applications are presented.
+
+This chapter cannot be comprehensive with regard to data visualization with +Python+ and +matplotlib+, but it provides a number of examples for the most basic and most important capabilities for finance. Other examples are also found in later chapters. For instance, <<fin_time_series>> shows how to visualize time series data with the +pandas+ library.
+
+
+=== Two-Dimensional Plotting
+
+((("data visualization", "two-dimensional plotting", id="ix_DVtwo", range="startofrange")))((("matplotlib library", "two-dimensional plotting", id="ix_MPLtwo", range="startofrange")))(((two-dimensional plotting, importing libraries)))To begin with, we have to import the respective libraries. The main plotting functions are found in the sublibrary +matplotlib.pyplot+: 
+
+// code cell start uuid: 1b8fb946-2573-442e-ab40-cc416f703b35
+[source, python]
+----
+In [1]: import numpy as np
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        %matplotlib inline
+----
+
+// code cell end
+
+
+==== One-Dimensional Data Set
+
+((("two-dimensional plotting", "one-dimensional data set", id="ix_twoone", range="startofrange")))In all that follows, we will plot data stored in +NumPy+ +ndarray+ objects. However, +matplotlib+ is of course able to plot data stored in different +Python+ formats, like +list+ objects, as well. First, we need data that we can plot. To this end, we generate 20 standard normally distributed (pseudo)random numbers as a +NumPy+ +ndarray+:
+
+// code cell start uuid: 033038bb-7b63-42c8-aa0e-a9b01df1a656
+[source, python]
+----
+In [2]: np.random.seed(1000)
+        y = np.random.standard_normal(20)
+----
+
+// code cell end
+
+(((pyplot sublibrary)))(((plot function)))The most fundamental, but nevertheless quite powerful, plotting function is +plot+ from the +pyplot+ sublibrary. In principle, it needs two sets of numbers:
+
+* **++x++ values**: a list or an array containing the ++x++ coordinates (values of the abscissa)
+* **++y++ values**: a list or an array containing the ++y++ coordinates (values of the ordinate)
+
+The number of ++x++ and ++y++ values provided must match, of course. Consider the following two lines of code, whose output is presented in <<matplotlib_0>>:
+
+// code cell start uuid: 86f4eb1d-a2e0-4573-b456-636756320573
+[source, python]
+----
+In [3]: x = range(len(y))
+        plt.plot(x, y)
+----
+
+[[matplotlib_0]]
+.Plot given x and y values
+image::images/pyfi_0501.png[]
+
+// code cell end
+
++plot+ notices when you pass an +ndarray+ object. In this case, there is no need to provide the "extra" information of the ++x++ values. If you only provide the ++y++ values, +plot+ takes the index values as the respective ++x++ values. Therefore, the following single line of code generates exactly the same output (cf. <<matplotlib_1>>):
+
+// code cell start uuid: dfe5ea13-bb4e-4158-85e1-d391b38ce53e
+[source, python]
+----
+In [4]: plt.plot(y)
+----
+
+[[matplotlib_1]]
+.Plot given data as 1D array
+image::images/pyfi_0502.png[]
+
+// code cell end
+
+.NumPy Arrays and matplotlib
+[TIP]
+====
+(((matplotlib library, NumPy arrays and)))You can simply pass +NumPy+ +ndarray+ objects to +matplotlib+ functions. It is able to interpret the data structure for simplified plotting. However, be careful to not pass a too large and/or complex array.
+====
+
+Since the majority of the +ndarray+ methods return again an +ndarray+ object, you can also pass your object with a method (or even multiple methods, in some cases) attached. By calling the +cumsum+ method on the +ndarray+ object with the sample data, we get the cumulative sum of this data and, as to be expected, a different output (cf. <<matplotlib_2>>):
+
+// code cell start uuid: 8ce3f781-2188-43da-86a0-866bb28bdfa2
+[source, python]
+----
+In [5]: plt.plot(y.cumsum())
+----
+
+[[matplotlib_2]]
+.Plot given a 1D array with method attached
+image::images/pyfi_0503.png[]
+
+// code cell end
+
+In general, the default plotting style does not satisfy typical requirements for reports, publications, etc. For example, you might want to customize the font used (e.g., for compatibility with +LaTeX+ fonts), to have labels at the axes, or to plot a grid for better readability. Therefore, +matplotlib+ offers a large number of functions to customize the plotting style. Some are easily accessible; for others one has to go a bit deeper. Easily accessible, for example, are those functions that manipulate the axes and those that add grids and labels (cf. <<matplotlib_3_a>>):
+
+// code cell start uuid: bb30a215-06d6-498f-815a-0f90c3ec5e3e
+[source, python]
+----
+In [6]: plt.plot(y.cumsum())
+        plt.grid(True)  # adds a grid
+        plt.axis('tight')  # adjusts the axis ranges
+----
+
+[[matplotlib_3_a]]
+.Plot with grid and tight axes
+image::images/pyfi_0504.png[]
+
+// code cell end
+
+(((data visualization, plt.axis options)))(((plt.axis method)))Other options for +plt.axis+ are given in <<axis_opts>>, the majority of which have to be passed as a +string+ object.
+
+[[axis_opts]]
+.Options for plt.axis
+[options="header, unbreakable"]
+|=======
+|Parameter     |  Description
+|Empty         |  Returns current axis limits
+|+off+         |  Turns axis lines and labels off
+|+equal+       |  Leads to equal scaling
+|+scaled+      |  Equal scaling via dimension changes
+|+tight+       |  Makes all data visible (tightens limits)
+|+image+       |  Makes all data visible (with data limits)
+|++[++__++xmin++__++,++ __++xmax++__++,++ __++ymin++__++,++ __++ymax++__++]++ |  Sets limits to given (+list+ of) values
+|==========
+
+In addition, you can directly set the minimum and maximum values of each axis by using +plt.xlim+ and +plt.ylim+. The following code provides an example whose output is shown in <<matplotlib_3_b>>:
+
+// code cell start uuid: 46c40470-43b9-41b2-a299-60bdcb535d4b
+[source, python]
+----
+In [7]: plt.plot(y.cumsum())
+        plt.grid(True)
+        plt.xlim(-1, 20)
+        plt.ylim(np.min(y.cumsum()) - 1,
+                 np.max(y.cumsum()) + 1)
+----
+
+[[matplotlib_3_b]]
+.Plot with custom axis limits
+image::images/pyfi_0505.png[]
+
+// code cell end
+
+For the sake of better readability, a plot usually contains a number of labels--e.g., a title and labels describing the nature of ++x++ and ++y++ values. These are added by the functions +plt.title+, +plt.xlabel+, and +plt.ylabel+, respectively. By default, +plot+ plots continuous lines, even if discrete data points are provided. The plotting of discrete points is accomplished by choosing a different style option. <<matplotlib_4>> overlays (red) points and a (blue) line with line width of 1.5 points:
+
+// code cell start uuid: a49d4a75-3e67-4e73-96b1-9db889127a62
+[source, python]
+----
+In [8]: plt.figure(figsize=(7, 4))
+          # the figsize parameter defines the
+          # size of the figure in (width, height)
+        plt.plot(y.cumsum(), 'b', lw=1.5)
+        plt.plot(y.cumsum(), 'ro')
+        plt.grid(True)
+        plt.axis('tight')
+        plt.xlabel('index')
+        plt.ylabel('value')
+        plt.title('A Simple Plot')
+----
+
+[[matplotlib_4]]
+.Plot with typical labels
+image::images/pyfi_0506.png[]
+
+// code cell end
+
+(((data visualization, standard color abbreviations)))(((color abbreviations)))(((standard color abbreviations)))By default, +plt.plot+ supports the color abbreviations in <<color_tab>>.
+
+[[color_tab]]
+.Standard color abbreviations
+[options="header, unbreakable"]
+|=======
+|Character |   Color
+|+b+       |  Blue
+|+g+       |  Green
+|+r+       |  Red
+|+c+       |  Cyan
+|+m+       |  Magenta
+|+y+       |  Yellow
+|+k+       |  Black
+|+w+       |  White
+|==========
+
+(((data visualization, standard style characters)))(((standard style characters)))((("characters, symbols for")))In terms of line and/or point styles, +plt.plot+ supports the characters listed in <<style_tab>>.
+
+[[style_tab]]
+.Standard style characters
+[options="header, unbreakable"]
+|=======
+|Character  |    Symbol
+|+-+|            Solid line style
+|+--+|            Dashed line style
+|+-.+|            Dash-dot line style
+|+:+|             Dotted line style
+|+.+|             Point marker
+|+,+|             Pixel marker
+|+o+|             Circle marker
+|+v+|             Triangle_down marker
+|+^+|             Triangle_up marker
+|+<+|             Triangle_left marker
+|+>+|             Triangle_right marker
+|+1+|             Tri_down marker
+|+2+|             Tri_up marker
+|+3+|             Tri_left marker
+|+4+|             Tri_right marker
+|+s+|             Square marker
+|+p+|             Pentagon marker
+|+*+|             Star marker
+|+h+|             Hexagon1 marker
+|+H+|             Hexagon2 marker
+|+++|             Plus marker
+|+x+|             X marker
+|+D+|             Diamond marker
+|+d+|             Thin diamond marker
+|+\|+|            Vline marker
+|+_+              Hline marker
+|==========
+
+(((range="endofrange", startref="ix_twoone")))Any color abbreviation can be combined with any style character. In this way, you can make sure that different data sets are easily distinguished. As we will see, the plotting style will also be reflected in the legend.
+
+
+==== Two-Dimensional Data Set
+
+((("two-dimensional plotting", "two-dimensional data set", id="ix_twotwo", range="startofrange")))Plotting one-dimensional data can be considered a special case. In general, data sets will consist of multiple separate subsets of data. The handling of such data sets follows the same rules with +matplotlib+ as with one-dimensional data. However, a number of additional issues might arise in such a context. For example, two data sets might have such a different scaling that they cannot be plotted using the same y- and/or x-axis scaling. Another issue might be that you may want to visualize two different data sets in different ways, e.g., one by a line plot and the other by a bar plot.
+
+To begin with, let us first generate a two-dimensional sample data set. The code that follows generates first a +NumPy+ +ndarray+ of shape 20 &#xd7; 2 with standard normally distributed (pseudo)random numbers. On this array, the method +cumsum+ is called to calculate the cumulative sum of the sample data along axis 0 (i.e., the first dimension):
+
+// code cell start uuid: f59132a2-1eda-49da-8efa-4a49e4e8a670
+[source, python]
+----
+In [9]: np.random.seed(2000)
+        y = np.random.standard_normal((20, 2)).cumsum(axis=0)
+----
+
+// code cell end
+
+In general, you can also pass such two-dimensional arrays to +plt.plot+. It will then automatically interpret the contained data as separate data sets (along axis 1, i.e., the second dimension). A respective plot is shown in <<matplotlib_5>>:
+
+// code cell start uuid: f9b54053-7cbc-49f3-a558-700356d9b3af
+[source, python]
+----
+In [10]: plt.figure(figsize=(7, 4))
+         plt.plot(y, lw=1.5)
+           # plots two lines
+         plt.plot(y, 'ro')
+           # plots two dotted lines
+         plt.grid(True)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value')
+         plt.title('A Simple Plot')
+----
+
+[[matplotlib_5]]
+.Plot with two data sets
+image::images/pyfi_0507.png[]
+
+// code cell end
+
+In such a case, further annotations might be helpful to better read the plot. You can add individual labels to each data set and have them listed in the legend. +plt.legend+ accepts different locality parameters. +0+ stands for _best location_, in the sense that as little data as possible is hidden by the legend. <<matplotlib_6>> shows the plot of the two data sets, this time with a legend. In the generating code, we now do not pass the +ndarray+ object as a whole but rather access the two data subsets separately (+y[:, 0]+ and +y[:, 0]+), which allows us to attach individual labels to them:
+
+// code cell start uuid: 7e085a23-dd6c-4709-a616-9eb1728447c6
+[source, python]
+----
+In [11]: plt.figure(figsize=(7, 4))
+         plt.plot(y[:, 0], lw=1.5, label='1st')
+         plt.plot(y[:, 1], lw=1.5, label='2nd')
+         plt.plot(y, 'ro')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value')
+         plt.title('A Simple Plot')
+----
+
+// code cell end
+
+(((data visualization, plt.legend options)))(((plt.legend function)))Further location options for +plt.legend+ include those presented in <<legend_opts>>.
+
+[[legend_opts]]
+.Options for plt.legend
+[options="header, unbreakable"]
+|=======
+|Loc      | Description
+|Empty    | Automatic
+|++0++        |Best possible
+|++1++        |Upper right
+|++2++        |Upper left
+|++3++        |Lower left
+|++4++        |Lower right
+|++5++        |Right
+|++6++        |Center left
+|7        |Center right
+|8        |Lower center
+|9        |Upper center
+|10       |Center
+|==========
+
+[[matplotlib_6]]
+.Plot with labeled data sets
+image::images/pyfi_0508.png[]
+
+Multiple data sets with a similar scaling, like simulated paths for the same financial risk factor, can be plotted using a single y-axis. However, often data sets show rather different scalings and the plotting of such data with a single y scale generally leads to a significant loss of visual information. To illustrate the effect, we scale the first of the two data subsets by a factor of 100 and plot the data again (cf. <<matplotlib_7>>):
+
+// code cell start uuid: 4586bd90-1e5b-4de4-8671-449b82cb53c7
+[source, python]
+----
+In [12]: y[:, 0] = y[:, 0] * 100
+         plt.figure(figsize=(7, 4))
+         plt.plot(y[:, 0], lw=1.5, label='1st')
+         plt.plot(y[:, 1], lw=1.5, label='2nd')
+         plt.plot(y, 'ro')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value')
+         plt.title('A Simple Plot')
+----
+
+[[matplotlib_7]]
+.Plot with two differently scaled data sets
+image::images/pyfi_0509.png[]
+
+// code cell end
+
+Inspection of <<matplotlib_7>> reveals that the first data set is still "visually readable," while the second data set now looks like a straight line with the new scaling of the y-axis. In a sense, information about the second data set now gets "visually lost." There are two basic approaches to resolve this problem:
+
+* Use of two y-axes (left/right)
+* Use of two subplots (upper/lower, left/right)
+
+Let us first introduce a second y-axis into the plot. <<matplotlib_8>> now has two different y-axes. The left y-axis is for the first data set while the right y-axis is for the second. Consequently, there are also two legends:
+
+// code cell start uuid: 6a47906a-7ef2-4a16-b076-ca870744e158
+[source, python]
+----
+In [13]: fig, ax1 = plt.subplots()
+         plt.plot(y[:, 0], 'b', lw=1.5, label='1st')
+         plt.plot(y[:, 0], 'ro')
+         plt.grid(True)
+         plt.legend(loc=8)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value 1st')
+         plt.title('A Simple Plot')
+         ax2 = ax1.twinx()
+         plt.plot(y[:, 1], 'g', lw=1.5, label='2nd')
+         plt.plot(y[:, 1], 'ro')
+         plt.legend(loc=0)
+         plt.ylabel('value 2nd')
+----
+
+[[matplotlib_8]]
+.Plot with two data sets and two y-axes
+image::images/pyfi_0510.png[]
+
+// code cell end
+
+The key lines of code are those that help manage the axes. These are the ones that follow:
+
+[source, python]
+----
+fig, ax1 = plt.subplots()
+  # plot first data set using first (left) axis
+ax2 = ax1.twinx()
+  # plot second data set using second (right) axis
+----
+
+By using the +plt.subplots+ function, we get direct access to the underlying plotting objects (the figure, subplots, etc.). It allows us, for example, to generate a second subplot that shares the x-axis with the first subplot. In <<matplotlib_8>> we have, then, actually two subplots that _overlay_ each other.
+
+Next, consider the case of two _separate_ subplots. This option gives even more freedom to handle the two data sets, as <<matplotlib_9>> illustrates:
+
+// code cell start uuid: 988b6e09-b849-4f37-939e-5922c0ace8f6
+[source, python]
+----
+In [14]: plt.figure(figsize=(7, 5))
+         plt.subplot(211)
+         plt.plot(y[:, 0], lw=1.5, label='1st')
+         plt.plot(y[:, 0], 'ro')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.ylabel('value')
+         plt.title('A Simple Plot')
+         plt.subplot(212)
+         plt.plot(y[:, 1], 'g', lw=1.5, label='2nd')
+         plt.plot(y[:, 1], 'ro')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value')
+----
+
+[[matplotlib_9]]
+.Plot with two subplots
+image::images/pyfi_0511.png[]
+
+// code cell end
+
+The placing of subplots in the a +matplotlib+ +figure+ object is accomplished here by the use of a special coordinate system. +plt.subplot+ takes as arguments three integers for +numrows+, +numcols+, and +fignum+ (either separated by commas or not). +numrows+ specifies the number of _rows_, +numcols+ the number of _columns_, and +fignum+ the number of the _sub-plot_, starting with 1 and ending with +numrows * numcols+. For example, a figure with nine equally sized subplots would have +numrows=3+, +numcols=3+, and +fignum=1,2,&#x2e;&#x2e;&#x2e;,9+. The lower-right subplot would have the following "coordinates": +plt.subplot(3, 3, 9)+.
+
+(((range="endofrange", startref="ix_twotwo")))Sometimes, it might be necessary or desired to choose two different plot types to visualize such data. With the subplot approach you have the freedom to combine arbitrary kinds of plots that +matplotlib+ offers.footnote:[For an overview of which plot types are available, visit the http://matplotlib.org/gallery.html[+matplotlib+ gallery].] <<matplotlib_10>> combines a line/point plot with a bar chart:
+
+// code cell start uuid: 1f78f7fe-b24b-4304-92c5-01d34d43c90f
+[source, python]
+----
+In [15]: plt.figure(figsize=(9, 4))
+         plt.subplot(121)
+         plt.plot(y[:, 0], lw=1.5, label='1st')
+         plt.plot(y[:, 0], 'ro')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.ylabel('value')
+         plt.title('1st Data Set')
+         plt.subplot(122)
+         plt.bar(np.arange(len(y)), y[:, 1], width=0.5,
+                 color='g', label='2nd')
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.axis('tight')
+         plt.xlabel('index')
+         plt.title('2nd Data Set')
+----
+
+[[matplotlib_10]]
+.Plot combining line/point subplot with bar subplot
+image::images/pyfi_0512.png[]
+
+// code cell end
+
+
+==== Other Plot Styles
+
+((("two-dimensional plotting", "other plot styles", id="ix_twoother", range="startofrange")))When it comes to two-dimensional plotting, line and point plots are probably the most important ones in finance; this is because many data sets embody time series data, which generally is visualized by such plots. <<fin_time_series>> addresses financial times series data in detail. However, for the moment we want to stick with the two-dimensional data set and illustrate some alternative, and for financial applications useful, visualization pass:[<phrase role='keep-together'>approaches.</phrase>]
+
+(((scatter plots)))The first is the _scatter plot_, where the values of one data set serve as the ++x++ values for the other data set. <<matplotlib_11_a>> shows such a plot. Such a plot type is used, for example, when you want to plot the returns of one financial time series against those of another one. For this example we will use a new two-dimensional data set with some more data:
+
+// code cell start uuid: 25aea2f5-5e26-4d01-9660-0eac2a9eaf7c
+[source, python]
+----
+In [16]: y = np.random.standard_normal((1000, 2))
+----
+
+// code cell end
+
+// code cell start uuid: 22e55805-f571-4f38-8b53-b1fd216a4b95
+[source, python]
+----
+In [17]: plt.figure(figsize=(7, 5))
+         plt.plot(y[:, 0], y[:, 1], 'ro')
+         plt.grid(True)
+         plt.xlabel('1st')
+         plt.ylabel('2nd')
+         plt.title('Scatter Plot')
+----
+
+[[matplotlib_11_a]]
+.Scatter plot via plot function
+image::images/pyfi_0513.png[]
+
+// code cell end
+
++matplotlib+ also provides a specific function to generate scatter plots. It basically works in the same way, but provides some additional features. <<matplotlib_11_b>> shows the corresponding scatter plot to <<matplotlib_11_a>>, this time generated using the +scatter+ function:
+
+// code cell start uuid: dcb44778-f3b8-4fae-95cb-4cf6d1fec624
+[source, python]
+----
+In [18]: plt.figure(figsize=(7, 5))
+         plt.scatter(y[:, 0], y[:, 1], marker='o')
+         plt.grid(True)
+         plt.xlabel('1st')
+         plt.ylabel('2nd')
+         plt.title('Scatter Plot')
+----
+
+[[matplotlib_11_b]]
+.Scatter plot via scatter function
+image::images/pyfi_0514.png[]
+
+// code cell end
+
+The +scatter+ plotting function, for example, allows the addition of a third dimension, which can be visualized through different colors and be described by the use of a color bar. To this end, we generate a third data set with random data, this time with integers between 0 and 10:
+
+// code cell start uuid: bc89c721-ef4f-45c5-a713-ae74134d4ab7
+[source, python]
+----
+In [19]: c = np.random.randint(0, 10, len(y))
+----
+
+// code cell end
+
+<<matplotlib_11_c>> shows a scatter plot where there is a third dimension illustrated by different colors of the single dots and with a color bar as a legend for the colors:
+
+// code cell start uuid: 9fcd1af6-f018-4f1b-a2e8-51a6f2cf415e
+[source, python]
+----
+In [20]: plt.figure(figsize=(7, 5))
+         plt.scatter(y[:, 0], y[:, 1], c=c, marker='o')
+         plt.colorbar()
+         plt.grid(True)
+         plt.xlabel('1st')
+         plt.ylabel('2nd')
+         plt.title('Scatter Plot')
+----
+
+[[matplotlib_11_c]]
+.Scatter plot with third dimension
+image::images/pyfi_0515.png[]
+
+// code cell end
+
+(((histograms)))Another type of plot, the _histogram_, is also often used in the context of financial returns. <<matplotlib_12_a>> puts the frequency values of the two data sets next to each other in the pass:[<phrase role='keep-together'>same plot:</phrase>]
+
+// code cell start uuid: c9a9df7d-0e1f-41c5-8e8c-8c523214fb93
+[source, python]
+----
+In [21]: plt.figure(figsize=(7, 4))
+         plt.hist(y, label=['1st', '2nd'], bins=25)
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.xlabel('value')
+         plt.ylabel('frequency')
+         plt.title('Histogram')
+----
+
+[[matplotlib_12_a]]
+.Histogram for two data sets
+image::images/pyfi_0516.png[]
+
+// code cell end
+
+Since the histogram is such an important plot type for financial applications, let us take a closer look at the use of +plt.hist+. The following example illustrates the parameters that are supported:
+----
+plt.hist(x, bins=10, range=None, normed=False, weights=None, cumulative=False,
+bottom=None, histtype='bar', align='mid', orientation='vertical', rwidth=None,
+log=False, color=None, label=None, stacked=False, hold=None, **kwargs)
+----
+
+(((data visualization, plt.hist parameters)))(((plt.hist function)))<<hist_params>> provides a description of the main parameters of the +plt.hist+ function.
+
+[[hist_params]]
+.Parameters for plt.hist
+[options="header, unbreakable"]
+|=======
+|Parameter     | Description
+|+x+           | +list+ object(s), +ndarray+ object
+|+bins+        | Number of bins
+|+range+       | Lower and upper range of bins
+|+normed+      | Norming such that integral value is 1
+|+weights+     | Weights for every value in +x+
+|+cumulative+  | Every bin contains the counts of the lower bins
+|+histtype+    | Options (strings): ++bar++, ++barstacked++, ++step++, ++stepfilled++
+|+align+       | Options (strings): ++left++, ++mid++, ++right++
+|+orientation+ | Options (strings): ++horizontal++, ++vertical++
+|+rwidth+      | Relative width of the bars
+|+log+         | Log scale
+|+color+       | Color per data set (array-like)
+|+label+       | String or sequence of strings for labels
+|+stacked+     | Stacks multiple data sets
+|==========
+
+<<matplotlib_12_b>> shows a similar plot; this time, the data of the two data sets is stacked in the histogram:
+
+// code cell start uuid: f7b73537-d6a9-4d34-9f3f-f838ab9f0eca
+[source, python]
+----
+In [22]: plt.figure(figsize=(7, 4))
+         plt.hist(y, label=['1st', '2nd'], color=['b', 'g'],
+                     stacked=True, bins=20)
+         plt.grid(True)
+         plt.legend(loc=0)
+         plt.xlabel('value')
+         plt.ylabel('frequency')
+         plt.title('Histogram')
+----
+
+[[matplotlib_12_b]]
+.Stacked histogram for two data sets
+image::images/pyfi_0517.png[]
+
+// code cell end
+
+(((boxplots)))Another useful plot type is the _boxplot_. Similar to the histogram, the boxplot allows both a concise overview of the characteristics of a data set and easy comparison of multiple data sets. <<matplotlib_13>> shows such a plot for our data set:
+
+// code cell start uuid: c5b0ef1f-17d9-485f-834c-ad016ac67484
+[source, python]
+----
+In [23]: fig, ax = plt.subplots(figsize=(7, 4))
+         plt.boxplot(y)
+         plt.grid(True)
+         plt.setp(ax, xticklabels=['1st', '2nd'])
+         plt.xlabel('data set')
+         plt.ylabel('value')
+         plt.title('Boxplot')
+----
+
+// code cell end
+
+This last example uses the function +plt.setp+, which sets properties for a (set of) plotting instance(s). For example, considering a line plot generated by:
+
+[source, python]
+----
+line = plt.plot(data, 'r')
+----
+
+the following code:
+
+[source, python]
+----
+plt.setp(line, linestyle='--')
+----
+
+changes the style of the line to "dashed." This way, you can easily change parameters after the plotting instance ("artist object") has been generated.
+
+[[matplotlib_13]]
+.Boxplot for two data sets
+image::images/pyfi_0518.png[]
+
+As a final illustration in this section, we consider a mathematically inspired plot that can also be found as http://www.matplotlib.org/gallery.html[an example in the gallery for +matplotlib+]. It plots a function and illustrates graphically the area below the function between a lower and an upper limit--in other words, the integral value of the function between the lower and upper limits. <<matplotlib_math>> shows the resulting plot and illustrates that +matplotlib+ seamlessly handles +LaTeX+ type setting for the inclusion of mathematical formulae into plots:
+
+// code cell start uuid: c4621c85-1082-4bce-937f-013a68de8181
+[source, python]
+----
+In [24]: from matplotlib.patches import Polygon
+         def func(x):
+             return 0.5 * np.exp(x) + 1
+         
+         a, b = 0.5, 1.5  # integral limits
+         x = np.linspace(0, 2)
+         y = func(x)
+         
+         fig, ax = plt.subplots(figsize=(7, 5))
+         plt.plot(x, y, 'b', linewidth=2)
+         plt.ylim(ymin=0)
+         
+         # Illustrate the integral value, i.e. the area under the function
+         # between the lower and upper limits
+         Ix = np.linspace(a, b)
+         Iy = func(Ix)
+         verts = [(a, 0)] + list(zip(Ix, Iy)) + [(b, 0)]
+         poly = Polygon(verts, facecolor='0.7', edgecolor='0.5')
+         ax.add_patch(poly)
+         
+         plt.text(0.5 * (a + b), 1, r"$\int_a^b f(x)\mathrm{d}x$",
+                  horizontalalignment='center', fontsize=20)
+         
+         plt.figtext(0.9, 0.075, '$x$')
+         plt.figtext(0.075, 0.9, '$f(x)$')
+         
+         ax.set_xticks((a, b))
+         ax.set_xticklabels(('$a$', '$b$'))
+         ax.set_yticks([func(a), func(b)])
+         ax.set_yticklabels(('$f(a)$', '$f(b)$'))
+         plt.grid(True)
+----
+
+[[matplotlib_math]]
+.Exponential function, integral area, and LaTeX labels
+image::images/pyfi_0519.png[]
+
+// code cell end
+
+Let us go through the generation of this plot step by step. The first step is the definition of the function to be integrated:
+
+[source, python]
+----
+def func(x):
+    return 0.5 * np.exp(x) + 1
+----
+
+The second step is the definition of the integral limits and the generation of needed numerical values:
+
+[source, python]
+----
+a, b = 0.5, 1.5  # integral limits
+x = np.linspace(0, 2)
+y = func(x)
+----
+
+Third, we plot the function itself:
+
+[source, python]
+----
+fig, ax = plt.subplots(figsize=(7, 5))
+plt.plot(x, y, 'b', linewidth=2)
+plt.ylim(ymin=0)
+----
+
+Fourth and central, we generate the shaded area ("patch") by the use of the +Polygon+ function illustrating the integral area:
+
+[source, python]
+----
+Ix = np.linspace(a, b)
+Iy = func(Ix)
+verts = [(a, 0)] + list(zip(Ix, Iy)) + [(b, 0)]
+poly = Polygon(verts, facecolor='0.7', edgecolor='0.5')
+ax.add_patch(poly)
+----
+
+The fifth step is the addition of the mathematical formula and some axis labels to the plot, using the +plt.text+ and +plt.figtext+ functions. +LaTeX+ code is passed between two dollar signs (+$ &#x2e;&#x2e;&#x2e; $+). The first two parameters of both functions are coordinate values to place the respective text:
+
+[source, python]
+----
+plt.text(0.5 * (a + b), 1, r"$\int_a^b f(x)\mathrm{d}x$",
+         horizontalalignment='center', fontsize=20)
+
+plt.figtext(0.9, 0.075, '$x$')
+plt.figtext(0.075, 0.9, '$f(x)$')
+----
+
+(((range="endofrange", startref="ix_DVtwo")))(((range="endofrange", startref="ix_MPLtwo")))(((range="endofrange", startref="ix_twoother")))Finally, we set the individual x and y tick labels at their respective positions. Note that although we place variable names rendered in +LaTeX+, the correct numerical values are used for the placing. We also add a grid, which in this particular case is only drawn for the selected ticks highlighted before:
+
+[source, python]
+----
+ax.set_xticks((a, b))
+ax.set_xticklabels(('$a$', '$b$'))
+ax.set_yticks([func(a), func(b)])
+ax.set_yticklabels(('$f(a)$', '$f(b)$'))
+plt.grid(True)
+----
+
+
+=== Financial Plots
+
+((("financial plots", id="ix_FP", range="startofrange")))(((data visualization, financial plots)))((("matplotlib library", "financial plots", id="ix_MLPfp", range="startofrange")))(((candlestick plots)))+matplotlib+ also provides a small selection of special finance plots. These, like the _candlestick_ plot, are mainly used to visualize historical stock price data or similar financial time series data. Those plotting capabilities are found in the +matplotlib.finance+ sublibrary:
+
+// code cell start uuid: e6364d22-c102-4a31-8bf1-35edbc5bbaae
+[source, python]
+----
+In [25]: import matplotlib.finance as mpf
+----
+
+// code cell end
+
+As a convenience function, this sublibrary allows for easy retrieval of historical stock price data from the Yahoo! Finance website (cf. http://finance.yahoo.com). All you need are start and end dates and the respective ticker symbol. The following retrieves data for the German DAX index whose ticker symbol is +^GDAXI+:
+
+// code cell start uuid: 01b01686-d054-4518-aea8-d249c883ffa2
+[source, python]
+----
+In [26]: start = (2014, 5, 1)
+         end = (2014, 6, 30)
+         
+         quotes = mpf.quotes_historical_yahoo('^GDAXI', start, end)
+----
+
+// code cell end
+
+.Data Quality of Web Sources
+[CAUTION]
+====
+(((Yahoo! Finance)))(((data, quality of web sources)))Nowadays, a couple of +Python+ libraries provide convenience functions to retrieve data from Yahoo! Finance. Be aware that, although this is a convenient way to visualize financial data sets, the data quality is not sufficient to base any important investment decision on it. For example, stock splits, leading to "price drops," are often not correctly accounted for in the data provided by Yahoo! Finance. This holds true for a number of other freely available data sources as well.
+====
+
++quotes+ now contains time series data for the DAX index starting with +Date+ (in epoch time format), then +Open+, +High+, +Low+, +Close+, and +Volume+:
+
+// code cell start uuid: 1b0d2b42-2091-4a6b-98d9-cb12ffa5d2a3
+[source, python]
+----
+In [27]: quotes[:2]
+----
+
+----
+Out[27]: [(735355.0,
+           9611.7900000000009,
+           9556.0200000000004,
+           9627.3799999999992,
+           9533.2999999999993,
+           88062300.0),
+          (735358.0,
+           9536.3799999999992,
+           9529.5,
+           9548.1700000000001,
+           9407.0900000000001,
+           61911600.0)]
+----
+
+// code cell end
+
+The plotting functions of +matplotlib.finance+ understand exactly this format and the data set can be passed, for example, to the +candlestick+ function as it is. <<matplotlib_14>> shows the result. Daily _positive_ returns are indicated by _blue_ rectangles, and _negative_ returns by _red_ ones. As you notice, +matplotlib+ takes care of the right labeling of the x-axis given the date information in the data set:
+
+// code cell start uuid: 59bba712-88ed-4e63-98ab-0f3849845679
+[source, python]
+----
+In [28]: fig, ax = plt.subplots(figsize=(8, 5))
+         fig.subplots_adjust(bottom=0.2)
+         mpf.candlestick(ax, quotes, width=0.6, colorup='b', colordown='r')
+         plt.grid(True)
+         ax.xaxis_date()
+           # dates on the x-axis
+         ax.autoscale_view()
+         plt.setp(plt.gca().get_xticklabels(), rotation=30)
+----
+
+[[matplotlib_14]]
+.Candlestick chart for financial data
+image::images/pyfi_0520.png[]
+
+// code cell end
+
+In the preceding code, +plt.setp(plt.gca().get_xticklabels(), rotation=30)+ grabs the x-axis labels and rotates them by 30 degrees. To this end, the function +plt.gca+ is used, which returns the current +figure+ object. The method call of +get_xticklabels+ then provides the tick labels for the x-axis of the figure.
+
+(((data visualization, plt.candlestick parameters)))(((plt.candlestick)))<<candle_params>> provides a description of the different parameters the +mpf.candlestick+ function takes.
+
+[[candle_params]]
+.Parameters for mpf.candlestick
+[options="header, unbreakable"]
+|=======
+|Parameter     | Description
+|+ax+          | An +Axes+ instance to plot to
+|+quotes+      | Financial data to plot (sequence of +time, open, close, high, low+ sequences)
+|+width+       | Fraction of a day for the rectangle width
+|+colorup+     | The color of the rectangle where close >= open
+|+colordown+   | The color of the rectangle where close <  open
+|+alpha+       | The rectangle alpha level
+|=======
+
+A rather similar plot type is provided by the +plot_day_summary+ function, which is used in the same fashion as the +candlestick+ function and with similar parameters. Here, opening and closing values are not illustrated by a colored rectangle but rather by two small horizontal lines, as <<matplotlib_15>> shows:
+
+// code cell start uuid: 0ed5878e-d95d-4633-a1b8-59967af490f6
+[source, python]
+----
+In [29]: fig, ax = plt.subplots(figsize=(8, 5))
+         mpf.plot_day_summary(ax, quotes, colorup='b', colordown='r')
+         plt.grid(True)
+         ax.xaxis_date()
+         plt.title('DAX Index')
+         plt.ylabel('index level')
+         plt.setp(plt.gca().get_xticklabels(), rotation=30)
+----
+
+[[matplotlib_15]]
+.Daily summary chart for financial data
+image::images/pyfi_0521.png[]
+
+// code cell end
+
+(((range="endofrange", startref="ix_FP")))(((range="endofrange", startref="ix_MLPfp")))Often, stock price data is combined with volume data in a single plot to also provide information with regard to market activity. The following code, with the result shown in <<matplotlib_16>>, illustrates such a use case based on historical data for the stock of pass:[<phrase role='keep-together'>Yahoo! Inc.:</phrase>]
+
+// code cell start uuid: c50e7be6-36bc-4ed4-9352-3d9b341cc01a
+[source, python]
+----
+In [30]: quotes = np.array(mpf.quotes_historical_yahoo('YHOO', start, end))
+----
+
+// code cell end
+
+// code cell start uuid: db02ec99-d005-4555-bc8f-b7e672bef774
+[source, python]
+----
+In [31]: fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(8, 6))
+         mpf.candlestick(ax1, quotes, width=0.6, colorup='b', colordown='r')
+         ax1.set_title('Yahoo Inc.')
+         ax1.set_ylabel('index level')
+         ax1.grid(True)
+         ax1.xaxis_date()
+         plt.bar(quotes[:, 0] - 0.25, quotes[:, 5], width=0.5)
+         ax2.set_ylabel('volume')
+         ax2.grid(True)
+         ax2.autoscale_view()
+         plt.setp(plt.gca().get_xticklabels(), rotation=30)
+----
+
+[[matplotlib_16]]
+.Plot combining candlestick and volume bar chart
+image::images/pyfi_0522.png[]
+
+// code cell end
+
+
+=== 3D Plotting
+
+(((data visualization, 3D plotting)))(((three-dimensional plotting)))(((matplotlib library, 3D plotting)))There are not too many fields in finance that really benefit from visualization in three dimensions. However, one application area is volatility surfaces showing implied volatilities simultaneously for a number of times-of-maturity and strikes. In what follows, we artificially generate a plot that resembles a volatility surface. To this end, we consider:
+
+* _Strike values_ between 50 and 150
+* _Times-to-maturity_ between 0.5 and 2.5 years
+
+This provides our two-dimensional coordinate system. We can use +NumPy+'s +meshgrid+ function to generate such a system out of two one-dimensional +ndarray+ objects:
+
+// code cell start uuid: a9064b7f-1ffc-497d-bcf0-5fe681e2e9ff
+[source, python]
+----
+In [32]: strike = np.linspace(50, 150, 24)
+         ttm = np.linspace(0.5, 2.5, 24)
+         strike, ttm = np.meshgrid(strike, ttm)
+----
+
+// code cell end
+
+This transforms both 1D ++array++s into 2D ++array++s, repeating the original axis values as often as needed:
+
+// code cell start uuid: 0a5797f5-0445-4bdc-8e11-5d88690a3b8a
+[source, python]
+----
+In [33]: strike[:2]
+----
+
+----
+Out[33]: array([[  50.        ,   54.34782609,   58.69565217,   63.04347826,
+                   67.39130435,   71.73913043,   76.08695652,   80.43478261,
+                   84.7826087 ,   89.13043478,   93.47826087,   97.82608696,
+                  102.17391304,  106.52173913,  110.86956522,  115.2173913 ,
+                  119.56521739,  123.91304348,  128.26086957,  132.60869565,
+                  136.95652174,  141.30434783,  145.65217391,  150.        ],
+                [  50.        ,   54.34782609,   58.69565217,   63.04347826,
+                   67.39130435,   71.73913043,   76.08695652,   80.43478261,
+                   84.7826087 ,   89.13043478,   93.47826087,   97.82608696,
+                  102.17391304,  106.52173913,  110.86956522,  115.2173913 ,
+                  119.56521739,  123.91304348,  128.26086957,  132.60869565,
+                  136.95652174,  141.30434783,  145.65217391,  150.        ]])
+----
+
+// code cell end
+
+Now, given the new +ndarray+ objects, we generate the _fake implied volatilities_ by a simple, scaled quadratic function:
+
+// code cell start uuid: b9c92f57-c819-4df4-bc68-a71e0065dfdc
+[source, python]
+----
+In [34]: iv = (strike - 100) ** 2 / (100 * strike) / ttm
+           # generate fake implied volatilities
+----
+
+// code cell end
+
+The plot resulting from the following code is shown in <<matplotlib_17>>:
+
+// code cell start uuid: f8557d99-cba4-4ab8-9594-ac8050801dce
+[source, python]
+----
+In [35]: from mpl_toolkits.mplot3d import Axes3D
+         
+         fig = plt.figure(figsize=(9, 6))
+         ax = fig.gca(projection='3d')
+         
+         surf = ax.plot_surface(strike, ttm, iv, rstride=2, cstride=2,
+                                cmap=plt.cm.coolwarm, linewidth=0.5,
+                                antialiased=True)
+         
+         ax.set_xlabel('strike')
+         ax.set_ylabel('time-to-maturity')
+         ax.set_zlabel('implied volatility')
+         
+         fig.colorbar(surf, shrink=0.5, aspect=5)
+----
+
+[[matplotlib_17]]
+.3D surface plot for (fake) implied volatilities
+image::images/pyfi_0523.png[]
+
+// code cell end
+
+(((data visualization, plot_surface parameters)))(((plot_surface function)))<<plot_surface_params>> provides a description of the different parameters the +plot_surface+ function can take.
+
+[[plot_surface_params]]
+.Parameters for plot_surface
+[options="header, unbreakable"]
+|=======
+|Parameter     | Description
+|+X, Y, Z+| 	Data values as 2D arrays
+|+rstride+| 	Array row stride (step size)
+|+cstride+| 	Array column stride (step size)
+|+color+| 	Color of the surface patches
+|+cmap+| 	A colormap for the surface patches
+|+facecolors+| 	Face colors for the individual patches
+|+norm+| 	An instance of +Normalize+ to map values to colors
+|+vmin+| 	Minimum value to map
+|+vmax+| 	Maximum value to map
+|+shade+| 	Whether to shade the face colors
+|=======
+
+As with two-dimensional plots, the line style can be replaced by single points or, as in what follows, single triangles. <<matplotlib_18>> plots the same data as a 3D scatter plot, but now also with a different viewing angle, using the +view_init+ function to set it:
+
+// code cell start uuid: d6126afb-1ead-4859-9b01-813c80c5c3dc
+[source, python]
+----
+In [36]: fig = plt.figure(figsize=(8, 5))
+         ax = fig.add_subplot(111, projection='3d')
+         ax.view_init(30, 60)
+         
+         ax.scatter(strike, ttm, iv, zdir='z', s=25,
+                    c='b', marker='^')
+         
+         ax.set_xlabel('strike')
+         ax.set_ylabel('time-to-maturity')
+         ax.set_zlabel('implied volatility')
+         
+----
+
+[[matplotlib_18]]
+.3D scatter plot for (fake) implied volatilities
+image::images/pyfi_0524.png[]
+
+// code cell end
+
+
+=== Conclusions
+
++matplotlib+ can be considered both the benchmark and the workhorse when it comes to data visualization in +Python+. It is tightly integrated with +NumPy+ and the basic functionality is easily and conveniently accessed. However, on the other hand, +matplotlib+ is a rather mighty library with a somewhat complex API. This makes it impossible to give a broader overview of all the capabilities of +matplotlib+ in this chapter.
+
+This chapter introduces the basic functions of +matplotlib+ for 2D and 3D plotting useful in most financial contexts. Other chapters provide further examples of how to use this fundamental library for visualization.
+
+=== Further Reading
+
+The major resources for +matplotlib+ can be found on the Web:
+
+* The home page of +matplotlib+ is, of course, the best starting point: http://matplotlib.org.
+* There's a gallery with many useful examples: http://matplotlib.org/gallery.html.
+* A tutorial for 2D plotting is found here: http://matplotlib.org/users/pyplot_tutorial.html.
+* Another one for 3D plotting is here: http://matplotlib.org/mpl_toolkits/mplot3d/tutorial.html.
+
+++++
+<?hard-pagebreak?>
+++++
+
+It has become kind of a standard routine to consult the gallery, to look there for an appropriate visualization example, and to start with the corresponding example code. Using, for example, +IPython Notebook+, only a single command is required to get started once you have found the right example.
+

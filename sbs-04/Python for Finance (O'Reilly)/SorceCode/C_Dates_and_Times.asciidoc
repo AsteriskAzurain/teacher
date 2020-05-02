@@ -1,0 +1,1153 @@
+[appendix]
+[[dates_times]]
+== Dates and Times
+
+As in the majority of scientific disciplines, dates and times play an important role in finance. This appendix introduces different aspects of this topic when it comes to +Python+ programming. It cannot, of course, not be exhaustive. However, it provides an introduction into the main areas of the +Python+ ecosystem that support the modeling of date and time information.
+
+
+=== Python
+
+The +datetime+ module from the +Python+ standard library allows for the implementation of the most important date and time-related tasks.footnote:[For more information on this module, see the https://docs.python.org/2/library/datetime.html[online documentation].] We start by importing the module:((("dates and times", "Python datetime module", id="ix_DTdatetime", range="startofrange")))((("datetime module", id="ix_datetime", range="startofrange")))
+
+// code cell start uuid: a3ec8d38-122c-43c5-8465-af5adca635ac
+[source, python]
+----
+In [1]: import datetime as dt
+----
+
+// code cell end
+
+Two different functions provide the exact current date and time:
+
+// code cell start uuid: 36fe56ce-2477-45b9-935f-05102b1c442b
+[source, python]
+----
+In [2]: dt.datetime.now()
+----
+
+----
+Out[2]: datetime.datetime(2014, 9, 14, 19, 22, 24, 366619)
+----
+
+// code cell end
+
+// code cell start uuid: 69b2ac27-0cdb-402c-9aa5-0d8b2b6341d2
+[source, python]
+----
+In [3]: to = dt.datetime.today()
+        to
+----
+
+----
+Out[3]: datetime.datetime(2014, 9, 14, 19, 22, 24, 491234)
+----
+
+// code cell end
+
+The resulting object is a +datetime+ object:
+
+// code cell start uuid: b92165ee-31d2-41cc-9daf-d95df94077d0
+[source, python]
+----
+In [4]: type(to)
+----
+
+----
+Out[4]: datetime.datetime
+----
+
+// code cell end
+
+The method +weekday+ provides the number for the day of the week, given a +datetime+ object:
+
+// code cell start uuid: fc7a2410-0f89-45ad-837d-7eb54168e219
+[source, python]
+----
+In [5]: dt.datetime.today().weekday()
+          # zero-based numbering; 0 = Monday
+----
+
+----
+Out[5]: 6
+----
+
+// code cell end
+
+Such an object can, of course, be directly constructed:
+
+// code cell start uuid: 03f82800-89c5-414c-a822-dbc50f0eed5d
+[source, python]
+----
+In [6]: d = dt.datetime(2016, 10, 31, 10, 5, 30, 500000)
+        d
+----
+
+----
+Out[6]: datetime.datetime(2016, 10, 31, 10, 5, 30, 500000)
+----
+
+// code cell end
+
+// code cell start uuid: 5b74f4da-d0b4-4dba-b93b-40bb8d253e5e
+[source, python]
+----
+In [7]: print d
+----
+
+----
+Out[7]: 2016-10-31 10:05:30.500000
+        
+----
+
+// code cell end
+
+// code cell start uuid: 3a1e7cb2-91b2-456b-87d6-9e6aaa4263e0
+[source, python]
+----
+In [8]: str(d)
+----
+
+----
+Out[8]: '2016-10-31 10:05:30.500000'
+----
+
+// code cell end
+
+From such an object you can easily extract, for example, +year+, +month+, +day+ information, and so forth:
+
+// code cell start uuid: b8cc16d8-d949-4538-b0a1-63e1f98590af
+[source, python]
+----
+In [9]: d.year
+----
+
+----
+Out[9]: 2016
+----
+
+// code cell end
+
+// code cell start uuid: a314498d-e218-4f11-95b1-6ce1a7e6e9c1
+[source, python]
+----
+In [10]: d.month
+----
+
+----
+Out[10]: 10
+----
+
+// code cell end
+
+// code cell start uuid: fc3d11d8-26b9-4cfb-87e7-593490b50669
+[source, python]
+----
+In [11]: d.day
+----
+
+----
+Out[11]: 31
+----
+
+// code cell end
+
+// code cell start uuid: 2d807f96-dfd8-4694-85d8-da052269ad33
+[source, python]
+----
+In [12]: d.hour
+----
+
+----
+Out[12]: 10
+----
+
+// code cell end
+
+Via the method +toordinal+, you can translate the  date information to ordinal number representation:
+
+// code cell start uuid: af34af38-1fb9-4215-af96-972163b10cae
+[source, python]
+----
+In [13]: o = d.toordinal()
+         o
+----
+
+----
+Out[13]: 736268
+----
+
+// code cell end
+
+This also works the other way around. However, you lose the time information during this process:
+
+// code cell start uuid: 85c1c8ca-3eee-4bd5-bb9b-c2e25a9757aa
+[source, python]
+----
+In [14]: dt.datetime.fromordinal(o)
+----
+
+----
+Out[14]: datetime.datetime(2016, 10, 31, 0, 0)
+----
+
+// code cell end
+
+On the other hand, you can separate out the time information from the +datetime+ object, which then gives you a +time+ object:
+
+// code cell start uuid: 39009fbb-a634-4faf-87bc-0fc2e8f04a28
+[source, python]
+----
+In [15]: t = dt.datetime.time(d)
+         t
+----
+
+----
+Out[15]: datetime.time(10, 5, 30, 500000)
+----
+
+// code cell end
+
+// code cell start uuid: 830baae5-3c29-4e0d-9cfb-b3e2001f23ea
+[source, python]
+----
+In [16]: type(t)
+----
+
+----
+Out[16]: datetime.time
+----
+
+// code cell end
+
+Similarly, you can separate out the date information only, ending up with a +date+ object:
+
+// code cell start uuid: 25a36760-27a9-46c8-a317-041ec0f405b4
+[source, python]
+----
+In [17]: dd = dt.datetime.date(d)
+         dd
+----
+
+----
+Out[17]: datetime.date(2016, 10, 31)
+----
+
+// code cell end
+
+Often, a certain degree of precision is sufficient. To this end, you can simply replace certain attributes of the +datetime+ object with literal:
+
+// code cell start uuid: e2951b1a-9b26-4681-8968-dd923edd8fb8
+[source, python]
+----
+In [18]: d.replace(second=0, microsecond=0)
+----
+
+----
+Out[18]: datetime.datetime(2016, 10, 31, 10, 5)
+----
+
+// code cell end
+
++timedelta+ is another class of objects that result from arithmetic operations on the other date-time-related objects:
+
+// code cell start uuid: 2e9b4861-55e6-4b5d-8980-3a353db62557
+[source, python]
+----
+In [19]: td = d - dt.datetime.now()
+         td
+----
+
+----
+Out[19]: datetime.timedelta(777, 52983, 863732)
+----
+
+// code cell end
+
+// code cell start uuid: 0d0fc0a2-e50e-4704-9bf4-df1b4c71b501
+[source, python]
+----
+In [20]: type(td)
+----
+
+----
+Out[20]: datetime.timedelta
+----
+
+// code cell end
+
+Again, you can access the attributes directly to extract detailed information:
+
+// code cell start uuid: 558a30a2-9b7a-4180-89db-fa8416bb35c7
+[source, python]
+----
+In [21]: td.days
+----
+
+----
+Out[21]: 777
+----
+
+// code cell end
+
+// code cell start uuid: 16bbe4f1-313d-4a3b-be60-9b313a700d44
+[source, python]
+----
+In [22]: td.seconds
+----
+
+----
+Out[22]: 52983
+----
+
+// code cell end
+
+// code cell start uuid: a8d8c177-a9f9-48c2-9275-3f45e328986a
+[source, python]
+----
+In [23]: td.microseconds
+----
+
+----
+Out[23]: 863732
+----
+
+// code cell end
+
+// code cell start uuid: 79935a05-995c-4a1a-8fae-370a1b4b55a9
+[source, python]
+----
+In [24]: td.total_seconds()
+----
+
+----
+Out[24]: 67185783.863732
+----
+
+// code cell end
+
+There are multiple ways to transform a +datetime+ object into different representations, as well as to generate +datetime+ objects out of, say, a +string+ object. Details are found in the documentation of the +datetime+ module. Here are a few examples:
+
+// code cell start uuid: b1d717a5-aa85-4398-80af-1cb051d8448a
+[source, python]
+----
+In [25]: d.isoformat()
+----
+
+----
+Out[25]: '2016-10-31T10:05:30.500000'
+----
+
+// code cell end
+
+// code cell start uuid: 3a3757c2-0740-4918-8739-56b217053f12
+[source, python]
+----
+In [26]: d.strftime("%A, %d. %B %Y %I:%M%p")
+----
+
+----
+Out[26]: 'Monday, 31. October 2016 10:05AM'
+----
+
+// code cell end
+
+// code cell start uuid: 404b702b-78cf-47c3-a21b-3d4921b30469
+[source, python]
+----
+In [27]: dt.datetime.strptime('2017-03-31', '%Y-%m-%d')
+           # year first and four-digit year
+----
+
+----
+Out[27]: datetime.datetime(2017, 3, 31, 0, 0)
+----
+
+// code cell end
+
+// code cell start uuid: 12c007b9-57a3-40f9-b9b7-6ccde307760b
+[source, python]
+----
+In [28]: dt.datetime.strptime('30-4-16', '%d-%m-%y')
+           # day first and two-digit year
+----
+
+----
+Out[28]: datetime.datetime(2016, 4, 30, 0, 0)
+----
+
+// code cell end
+
+// code cell start uuid: 1a440514-345b-4dcb-ab2a-08428d3cf4f9
+[source, python]
+----
+In [29]: ds = str(d)
+         ds
+----
+
+----
+Out[29]: '2016-10-31 10:05:30.500000'
+----
+
+// code cell end
+
+// code cell start uuid: a379344e-f3be-4647-8c5d-5e9bff57a033
+[source, python]
+----
+In [30]: dt.datetime.strptime(ds, '%Y-%m-%d %H:%M:%S.%f')
+----
+
+----
+Out[30]: datetime.datetime(2016, 10, 31, 10, 5, 30, 500000)
+----
+
+// code cell end
+
+In addition to the +now+ and +today+ functions, there is also the +utcnow+ function, which gives the exact date and time information in UTC (Coordinated Universal Time, formerly known as Greenwich Mean Time, or GMT). This represents a two-hour difference from the author's time zone (CET):
+
+// code cell start uuid: 20a5bddd-64a6-4984-9b22-fac30d3e3447
+[source, python]
+----
+In [31]: dt.datetime.now()
+----
+
+----
+Out[31]: datetime.datetime(2014, 9, 14, 19, 22, 28, 123943)
+----
+
+// code cell end
+
+// code cell start uuid: 9eff07dc-55cd-499a-be35-897823eb9d26
+[source, python]
+----
+In [32]: dt.datetime.utcnow()
+           #  Coordinated Universal Time
+----
+
+----
+Out[32]: datetime.datetime(2014, 9, 14, 17, 22, 28, 240319)
+----
+
+// code cell end
+
+// code cell start uuid: 9dcdea6f-ae6f-4a65-9367-df9f3a2cce93
+[source, python]
+----
+In [33]: dt.datetime.now() - dt.datetime.utcnow()
+           # UTC + 2h = CET (summer)
+----
+
+----
+Out[33]: datetime.timedelta(0, 7199, 999982)
+----
+
+// code cell end
+
+Another class of the +datetime+ module is the +tzinfo+ class, a generic time zone class with methods +utcoffset+, +dst+, and +tzname+. +dst+ stands for Daylight Saving Time (DST). A definition for UTC time might look as follows:
+
+// code cell start uuid: 7084aef3-63ad-4809-a806-0a1da337ce32
+[source, python]
+----
+In [34]: class UTC(dt.tzinfo):
+             def utcoffset(self, d):
+                 return dt.timedelta(hours=0)
+             def dst(self, d):
+                 return dt.timedelta(hours=0)
+             def tzname(self, d):
+                 return "UTC"
+----
+
+// code cell end
+
+This can be used as an attribute to a +datetime+ object and be defined via the +replace+ method:
+
+// code cell start uuid: ca89cc7a-140b-4667-b14c-d550d05deac8
+[source, python]
+----
+In [35]: u = dt.datetime.utcnow()
+         u = u.replace(tzinfo=UTC())
+           # attach time zone information
+         u
+----
+
+----
+Out[35]: datetime.datetime(2014, 9, 14, 17, 22, 28, 597383, tzinfo=<__main__.UTC
+          object at 0x7f59e496ec10>)
+----
+
+// code cell end
+
+Similarly, the following definition is for CET during the summer:
+
+// code cell start uuid: 1ae44368-a923-45a4-a8d7-fd47665b29eb
+[source, python]
+----
+In [36]: class CET(dt.tzinfo):
+             def utcoffset(self, d):
+                 return dt.timedelta(hours=2)
+             def dst(self, d):
+                 return dt.timedelta(hours=1)
+             def tzname(self, d):
+                 return "CET + 1"
+----
+
+// code cell end
+
+Making use of the +astimezone+ method then makes it straightforward to transform the UTC-based +datetime+ object +u+ into a CET-based one:
+
+// code cell start uuid: 044fdad9-ed43-44a7-a43c-b701bd47e0ce
+[source, python]
+----
+In [37]: u.astimezone(CET())
+----
+
+----
+Out[37]: datetime.datetime(2014, 9, 14, 19, 22, 28, 597383, tzinfo=<__main__.CET
+          object at 0x7f59e79d8f10>)
+----
+
+// code cell end
+
+There is a +Python+ module available called http://pytz.sourceforge.net[+pytz+] that implements the most important time zones from around the world:
+
+// code cell start uuid: a387a449-123e-443f-8e9b-d57690b59adf
+[source, python]
+----
+In [38]: import pytz
+----
+
+// code cell end
+
++country_names+ and +country_timezones+ are dictionaries containing the countries and time zones covered:
+
+// code cell start uuid: d7b48ceb-344f-4ffe-9d28-7a3a7efc2a6f
+[source, python]
+----
+In [39]: pytz.country_names['US']
+----
+
+----
+Out[39]: u'United States'
+----
+
+// code cell end
+
+// code cell start uuid: ea67d723-598b-425e-9430-b872f3a0a126
+[source, python]
+----
+In [40]: pytz.country_timezones['BE']
+----
+
+----
+Out[40]: [u'Europe/Brussels']
+----
+
+// code cell end
+
+// code cell start uuid: 04be41f4-2503-4592-90d7-e6152c6b956a
+[source, python]
+----
+In [41]: pytz.common_timezones[-10:]
+----
+
+----
+Out[41]: ['Pacific/Wake',
+          'Pacific/Wallis',
+          'US/Alaska',
+          'US/Arizona',
+          'US/Central',
+          'US/Eastern',
+          'US/Hawaii',
+          'US/Mountain',
+          'US/Pacific',
+          'UTC']
+----
+
+// code cell end
+
+With +pytz+, there is generally no need to define your own +tzinfo+ objects:
+
+// code cell start uuid: 997a6626-3c15-41da-ac1d-50e90dbca3ab
+[source, python]
+----
+In [42]: u = dt.datetime.utcnow()
+         u = u.replace(tzinfo=pytz.utc)
+         u
+----
+
+----
+Out[42]: datetime.datetime(2014, 9, 14, 17, 22, 29, 503702, tzinfo=<UTC>)
+----
+
+// code cell end
+
+// code cell start uuid: c483d48c-ec47-46bc-96b1-7bbb181c019e
+[source, python]
+----
+In [43]: u.astimezone(pytz.timezone("CET"))
+----
+
+----
+Out[43]: datetime.datetime(2014, 9, 14, 19, 22, 29, 503702, tzinfo=<DstTzInfo 'C
+         ET' CEST+2:00:00 DST>)
+----
+
+// code cell end
+
+// code cell start uuid: 342ad2f0-7702-4b2f-8bfb-e77ad746ec72
+[source, python]
+----
+In [44]: u.astimezone(pytz.timezone("GMT"))
+----
+
+----
+Out[44]: datetime.datetime(2014, 9, 14, 17, 22, 29, 503702, tzinfo=<StaticTzInfo
+          'GMT'>)
+----
+
+// code cell end
+
+// code cell start uuid: f793e4b9-f88f-488a-870a-389264287518
+[source, python]
+----
+In [45]: u.astimezone(pytz.timezone("US/Central"))
+----
+
+----
+Out[45]: datetime.datetime(2014, 9, 14, 12, 22, 29, 503702, tzinfo=<DstTzInfo 'U
+         S/Central' CDT-1 day, 19:00:00 DST>)
+----
+
+// code cell end
+
+
+=== NumPy
+
+(((range="endofrange", startref="ix_DTdatetime")))(((range="endofrange", startref="ix_datetime")))Since +NumPy+ ++1.7++, there has been native date-time information support in http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html[+NumPy+]. The basic class is called +datetime64+:((("NumPy", "date-time information support in", id="ix_NPdattm", range="startofrange")))((("dates and times", "NumPy support for", id="ix_DTnumpy", range="startofrange")))((("datetime64 class", id="ix_dt64", range="startofrange")))
+
+// code cell start uuid: dbf9456a-d9af-4ef5-84e9-fd1479d0c93a
+[source, python]
+----
+In [46]: import numpy as np
+----
+
+// code cell end
+
+// code cell start uuid: 25f1a778-2ed7-43e2-bae5-c7fde6045e0e
+[source, python]
+----
+In [47]: nd = np.datetime64('2015-10-31')
+         nd
+----
+
+----
+Out[47]: numpy.datetime64('2015-10-31')
+----
+
+// code cell end
+
+Like +datetime+ objects, +datetime64+ objects can be represented as +string+ objects:
+
+// code cell start uuid: 9436432c-dc36-4e4d-8ead-21ced9abe2cc
+[source, python]
+----
+In [48]: np.datetime_as_string(nd)
+----
+
+----
+Out[48]: '2015-10-31'
+----
+
+// code cell end
+
+Every such object has metadata stored with it, which can be accessed via the +datetime_data+ method. The two main components are the frequency information (e.g., +D+ for day) and the unit (e.g., +1+ for one day in our case):
+
+// code cell start uuid: 162dbea3-2ab7-4e5b-b682-ea51e256c82a
+[source, python]
+----
+In [49]: np.datetime_data(nd)
+----
+
+----
+Out[49]: ('D', 1)
+----
+
+// code cell end
+
+A +datetime64+ object can easily be constructed from a +datetime+ object:
+
+// code cell start uuid: a12e0b91-7dc0-4f79-a400-ec00c55a1774
+[source, python]
+----
+In [50]: d
+----
+
+----
+Out[50]: datetime.datetime(2016, 10, 31, 10, 5, 30, 500000)
+----
+
+// code cell end
+
+// code cell start uuid: 8892e8b0-d07a-4e7d-bb93-7ffbaaca9ede
+[source, python]
+----
+In [51]: nd = np.datetime64(d)
+         nd
+----
+
+----
+Out[51]: numpy.datetime64('2016-10-31T11:05:30.500000+0100')
+----
+
+// code cell end
+
+Similarly, using the +astype+ method, a +datetime64+ object can be converted into a +datetime+ object:
+
+// code cell start uuid: f8409d8d-7a34-4bba-b436-0c29ddd80bab
+[source, python]
+----
+In [52]: nd.astype(dt.datetime)
+----
+
+----
+Out[52]: datetime.datetime(2016, 10, 31, 10, 5, 30, 500000)
+----
+
+// code cell end
+
+Another way to construct such an object is by providing a +string+ object, e.g., with year and month, and the frequency information. Note that in the following case, the object value defaults to the first day of the month:
+
+// code cell start uuid: 9863c779-602c-4f36-9332-d5b0712ca412
+[source, python]
+----
+In [53]: nd = np.datetime64('2015-10', 'D')
+         nd
+----
+
+----
+Out[53]: numpy.datetime64('2015-10-01')
+----
+
+// code cell end
+
+Comparing two +datetime64+ objects yields a +True+ value whenever the information given is the same--even if the level of detail is different:
+
+// code cell start uuid: e18b3645-6a30-4684-a1b7-f96015c1ec12
+[source, python]
+----
+In [54]: np.datetime64('2015-10') == np.datetime64('2015-10-01')
+----
+
+----
+Out[54]: True
+----
+
+// code cell end
+
+Of course, you can also define +ndarray+ objects containing multiple +datetime64+ objects:
+
+// code cell start uuid: 3002dcbe-be45-43a7-892d-0a12982ab27a
+[source, python]
+----
+In [55]: np.array(['2016-06-10', '2016-07-10', '2016-08-10'], dtype='datetime64')
+----
+
+----
+Out[55]: array(['2016-06-10', '2016-07-10', '2016-08-10'], dtype='datetime64[D]')
+----
+
+// code cell end
+
+// code cell start uuid: c2e23eb6-f26e-4da0-83ff-fb50c5a7f3b0
+[source, python]
+----
+In [56]: np.array(['2016-06-10T12:00:00', '2016-07-10T12:00:00',
+                   '2016-08-10T12:00:00'], dtype='datetime64[s]')
+----
+
+----
+Out[56]: array(['2016-06-10T12:00:00+0200', '2016-07-10T12:00:00+0200',
+                '2016-08-10T12:00:00+0200'], dtype='datetime64[s]')
+----
+
+// code cell end
+
+You can also generate ranges of dates by using the function +arange+. Different frequencies (e.g., days, months, or weeks) are easily taken care of:
+
+// code cell start uuid: fb0bf002-aeb4-46a3-acc1-26771e9f2200
+[source, python]
+----
+In [57]: np.arange('2016-01-01', '2016-01-04', dtype='datetime64')
+           # daily frequency as default in this case
+----
+
+----
+Out[57]: array(['2016-01-01', '2016-01-02', '2016-01-03'], dtype='datetime64[D]')
+----
+
+// code cell end
+
+// code cell start uuid: a6247fe4-bb1f-47c3-9e23-a96a921660e0
+[source, python]
+----
+In [58]: np.arange('2016-01-01', '2016-10-01', dtype='datetime64[M]')
+           # monthly frequency
+----
+
+----
+Out[58]: array(['2016-01', '2016-02', '2016-03', '2016-04', '2016-05', '2016-06',
+                '2016-07', '2016-08', '2016-09'], dtype='datetime64[M]')
+----
+
+// code cell end
+
+// code cell start uuid: e1ab7a40-9075-4dca-9b7d-4c0838a39243
+[source, python]
+----
+In [59]: np.arange('2016-01-01', '2016-10-01', dtype='datetime64[W]')[:10]
+           # weekly frequency
+----
+
+----
+Out[59]: array(['2015-12-31', '2016-01-07', '2016-01-14', '2016-01-21',
+                '2016-01-28', '2016-02-04', '2016-02-11', '2016-02-18',
+                '2016-02-25', '2016-03-03'], dtype='datetime64[W]')
+----
+
+// code cell end
+
+You can also easily use subday frequencies, like hours or seconds (refer to the documentation for all options):
+
+// code cell start uuid: ef43165d-ade2-49fd-bed5-c36564720ceb
+[source, python]
+----
+In [60]: dtl = np.arange('2016-01-01T00:00:00', '2016-01-02T00:00:00',
+                         dtype='datetime64[h]')
+           # hourly frequency
+         dtl[:10]
+----
+
+----
+Out[60]: array(['2016-01-01T00+0100', '2016-01-01T01+0100', '2016-01-01T02+0100',
+                '2016-01-01T03+0100', '2016-01-01T04+0100', '2016-01-01T05+0100',
+                '2016-01-01T06+0100', '2016-01-01T07+0100', '2016-01-01T08+0100',
+                '2016-01-01T09+0100'], dtype='datetime64[h]')
+----
+
+// code cell end
+
+Plotting date-time and/or time series data can sometimes be tricky. +matplotlib+ has good support for standard +datetime+ objects. Transforming +datetime64+ information into +datetime+ information generally does the trick, as the following example, whose result is shown in <<datetime_plot>>, illustrates:
+
+// code cell start uuid: fed58557-33d1-400b-bab6-f42413da2b3d
+[source, python]
+----
+In [61]: import matplotlib.pyplot as plt
+         %matplotlib inline
+----
+
+// code cell end
+
+// code cell start uuid: b4fa249e-72b1-4b02-b36e-7a9f2f16cb94
+[source, python]
+----
+In [62]: np.random.seed(3000)
+         rnd = np.random.standard_normal(len(dtl)).cumsum() ** 2
+----
+
+// code cell end
+
+// code cell start uuid: 2002ee13-8204-4bbd-94ad-d1c0d3236ed7
+[source, python]
+----
+In [63]: fig = plt.figure()
+         plt.plot(dtl.astype(dt.datetime), rnd)
+           # convert np.datetime to datetime.datetime
+         plt.grid(True)
+         fig.autofmt_xdate()
+           # autoformatting of datetime x-ticks
+----
+
+[[datetime_plot]]
+.Plot with datetime.datetime x-ticks autoformatted
+image::images/pyfi_ac01.png[]
+
+// code cell end
+
+Finally, we also have an illustration of using +arange+ with seconds and milliseconds as frequencies:
+
+// code cell start uuid: a2304fd8-93ce-461c-9005-92ddbb1709cf
+[source, python]
+----
+In [64]: np.arange('2016-01-01T00:00:00', '2016-01-02T00:00:00',
+                   dtype='datetime64[s]')[:10]
+           # seconds as frequency
+----
+
+----
+Out[64]: array(['2016-01-01T00:00:00+0100', '2016-01-01T00:00:01+0100',
+                '2016-01-01T00:00:02+0100', '2016-01-01T00:00:03+0100',
+                '2016-01-01T00:00:04+0100', '2016-01-01T00:00:05+0100',
+                '2016-01-01T00:00:06+0100', '2016-01-01T00:00:07+0100',
+                '2016-01-01T00:00:08+0100', '2016-01-01T00:00:09+0100'], dtype='
+         datetime64[s]')
+----
+
+// code cell end
+
+// code cell start uuid: 9904555a-4e39-41c4-bc28-39dfeeac2542
+[source, python]
+----
+In [65]: np.arange('2016-01-01T00:00:00', '2016-01-02T00:00:00',
+                   dtype='datetime64[ms]')[:10]
+           # milliseconds as frequency
+----
+
+----
+Out[65]: array(['2016-01-01T00:00:00.000+0100', '2016-01-01T00:00:00.001+0100',
+                '2016-01-01T00:00:00.002+0100', '2016-01-01T00:00:00.003+0100',
+                '2016-01-01T00:00:00.004+0100', '2016-01-01T00:00:00.005+0100',
+                '2016-01-01T00:00:00.006+0100', '2016-01-01T00:00:00.007+0100',
+                '2016-01-01T00:00:00.008+0100', '2016-01-01T00:00:00.009+0100'],
+          dtype='datetime64[ms]')
+----
+
+// code cell end
+
+
+=== pandas
+
+(((range="endofrange", startref="ix_DTnumpy")))(((range="endofrange", startref="ix_dt64")))((("dates and times", "pandas support for", id="ix_DTpandas", range="startofrange")))((("pandas library", "date-time information support in", id="ix_PLdattm", range="startofrange")))The +pandas+ library was specifically designed with time series data in mind. Therefore, the library provides classes that are able to efficiently handle date-time information, like the +DatetimeIndex+ class for time indices (cf. the http://pandas.pydata.org/pandas-docs/stable/timeseries.html[documentation]):
+
+// code cell start uuid: ef2f12cc-0ff2-4f8d-88a2-ed4e7904019e
+[source, python]
+----
+In [66]: import pandas as pd
+----
+
+// code cell end
+
+Date-time information in +pandas+ is generally stored as a +Timestamp+ object:
+
+// code cell start uuid: b5772b82-ae54-4ab5-b776-65e5bdfed0b4
+[source, python]
+----
+In [67]: ts = pd.Timestamp('2016-06-30')
+         ts
+----
+
+----
+Out[67]: Timestamp('2016-06-30 00:00:00')
+----
+
+// code cell end
+
+Such objects are easily transformed into regular +datetime+ objects with the +to_datetime+ method:
+
+// code cell start uuid: 7ec0312f-8bfa-45fb-ae4e-7e7e2f3d4866
+[source, python]
+----
+In [68]: d = ts.to_datetime()
+         d
+----
+
+----
+Out[68]: datetime.datetime(2016, 6, 30, 0, 0)
+----
+
+// code cell end
+
+Similarly, a +Timestamp+ object is straightforwardly constructed from a +datetime+ object:
+
+// code cell start uuid: 9002f4f5-a542-4208-897d-4cd4a5b7ca9e
+[source, python]
+----
+In [69]: pd.Timestamp(d)
+----
+
+----
+Out[69]: Timestamp('2016-06-30 00:00:00')
+----
+
+// code cell end
+
+or from a +NumPy+ +datetime64+ object:
+
+// code cell start uuid: 17eb827b-b356-4d6e-9e86-7e99483087fd
+[source, python]
+----
+In [70]: pd.Timestamp(nd)
+----
+
+----
+Out[70]: Timestamp('2015-10-01 00:00:00')
+----
+
+// code cell end
+
+Another important class is the +DatetimeIndex+ class, which is a collection of +Timestamp+ objects with a number of powerful methods attached (cf. http://bit.ly/date_range_doc and http://bit.ly/datetimeindex_doc). Such an object can be instantiated with the +date_range+ function, which is rather flexible and powerful for constructing time indices (see <<fin_time_series>> for more details on this function):
+
+// code cell start uuid: 1dada741-691b-481f-a944-3e810f80b213
+[source, python]
+----
+In [71]: dti = pd.date_range('2016/01/01', freq='M', periods=12)
+         dti
+----
+
+----
+Out[71]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2016-01-31, ..., 2016-12-31]
+         Length: 12, Freq: M, Timezone: None
+----
+
+// code cell end
+
+Single elements of the object are accessed by the usual indexing operations:
+
+// code cell start uuid: e6794dab-86c8-4ee2-99de-1c86f2a4a445
+[source, python]
+----
+In [72]: dti[6]
+----
+
+----
+Out[72]: Timestamp('2016-07-31 00:00:00', offset='M')
+----
+
+// code cell end
+
++DatetimeIndex+ objects can be transformed into arrays of +datetime+ objects through the method +to_pydatetime+:
+
+// code cell start uuid: e75454d8-1ea6-45aa-b1fd-281d6e41a8c4
+[source, python]
+----
+In [73]: pdi = dti.to_pydatetime()
+         pdi
+----
+
+----
+Out[73]: array([datetime.datetime(2016, 1, 31, 0, 0),
+                datetime.datetime(2016, 2, 29, 0, 0),
+                datetime.datetime(2016, 3, 31, 0, 0),
+                datetime.datetime(2016, 4, 30, 0, 0),
+                datetime.datetime(2016, 5, 31, 0, 0),
+                datetime.datetime(2016, 6, 30, 0, 0),
+                datetime.datetime(2016, 7, 31, 0, 0),
+                datetime.datetime(2016, 8, 31, 0, 0),
+                datetime.datetime(2016, 9, 30, 0, 0),
+                datetime.datetime(2016, 10, 31, 0, 0),
+                datetime.datetime(2016, 11, 30, 0, 0),
+                datetime.datetime(2016, 12, 31, 0, 0)], dtype=object)
+----
+
+// code cell end
+
+Using the +DatetimeIndex+ constructor also allows the opposite operation:
+
+// code cell start uuid: a13e4c12-5cb0-480a-a73f-a9a257a71ede
+[source, python]
+----
+In [74]: pd.DatetimeIndex(pdi)
+----
+
+----
+Out[74]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2016-01-31, ..., 2016-12-31]
+         Length: 12, Freq: None, Timezone: None
+----
+
+// code cell end
+
+In the case of +NumPy+ +datetime64+ objects, the +astype+ method has to be used:
+
+// code cell start uuid: 142ccb72-59dc-4468-85a0-efb563f70b94
+[source, python]
+----
+In [75]: pd.DatetimeIndex(dtl.astype(pd.datetime))
+----
+
+----
+Out[75]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2015-12-31 23:00:00, ..., 2016-01-01 22:00:00]
+         Length: 24, Freq: None, Timezone: None
+----
+
+// code cell end
+
+
++pandas+ takes care of proper plotting of date-time information (see <<pandas_plot>> and also <<fin_time_series>>):
+
+// code cell start uuid: 0cb256aa-7720-460c-8958-e3435a33ec9a
+[source, python]
+----
+In [76]: rnd = np.random.standard_normal(len(dti)).cumsum() ** 2
+----
+
+// code cell end
+
+// code cell start uuid: c7dde921-fcde-4b6a-8820-0208c2c883d2
+[source, python]
+----
+In [77]: df = pd.DataFrame(rnd, columns=['data'], index=dti)
+----
+
+// code cell end
+
+// code cell start uuid: 7e61fdd3-a9b4-4342-adfb-91aa3450c2b7
+[source, python]
+----
+In [78]: df.plot()
+----
+
+[[pandas_plot]]
+.pandas plot with Timestamp x-ticks autoformatted
+image::images/pyfi_ac02.png[]
+
+// code cell end
+
++pandas+ also integrates well with the +pytz+ module to manage time zones:
+
+// code cell start uuid: 5ce96331-90c9-4a16-8156-8d5d7b75f52c
+[source, python]
+----
+In [79]: pd.date_range('2016/01/01', freq='M', periods=12,
+                       tz=pytz.timezone('CET'))
+----
+
+----
+Out[79]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2016-01-31 00:00:00+01:00, ..., 2016-12-31 00:00:00+01:00]
+         Length: 12, Freq: M, Timezone: CET
+----
+
+// code cell end
+
+// code cell start uuid: bf962082-ff16-4810-bd88-160eb088f46a
+[source, python]
+----
+In [80]: dti = pd.date_range('2016/01/01', freq='M', periods=12, tz='US/Eastern')
+         dti
+----
+
+----
+Out[80]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2016-01-31 00:00:00-05:00, ..., 2016-12-31 00:00:00-05:00]
+         Length: 12, Freq: M, Timezone: US/Eastern
+----
+
+// code cell end
+
+Using the +tz_convert+ method, +DatetimeIndex+ objects can be transformed from one time zone to another:(((range="endofrange", startref="ix_DTpandas")))(((range="endofrange", startref="ix_PLdattm")))
+
+// code cell start uuid: 61ca3a1e-79cb-4e30-8c83-864a6fb1409c
+[source, python]
+----
+In [81]: dti.tz_convert('GMT')
+----
+
+----
+Out[81]: <class 'pandas.tseries.index.DatetimeIndex'>
+         [2016-01-31 05:00:00+00:00, ..., 2016-12-31 05:00:00+00:00]
+         Length: 12, Freq: M, Timezone: GMT
+----
+
+// code cell end
+

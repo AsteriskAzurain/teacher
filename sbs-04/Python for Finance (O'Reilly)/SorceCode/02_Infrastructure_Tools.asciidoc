@@ -1,0 +1,747 @@
+[[infrastructure]]
+
+== Infrastructure and Tools
+
+[quote, Rem Koolhaas]
+____
+[role="align_me_right"]
+Infrastructure is much more important than architecture.
+____
+
+You could say infrastructure is not everything, but without infrastructure everything can be nothing--be it in the real world or in technology. What do we mean then by infrastructure? In principle, it is those hardware and software components that allow the development and execution of a simple +Python+ script or more complex +Python+ applications.
+
+However, this chapter does not go into detail with regard to hardware infrastructure, since all +Python+ code and examples should be executable on almost any hardware.footnote:[They can, for example, in general be executed even on a +Raspberry Pi+ for about 30 USD (cf. http://www.raspberrypi.org[]), although memory issues quickly arise for some applications. Nevertheless, this can be considered a rather low requirement when it comes to hardware.] Nor does it discuss different operating systems, since the code should be executable on any operating system on which +Python+, in principle, is available. This chapter rather focuses on the following topics:
+
+Deployment:: 
+How can I make sure to have everything needed available in a consistent fashion to deploy +Python+ code and applications? This chapter introduces +Anaconda+, a +Python+ distribution that makes deployment quite efficient, as well as the +Python Quant Platform+, which allows for a web- and browser-based deployment.
+Tools:: 
+Which tools shall I use for (interactive) +Python+ development and data analytics? The chapter introduces two of the most popular development environments for +Python+, namely +IPython+ and +Spyder+.
+
+There is also <<best_practices>>, on:
+
+Best practices:: 
+Which best practices should I follow when developing +Python+ code? The appendix briefly reviews fundamentals of, for example, +Python+ code syntax and pass:[<phrase role="keep-together">documentation</phrase>].
+
+=== Python Deployment
+
+((("Python", "deployment", id="ix_Pdep", range="startofrange")))This section shows how to deploy +Python+ locally (or on a server) as well as via the web browser.
+
+==== Anaconda
+
+((("deployment", "Anaconda", id="ix_Dana", range="startofrange")))((("Anaconda", id="ix_Ana", range="startofrange")))A number of operating systems come with a version of +Python+ and a number of additional libraries already installed. This is true, for example, of +Linux+ operating systems, which often rely on +Python+ as their main language (for packaging, administration, etc.). However, in what follows we assume that +Python+ is not installed or that we are installing an additional version of +Python+ (in parallel to an existing one) using the +Anaconda+ distribution.
+
+(((Anaconda, downloading)))(((Anaconda, benefits of)))You can download +Anaconda+ for your operating system from the website http://continuum.io/downloads[]. There are a couple of reasons to consider using +Anaconda+ for +Python+ deployment. Among them are:
+
+Libraries/packages:: 
+You get more than 100 of the most important +Python+ libraries and packages in a single installation step; in particular, you get all these installed in a version-consistent manner (i.e., all libraries and packages work with each other).footnote:[For those who want to control which libraries and packages get installed, there is +Miniconda+, which comes with a minimal +Python+ installation only. Cf. http://conda.pydata.org/miniconda.html[].]
+Open source:: 
+The +Anaconda+ distribution is free of charge in general,footnote:[There is also an +Anaconda+ version available that contains proprietary packages from Continuum Analytics called +Accelerate+. This commercial version, whose main goal is to improve the performance of typical operations with +Python+, has to be licensed.] as are all libraries and packages included in the distribution.
+Cross platform:: 
+It is available for +Windows+, +Mac OS+, and +Linux+ platforms.
+Separate installation:: 
+It installs into a separate directory without interfering with any existing installation; no root/admin rights are needed.
+Automatic updates:: 
+Libraries and packages included in +Anaconda+ can be (semi)automatically updated via free online repositories.
+Conda package manager:: 
+The package manager allows the use of multiple +Python+ versions and multiple versions of libraries in parallel (for experimentation or development/testing purposes); it also has great support for virtual environments.
+
+(((Anaconda, installing)))After having downloaded the installer for +Anaconda+, the installation in general is quite easy. On +Windows+ platforms, just double-click the installer file and follow the instructions. Under +Linux+, open a shell, change to the directory where the installer file is located, and type:
+
+----
+$ bash Anaconda-1.x.x-Linux-x86[_64].sh
+----
+
+Replacing the file name with the respective name of your installer file. Then again follow the instructions. It is the same on an +Apple+ computer; just type:
+
+----
+$ bash Anaconda-1.x.x-MacOSX-x86_64.sh
+----
+
+making sure you replace the name given here with the correct one. Alternatively, you can use the graphical installer that is available.
+
+(((Anaconda, libraries/packages available)))(((libraries, available in Anaconda)))After the installation you have more than 100 libraries and packages available that you can use immediately. Among the scientific and data analytics packages are those listed in <<anaconda_libs>>.
+
+[[anaconda_libs]]
+.Selected libraries and packages included in Anaconda
+[options="header, unbreakable"]
+|=======
+|Name       |Description  
+| +BitArray+ |Object types for arrays of Booleans
+| +Cubes+ +OLAP+ |Framework for ++Online Analytical Processing++ (++OLAP++) applications
+| +Disco+ |+mapreduce+ implementation for distributed computing
+| +Gdata+ |Implementation of +Google Data Protocol+
+| +h5py+ |+Python+ wrapper around +HDF5+ file format
+| +HDF5+ |File format for fast I/O operations
+| +IPython+ |Interactive development environment (IDE)
+| +lxml+ |Processing +XML+ and +HTML+ with +Python+
+| +matplotlib+ |Standard 2D and 3D plotting library
+| +MPI4Py+ |++Message Parsing Interface++ (++MPI++) implementation for parallel computation
+| +MPICH2+ |Another +MPI+ implementation
+| +NetworkX+ |Building and analyzing network models and algorithms
+| +numexpr+ |Optimized execution of numerical expressions
+| +NumPy+ |Powerful array class and optimized functions on it
+| +pandas+ |Efficient handling of time series data
+| +PyTables+ |Hierarchical database using +HDF5+
+| +SciPy+ |Collection of scientific functions
+| +Scikit-Learn+ |Machine learning algorithms
+| +Spyder+ |+Python+ IDE with syntax checking, debugging, and inspection capabilities
+| +statsmodels+ |Statistical models
+| +SymPy+ |Symbolic computation and mathematics
+| +Theano+ |Mathematical expression compiler
+|=======
+
+If the installation procedure was successful, you should open a new terminal window and should then be able, for example, to start the +Spyder+ IDE by simply typing in the shell:
+
+----
+$ spyder
+----
+
+Alternatively, you can start a +Python+ session from the shell as follows:
+
+----
+$ python
+Python 2.7.6 |Anaconda 1.9.2 (x86_64)| (default, Feb 10 2014, 17:56:29)  
+[GCC 4.0.1 (Apple Inc. build 5493)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> exit()
+$
+----
+
++Anaconda+ by default installs, at the time of this writing, with +Python 2.7.x+. It always comes with +conda+, the open source package manager. Useful information about this tool can be obtained by the command:
+
+----
+$ conda info
+Current conda install:
+
+             platform : osx-64
+        conda version : 3.4.1
+       python version : 2.7.6.final.0
+     root environment : /Library/anaconda  (writable)
+  default environment : /Library/anaconda
+     envs directories : /Library/anaconda/envs
+        package cache : /Library/anaconda/pkgs
+         channel URLs : http://repo.continuum.io/pkgs/free/osx-64/
+                        http://repo.continuum.io/pkgs/pro/osx-64/
+          config file : None
+    is foreign system : False
+
+$
+----
+
++conda+ allows one to search for libraries and packages, both locally and in available online repositories:
+
+----
+$ conda search pytables
+Fetching package metadata: ..
+pytables                  .  2.4.0                np17py27_0  defaults        
+                             2.4.0                np17py26_0  defaults        
+                             2.4.0                np16py27_0  defaults        
+                             2.4.0                np16py26_0  defaults        
+                          .  3.0.0                np17py27_0  defaults        
+                             3.0.0                np17py26_0  defaults        
+                             3.0.0                np16py27_0  defaults        
+                             3.0.0                np16py26_0  defaults        
+                          .  3.0.0                np17py33_1  defaults        
+                          .  3.0.0                np17py27_1  defaults        
+                             3.0.0                np17py26_1  defaults        
+                          .  3.0.0                np16py27_1  defaults        
+                             3.0.0                np16py26_1  defaults        
+                             3.1.0                np18py33_0  defaults        
+                          *  3.1.0                np18py27_0  defaults        
+                             3.1.0                np18py26_0  defaults        
+                             3.1.1                np18py34_0  defaults        
+                             3.1.1                np18py33_0  defaults        
+                             3.1.1                np18py27_0  defaults        
+                             3.1.1                np18py26_0  defaults   
+----
+
+The results contain those versions of +PyTables+ that are available for download and installation in this case and that are installed (indicated by the asterisk). Similary, the +list+ command gives all locally installed packages that match a certain pattern. The following lists all packages that start with "pyt":
+
+----
+$ conda list ^pyt
+# packages in environment at /Library/anaconda:
+#
+pytables                  3.1.0                np18py27_0  
+pytest                    2.5.2                    py27_0  
+python                    2.7.6                         1  
+python-dateutil           1.5                       <pip>
+python.app                1.2                      py27_1  
+pytz                      2014.2                   py27_0  
+----
+
+More complex patterns, based on regular expressions, are also possible. For example:
+
+----
+$ conda list ^p.*les$
+# packages in environment at /Library/anaconda:
+#
+pytables                  3.1.0                np18py27_0
+$
+----
+
+(((Anaconda, conda package manager)))(((conda package manager)))Suppose we want to have +Python 3.x+ available in addition to the +2.7.x+ version. The package manager +conda+ allows the creation of an environment in which to accomplish this goal. The following output shows how this works in principle:
+
+----
+$ conda create -n py33test anaconda=1.9 python=3.3 numpy=1.8 
+Fetching package metadata: ..
+Solving package specifications: .
+Package plan for installation in environment /Library/anaconda/envs/py33test:
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    anaconda-1.9.2             |       np18py33_0           2 KB
+    ...
+    xlsxwriter-0.5.2           |           py33_0         168 KB
+
+The following packages will be linked:
+
+    package                    |            build
+    ---------------------------|-----------------
+    anaconda-1.9.2             |       np18py33_0   hard-link
+    ...
+    zlib-1.2.7                 |                1   hard-link
+
+Proceed ([y]/n)? 
+
+----
+
+When you type *++y++* to confirm the creation, +conda+ will do as proposed (i.e., downloading, extracting, and linking the packages):
+
+----
+
+*******UPDATE**********
+
+Fetching packages ...
+anaconda-1.9.2-np18py33_0.tar.bz2 100% |##########| Time: 0:00:00 173.62 kB/s
+...
+xlsxwriter-0.5.2-py33_0.tar.bz2 100% |############| Time: 0:00:01 131.32 kB/s
+Extracting packages ...
+[      COMPLETE      ] |##########################| 100%
+Linking packages ...
+[      COMPLETE      ] |##########################| 100%
+#
+# To activate this environment, use:
+# $ source activate py33test
+#
+# To deactivate this environment, use:
+# $ source deactivate
+#
+----
+
+Now activate the new environment as advised by +conda+:
+
+----
+$ source activate py33test
+discarding /Library/anaconda/bin from PATH
+prepending /Library/anaconda/envs/py33test/bin to PATH
+(py33test)$ python
+Python 3.3.4 |Anaconda 1.9.2 (x86_64)| (default, Feb 10 2014, 17:56:29) 
+[GCC 4.0.1 (Apple Inc. build 5493)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> print "Hello Python 3.3"  # this shouldn't work with Python 3.3
+  File "<stdin>", line 1
+    print "Hello Python 3.3"  # this shouldn't work with Python 3.3
+                           ^
+SyntaxError: invalid syntax
+>>> print ("Hello Python 3.3")  # this syntax should work
+Hello Python 3.3
+>>> exit()
+$
+----
+
+(((syntax, Python 2.7 vs. 3.x)))Obviously, we indeed are now in the +Python 3.3+ world, which you can judge from the +Python+ version number displayed and the fact that you need parentheses for the +print+ statement to work correctly.footnote:[This is only one subtle, but harmless, change in the +Python+ syntax from +2.7.x+ to +3.x+ that might be a bit confusing to someone new to +Python+.]
+
+.Multiple Python Environments
+[TIP]
+====
+(((Python, multiple environments for)))(((Anaconda, multiple Python environments)))With the +conda+ package manager you can install and use multiple separated +Python+ environments on a single machine. This, among other features, simplifies testing of +Python+ code for compatibility with different +Python+ versions.
+====
+
+Single libraries and packages can be installed using the ++conda install++ command, either in the general +Anaconda+ installation:
+
+----
+$ conda install scipy
+----
+
+or for a specific environment, as in:
+
+----
+$ conda install -n py33test scipy
+----
+
+Here, +py33test+ is the environment we created before. Similarly, you can update single packages easily:
+
+----
+$ conda update pandas
+----
+
+The packages to download and link depend on the respective version of the package that is installed. These can be very few to numerous, e.g., when a package has a number of dependencies for which no current version is installed. For our newly created environment, the updating would take the form:
+
+----
+$ conda update -n py33test pandas
+----
+
+Finally, +conda+ makes it easy to remove packages with the +remove+ command from the main installation or a specific environment. The basic usage is:
+
+----
+$ conda remove scipy
+----
+
+For an environment it is:
+
+----
+$ conda remove -n py33test scipy
+----
+
+Since the removal is a somewhat "final" operation, you might want to _dry run_ the pass:[<phrase role="keep-together">command</phrase>]:
+
+----
+$ conda remove --dry-run -n py33test scipy
+----
+
+If you are sure, you can go ahead with the actual removal. To get back to the original +Python+ and +Anaconda+ version, deactivate the environment:
+
+----
+$ source deactivate
+----
+
+Finally, we can clean up the whole environment by use of +remove+ with the option +--all+:
+
+----
+$ conda remove --all -n py33test
+----
+
+(((range="endofrange", startref="ix_Dana")))(((range="endofrange", startref="ix_Ana")))The package manager +conda+ makes +Python+ deployment quite convenient. Apart from the basic functionalities illustrated in this section, there are also a number of more advanced features available. Detailed documentation is found at http://conda.pydata.org/docs/[].
+
+
+
+==== Python Quant Platform
+
+(((deployment, Python Quant platform)))(((Python, Quant platform)))(((Quant platform, benefits of)))(((web browser deployment)))(((deployment, via web browser)))(((Python Quants GmbH, benefits of)))There are a number of reasons why one might like to deploy +Python+ via a web browser. Among them are:
+
+No need for installation:: 
+Local installations of a complete +Python+ environment might be both complex (e.g., in a large organization with many computers), and costly to support and maintain; making +Python+ available via a web browser makes deployment much more efficient in certain scenarios.
+Use of (better) remote hardware:: 
+When it comes to complex, compute- and memory-intensive analytics tasks, a local computer might not be able to perform such tasks; the use of (multiple) shared servers with multiple cores, larger memories, and maybe GPGPUs makes such tasks possible and more efficient.
+Collaboration:: 
+Working, for example, with a team on a single or multiple servers makes collaboration simpler and also increases efficiency: data is not moved to every local machine, nor, after the analytics tasks are finished, are the results moved back to some central storage unit and/or distributed among the team members.
+
+The (((Python Quants GmbH, features of)))(((Quant platform, features of)))+Python Quant Platform+ is a web- and browser-based financial analytics and collaboration platform developed and maintained by http://www.pythonquants.com[The Python Quants GmbH]. You can register for the platform at http://quant-platform.com[]. It features, among others, the following basic components:
+
+File manager::
+  A tool to manage file up/downloads and more via a web GUI.
+++Linux++ terminal::
+  A +Linux+ terminal to work with the server (for example, a virtual server instance in the cloud or a dedicated server run on-premise by a company); you can use +Vim+, +Nano+, etc. for code editing and work with +Git+ repositories for version control.
+++Anaconda++::
+  An +Anaconda+ installation that provides all the functionality discussed previously; by default you can choose between +Python 2.7+ and +Python 3.4+.
+++Python++ shell::
+  The standard +Python+ shell.
+++IPython++ Shell::
+  An enhanced +IPython+ shell.
+++IPython Notebook++::
+  The browser version of +IPython+. You will generally use this as the central tool.
+Chat room/forum::
+  To collaborate, exchange ideas, and to up/download, for example, research pass:[<phrase role="keep-together">documents</phrase>].
+Advanced analytics::
+  In addition to the +Linux+ server and +Python+ environments, the platform provides analytical capabilities for, e.g., portfolio, risk, and derivatives analytics as well as for backtesting trading strategies (in particular, +DX+ analytics; see <<dx_library>> for a simplified but fully functional version of the library); there is also an +R+ stack available to call, for example, +R+ functions from within +IPython Notebook+.
+Standard APIs::
+  Standard +Python+-based APIs for data delivery services of leading financial data providers.
+
+(((range="endofrange", startref="ix_Pdep")))When it comes to collaboration, the +Python Quant Platform+ also allows one to define--under a "company&#x201d;—certain "user groups" with certain rights for different +Python+ projects (i.e., directories and files). The platform is easily scalable and is deployed via http://docker.com[+Docker+ containers]. <<pqp>> shows a screenshot of the main screen of the +Python Quant Platform+.
+
+[[pqp]]
+.Screenshot of Python Quant Platform
+image::images/pyfi_0201.png[]
+
+=== Tools
+
+((("application development", "tools for", id="ix_ADtools", range="startofrange")))((("interactive analytics", "tools for", id="ix_IAtool", range="startofrange")))((("tools", id="ix_Tool", range="startofrange")))((("analytics", "interactive", "tools for", id="ix_Atool", range="startofrange")))The success and popularity of a programming language result to some extent from the tools that are available to work with the language. It has long been the case that +Python+ was considered a nice, easy-to-learn and easy-to-use language, but without a compelling set of tools for interactive analytics or development. This has changed. There are now a large number of tools available that help analysts and developers to be as productive as possible with +Python+. It is not possible to give even a somewhat exhaustive overview. However, it is possible to highlight two of the most popular tools in use today: +IPython+ and +Spyder+.footnote:[For +Windows+ users and developers, the full integration of +Python+ in +Visual Studio+ is a compelling alternative. There is even a whole suite of +Python+ tools for +Visual Studio+ available (cf. http://pytools.codeplex.com[]).]
+
+==== Python
+
+(((tools, Python interpreter)))(((Python, invoking interpreter)))(((interpreters, standard)))(((standard interpreter)))For completeness, let us first consider using the standard +Python+ interpreter itself. From the system shell/command-line interface, +Python+ is invoked by simply typing ++python++:
+
+----
+$ python
+Python 2.7.6 |Anaconda 1.9.2 (x86_64)| (default, Feb 10 2014, 17:56:29) 
+[GCC 4.0.1 (Apple Inc. build 5493)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> print "Hello Python for Finance World."
+Hello Python for Finance World.
+>>> exit()
+$
+----
+
+Although you can do quite a bit of +Python+ with the standard prompt, most people prefer to use +IPython+ by default since this environment provides _everything_ that the standard interpreter prompt offers, and _much more_ on top of that.
+
+==== IPython
+
+((("tools", "IPython", id="ix_Tipyth", range="startofrange")))((("interpreters", "IPython", id="ix_Iipyth", range="startofrange")))((("IPython", id="ix_IPyth", range="startofrange")))+IPython+ was used in <<why_python_for_finance>> to present the first examples of +Python+ code. This section gives an overview of the capabilities of +IPython+ through specific examples. A complete ecosystem has evolved around +IPython+ that is so successful and appealing that users of other languages make use of the basic approach and architecture it provides. For example, there is a version of +IPython+ for the http://julialang.org[+Julia+ language].
+
+
+===== From shell to browser
+
+(((IPython, versions of)))+IPython+ comes in three flavors:
+
+Shell:: 
+The shell version is based on the system and +Python+ shell, as the name suggests; there are no graphical capabilities included (apart from displaying plots in a separate window).
+++QT console++:: 
+This version is based on the +QT+ graphical user interface framework (cf. http://qt-project.org[]), is more feature-rich, and allows, for example, for inline graphics.
+++Notebook++:: 
+This is a +JavaScript+-based web browser version that has become the community favorite for interactive analytics and also for teaching, presenting, etc. 
+
+(((IPython, invoking)))The shell version is invoked by simply typing ++ipython++ in the shell:
+
+----
+$ ipython
+Python 2.7.6 |Anaconda 1.9.2 (x86_64)| (default, Feb 10 2014, 17:56:29) 
+Type "copyright", "credits" or "license" for more information.
+
+IPython 2.0.0 -- An enhanced Interactive Python.
+?         -> Introduction and overview of IPython's features.
+%quickref -> Quick reference.
+help      -> Python's own help system.
+object?   -> Details about 'object', use 'object??' for extra details.
+----
+
+[source, python]
+----
+In [1]: 3 + 4 * 2
+----
+----
+Out[1]: 11
+----
+
+[source, python]
+----
+In [2]:
+----
+
+(((IPython, importing libraries)))(((libraries, importing to IPython)))Using the option +--pylab+ imports a large set of scientific and data analysis libraries, like +NumPy+, in the namespace:
+
+----
+$ ipython --pylab
+Python 2.7.6 |Anaconda 1.9.2 (x86_64)| (default, Feb 10 2014, 17:56:29)  
+Type "copyright", "credits" or "license" for more information.
+
+IPython 2.0.0 -- An enhanced Interactive Python.
+?         -> Introduction and overview of IPython's features.
+%quickref -> Quick reference.
+help      -> Python's own help system.
+object?   -> Details about 'object', use 'object??' for extra details.
+Using matplotlib backend: MacOSX
+----
+
+[source,python]
+----
+In [1]: a = linspace(0, 20, 5)  # linspace from NumPy
+
+In [2]: a
+
+Out[2]: array([  0.,   5.,  10.,  15.,  20.])
+
+In [3]: 
+----
+
+Similarly, the +QT console+ of +IPython+ is invoked by the following command:
+
+----
+$ ipython qtconsole --pylab inline
+----
+
+Using the +inline+ parameter in addition to the +--pylab+ option lets +IPython+ plot all graphics inline. <<qtconsole>> shows a screenshot of the +QT console+ with an inline plot.
+
+Finally, the +Notebook+ version is invoked as follows:
+
+----
+$ ipython notebook --pylab inline
+----
+
+<<notebook>> shows a screenshot of an +IPython Notebook+ session. The +inline+ option again has the effect that plots will be displayed in +IPython Notebook+ and not in a separate window.
+
+All in all, there are a large number of options for how to invoke an +IPython+ kernel. You can get a listing of all the options by typing: 
+
+----
+$ ipython --h
+----
+
+Refer to the http://www.ipython.org/documentation.html[+IPython+ documentation] for detailed explanations.
+
+[[qtconsole]]
+.IPython's QT console
+image::images/pyfi_0202.png[]
+
+===== Basic usage
+
+(((IPython, basic usage)))(((cells, in IPython)))In what follows, we describe the basic usage of the +IPython Notebook+. A fundamental concept of the +Notebook+ is that you work with different kinds of cells. These include the following types:
+
+Code:: 
+Contains executable +Python+ code
+++Markdown++:: 
+Contains text written in +Markdown+ language and/or +HTML+
+Raw text:: 
+Contains text without formattingfootnote:[From +IPython 2.0+ on, these cells are called +Raw NBConvert+.]
+Heading (1-6):: 
+Headings for text structuring, e.g., section heads
+
+[[notebook]]
+.IPython's browser-based Notebook
+image::images/pyfi_0203.png[]
+
+(((documentation, IPython Notebook for)))((("presentation, IPython Notebook for")))(((IPython, documentation with)))The different cell types already indicate that the +Notebook+ is more than an enhanced +Python+ shell only. It is intended to fulfill the requirements of a multitude of documentation and presentation scenarios. For example, an +IPython Notebook+ file, having a suffix of +.ipynb+, can be converted to the following formats:
+
++Python+ file:: 
+Generates a +Python+ code file (+.py+) from an +IPython Notebook+ file with noncode cells commented out.
++HTML+ page:: 
+Generates a single +HTML+ page from a single +IPython Notebook+ file.
++HTML5+ slides:: 
+Making use of different cell markings for slide shows, a +Notebook+ file is converted into a presentation with multiple +HTML5+ slides (using the http://lab.hakim.se/reveal-js/[+reveal.js+ framework]).
++LaTeX/PDF+:: 
+Such a file can also be converted to a +LaTeX+ file, which then can be converted into a +PDF+ document.
++RestructuredText+:: 
++RestructuredText+ (+.rst+) is used, for example, by the http://sphinx-doc.org[+SPHINX+ documentation package] for +Python+ projects.
+
+.Analytics and Publishing Platform
+[TIP]
+====
+(((interactive analytics, publishing platform for sharing)))(((publishing platform)))(((analytics, interactive, publishing platform for sharing)))A major advantage of +IPython Notebook+ is that you can easily publish and share your complete +Notebook+ with others. Once your analytics project with +IPython+ is finished, you can publish it as an +HTML+ page or a +PDF+, or use the content for a slide presentation.
+====
+
+The format of an +IPython Notebook+ file is based on the +JavaScript Object Notation+ (++JSON++) standard. The following is the text version of the +Notebook+ displayed in pass:[<phrase role="keep-together"><xref linkend="notebook" />—</phrase>]you will notice some metadata, the different types of cells, and their content, and that even graphics are translated into +ASCII+ characters: 
+
+[source, json]
+----
+include::ipython/ipynb_example.txt[]
+----
+
+(((LaTeX, IPython Notebook cells and)))For example, when converting such a file to +LaTeX+, raw text cells can contain +LaTeX+ code since the content of such cells is simply passed on by the converter. All this is one of the reasons why the +IPython Notebook+ is nowadays often used for the composition of larger, more complex documents, like scientific research papers. You have executable code and documenting text in a single file that can be translated into a number of different output formats.
+
+In a finance context this also makes +IPython+ a valuable tool, since, for example, the mathematical description of an algorithm and the executable +Python+ version can live in the same document. Depending on the usage scenario, a web page (e.g., intranet), a +PDF+ document (e.g., client mailings), or a presentation (e.g., board meeting) can be generated. With regard to the presentation option, you can, for example, skip those cells that may contain text passages that might be too long for a presentation.
+
+The basic usage of the +Notebook+ is quite intuitive. You mainly navigate it with the arrow keys and "execute" cells by using either Shift-Return or Ctrl-Return. The difference is that the first option moves you automatically to the next cell after execution while the second option lets you remain at the same cell. The effect of "executing" cells depends on the type of the cell. If it is a code cell, then the code is executed and the output (if any) is shown. If it is a +Markdown+ cell, the content is rendered to show the result.
+
+===== Markdown and LaTeX
+
+(((IPython, Markdown commands)))(((Markdown commands)))(((LaTeX, commands)))The following shows a few selected examples for +Markdown+ commands:
+
+----
+**bold** prints the text in bold
+
+*italic* prints the text in italic
+
+_italic_ also prints it in italic
+
+**_italic_** bold and italic
+
+bullet point lists:
+
+* first_bullet
+* second_bullet
+
+&ndash; renders to a dash
+
+<br> inserts a line break
+----
+
+<<markdown>> shows the same code both in a raw text cell (which looks the same as the preceding text) and rendered in a +Markdown+ cell. In this way, you can easily combine +Python+ code and formatted, nicely rendered text in a single document.
+
+A detailed description of the +Markdown+ language used for +IPython Notebook+ is found at http://daringfireball.net/projects/markdown/[].
+
+(((IPython, rendering capabilities)))As mentioned before, the rendering capabilities of +IPython+ are not restricted to the +Markdown+ language. +IPython+ also renders by default mathematical formulae described on the basis of the +LaTeX+ typesetting system, the de facto standard for scientific publishing. Consider, for example, from <<why_python_for_finance>> the formula for the index level in the Black-Scholes-Merton (1973) model, as provided in <<bsm_rv>>. For convenience, we repeat it here as <<bsm_rv_2nd>>.
+
+[[bsm_rv_2nd]]
+[latexmath]
+.Black-Scholes-Merton (1973) index level at maturity
+++++
+\begin{equation}
+S_T = S_0 \exp \left( \left( r - \frac{1}{2} \sigma^2 \right) T + \sigma \sqrt{T} z \right)
+\end{equation}
+++++ 
+
+[[markdown]]
+.Screenshot of IPython Notebook with Markdown rendering
+image::images/pyfi_0204.png[]
+
+(((Black-Scholes-Merton model, LaTeX code for)))The +LaTeX+ code that describes <<bsm_rv_2nd>> looks roughly like the following:
+
+----
+S_T = S_0 \exp((r - 0.5\sigma^2) T + \sigma \sqrt{T} z)
+----
+
+<<latex>> shows a raw text cell with +Markdown+ text and the +LaTeX+ code, as well as the result as rendered in a +Markdown+ cell. The figure also shows a more complex formula: the Black-Scholes-Merton option pricing formula for European call options, as found in <<bsm_formula>> in <<introductory_examples>>.
+
+[[latex]]
+.Markdown and LaTeX for financial formulae
+image::images/pyfi_0205.png[]
+
+
+===== Magic commands
+
+(((IPython, magic commands)))(((magic commands/functions)))One of +IPython+'s strengths lies in its magic commands. They are "magic" in the sense that they add some really helpful and powerful functions to the standard +Python+ shell functionality. Basic information and help about these functions can be accessed via:
+
+----
+In [1]: %magic
+
+
+IPython's 'magic' functions
+===========================
+
+The magic function system provides a series of functions which allow you to
+control the behavior of IPython itself, plus a lot of system-type
+features. There are two kinds of magics, line-oriented and cell-oriented.
+
+...
+----
+
+A list of all available magic commands can be generated in an +IPython+ session as follows:
+
+[source, python]
+----
+In [2]: %lsmagic
+----
+
+In interactive computing, magic commands can, for example, be used for simple profiling tasks. For such a use case, you might use +%time+ or +%prun+:
+
+[source, python]
+----
+In [3]: import numpy as np
+
+In [4]: %time np.sin(np.arange(1000000))
+CPU times: user 31.8 ms, sys: 7.87 ms, total: 39.7 ms
+Wall time: 39 ms
+----
+----
+Out[5]: 
+array([ 0.        ,  0.84147098,  0.90929743, ...,  0.21429647,
+       -0.70613761, -0.97735203])
+----
+[source, python]
+----
+In [6]: %prun np.sin(np.arange(1000000))
+         3 function calls in 0.043 seconds
+
+   Ordered by: internal time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.041    0.041    0.043    0.043 <string>:1(<module>)
+        1    0.002    0.002    0.002    0.002 {numpy.core.multiarray.arange}
+        1    0.000    0.000    0.000    0.000 {method 'disable'
+        of '_lsprof.Profiler' objects}
+----
+
+There is yet another command, +%timeit+ or +%%timeit+, for timing codes in a single line or a whole cell in the +IPython+ +Notebook+:
+
+----
+In [6]: %timeit np.sin(np.arange(1000000))
+10 loops, best of 3: 27.5 ms per loop
+----
+
+(((IPython, help functions in)))This function executes a number of loops to get more reliable estimates for the duration of a function call or a snippet of code. 
+
+It is not possible to explain in detail all the magic functions that +IPython+ provides. However, +IPython+ itself strives to make it as easy as possible to interactively look up information about +IPython+ and its commands. Among the most helpful are those listed in <<ipython_help>> (cf. http://bit.ly/ipython_tutorial[]).
+
+
+[[ipython_help]]
+.Selected help functions included in IPython
+[options="header, unbreakable"]
+|=======
+|++Name++       |Description 
+|++?++ 	        |Introduction and overview of +IPython+ features
+|++%quickref++ 	|Quick reference 
+|++help++ 	    |+Python+'s own help system
+|++object?++ 	|Details about the "object"; use +object??+ for extra details
+|=======
+
+Another feature of +IPython+ is that it is highly configurable. Information about the configuration capabilities is also found in the http://ipython.org/ipython-doc/stable/config/[documentation].
+
+A magic command that also helps with customizing +IPython+ is +%bookmark+. This allows the bookmarking of arbitrary directories by the use of your custom names such that you can later--no matter where the +IPython+ kernel is invoked from and no matter what the current directory is--navigate to any of your bookmarked directories immediately (i.e., you do not need to use +cd+). The following shows how to set a bookmark and how to get a list of all bookmarks:
+
+[source, python]
+----
+In [6]: %bookmark py4fi
+
+In [7]: %bookmark -l
+Current bookmarks:
+py4fi -> /Users/yhilpisch/Documents/Work/Python4Finance/
+----
+
+===== System shell commands
+
+(((IPython, system shell commands)))Yet another really helpful feature is that you can execute command-line/system shell functions directly from an +IPython+ prompt or a +Notebook+ cell. To this end you need to use the +!+ to indicate that the following command should be escaped to the system shell (or +%%!+ when a complete cell should be handled that way). As a simple illustration, the following creates a directory, moves to that directory, moves back, and deletes the directory:
+
+[source, python]
+----
+In [7]: !mkdir python4finance
+
+In [8]: cd python4finance/
+/Users/yhilpisch/python4finance
+
+In [9]: cd ..
+/Users/yhilpisch  
+
+In [10]: !rm -rf python4finance/
+----
+
+(((range="endofrange", startref="ix_Tipyth")))(((range="endofrange", startref="ix_Iipyth")))(((range="endofrange", startref="ix_IPyth")))+IPython+ provides you with all the functions you would expect from a powerful interactive development environment. It is often the case that people, beginners and experts alike, even find their way to +Python+ via +IPython+. Throughout the book, there are a plentitude of examples illustrating the use of +IPython+ for interactive data and financial analytics. You should also consult the book by McKinney (2012), and in particular Chapter 3, for further information on how to use +IPython+ effectively.
+
+==== Spyder
+
+(((editors, configuring)))(((Spyder, benefits of)))((("tools", "Spyder", id="ix_Tspyder", range="startofrange", seealso="mathematical tools")))While +IPython+ satisfies all of most users' requirements for interactive analytics and prototyping, larger projects generally demand "something more." In particular, +IPython+ itself has no editor directly built into the application.footnote:[However, you can configure your favorite editor for +IPython+ and invoke it by the magic command __++%editor FILENAME++__.] For all those looking for a more traditional development environment, +Spyder+ might therefore be a good choice.
+
+(((editors, Spyder)))Similar to +IPython+, +Spyder+ has been designed to support rapid, interactive development with +Python+. However, it also has, for example, a full-fledged editor, more powerful project management and debugging capabilities, and an object and variable inspector as well as a full integration of the +IPython+ shell version. Within +Spyder+ you can also start a standard +Python+ prompt session.
+
+(((Spyder, features of)))The built-in editor of +Spyder+ provides all you need to do +Python+ development. Among other features (cf. http://code.google.com/p/spyderlib/wiki/Features[]), it offers the following:
+
+Highlighting:: 
+Syntax coloring for +Python+, +C/C&#x2b;&#x2b;+, and +Fortran+ code; occurrence highlighting
+Introspection:: 
+Powerful dynamic code introspection features (e.g., code completion, calltips, object definition with a mouse click)
+Code browser:: 
+Browsing of classes and functions 
+Project management:: 
+Defining and managing projects; generating to-do lists
+Instant code checking:: 
+Getting errors and warnings on the fly (by using +pyflakes+, cf. https://pypi.python.org/pypi/pyflakes[])
+Debugging:: 
+Setting breakpoints and conditional breakpoints to use with the +Python+ debugger +pdb+ (cf. http://docs.python.org/2/library/pdb.html[])
+
+In addition, +Spyder+ provides further helpful functionality:
+
+Consoles:: 
+Open multiple +Python+ and +IPython+ consoles with separate processes each; run the code from the active editor tab (or parts of it) in a console
+Variable explorer:: 
+Edit and compare variables and arrays; generate 2D plots of arrays on the fly; inspect variables while debugging
+Object inspector:: 
+Display documentation strings interactively; automatically render, for example, rich text formatting
+Other features:: 
+History log; array editor similar to a spreadsheet; direct access to online help; management and exploration of whole projects; syntax and code checking via http://www.pylint.org[+Pylint+].
+
+<<spyder>> provides a screenshot of +Spyder+ showing the text editor (on the left), the variable inspector (upper right), and an active +Python+ console (lower right). +Spyder+ is a good choice to start with +Python+ programming, especially for those who are used, for example, to such environments as those provided by +Matlab+ or +R+. However, advanced programmers will also find a lot of helpful development functionality under a single roof.(((range="endofrange", startref="ix_Tspyder")))(((range="endofrange", startref="ix_ADtools")))(((range="endofrange", startref="ix_IAtool")))(((range="endofrange", startref="ix_Tool")))(((range="endofrange", startref="ix_Atool")))
+
+[[spyder]]
+.Screenshot of Spyder
+image::images/pyfi_0206.png[]
+
+=== Conclusions
+
+If you are a beginner or casual +Python+ developer or an expert coming from a different programming background, getting started with +Python+ is generally pretty easy in that only a couple of simple steps are required. To begin, you should install an appropriate +Python+ distribution, like +Anaconda+, to have a consistent +Python+ environment available and also to simplify the regular updating procedures.
+
+With a distribution like +Anaconda+ you have available the most important tools to interactively practice data and financial analytics, like with +IPython+, or to develop larger applications in a more traditional implement-test-debug fashion, like with +Spyder+. Of course, you can add to the mix your favorite editor, which probably already has +Python+ syntax highlighting included. If you additionally are looking for syntax and code checking capabilities, you might consider the built-in +Spyder+ editor or any other +Python+-focused editor available.
+
+<<best_practices>> introduces a number of best practices in the areas of _syntax, documentation_, and _unit testing_. In terms of syntax, spaces and blank lines play an important role, as well as the indentation of code blocks. When it comes to documentation, you should consider including documentation strings in any function or class, providing background and help for such things as input parameters, output, and possible errors, as well as usage examples. Finally, you should include unit tests in your development process from the beginning (at least for larger projects or those shared with a broader user base) and use dedicated tools to simplify the test procedures.
+
+=== Further Reading
+
+The following web resources are helpful with regard to the topics covered in this chapter:
+
+* http://docs.continuum.io/anaconda/[] for the +Anaconda+ documentation 
+* http://conda.pydata.org/docs/[] for the +conda+ documentation
+* http://ipython.org/ipython-doc/stable/[] for the +IPython+ documentation
+* http://daringfireball.net/projects/markdown/[] for the +Markdown+ language used by +IPython Notebook+
+* http://code.google.com/p/spyderlib[] for information about +Spyder+
+
+A good introduction to +Python+ deployment and the use of +IPython+ as a development environment is provided in:
+
+* Wes McKinney (2012): pass:[<ulink role="orm:hideurl" url="http://shop.oreilly.com/product/0636920023784.do"><emphasis>Python for Data Analysis</emphasis></ulink>]. O'Reilly, Sebastopol, CA.

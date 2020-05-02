@@ -1,0 +1,753 @@
+[[model_simulation]]
+== Simulation of Financial Models
+
+
+[quote, Edward de Bono]
+____
+[role="align_me_right"]
+The purpose of science is not to analyze or pass:[<phrase role="keep-together">describe but to make useful models of the world</phrase>].
+____
+
+((("derivatives analytics library", "simulation of financial models", id="ix_DALsim", range="startofrange")))((("analytics", "derivatives analytics library", "simulation of financial models", id="ix_ALsim", range="startofrange")))<<stochastics>> introduces in some detail the Monte Carlo simulation of stochastic processes using +Python+ and +NumPy+. This chapter applies the basic techniques presented there to implement simulation classes as a central component of the +DX+ library. We restrict our attention to three widely used stochastic processes:
+
+Geometric Brownian motion:: 
+    This is the process that was introduced to the 
+    option pricing literature by the seminal work of 
+    Black and Scholes (1973); it is used several 
+    times throughout this book and still 
+    represents--despite its known shortcomings and 
+    given the mounting empirical evidence from 
+    financial reality--a benchmark process for option 
+    and derivative valuation purposes.(((simulation, stochastic processes)))(((stochastic processes, geometric Brownian motion)))(((geometric Brownian motion)))
+
+Jump diffusion:: 
+    The jump diffusion, as introduced by Merton (1976), 
+    adds a log-normally distributed jump component to 
+    the geometric Brownian motion (GBM); this allows 
+    us to take into account that, for example, short-term out-of-the-money (OTM) options often seem to 
+    have priced in the possibility of large jumps. In 
+    other words, relying on GBM as a financial model 
+    often cannot explain the market values of such OTM 
+    options satisfactorily, while a jump diffusion may 
+    be able to do so.(((stochastic processes, jump diffusion)))(((jump diffusion)))
+
+Square-root diffusion:: 
+    The square-root diffusion, popularized for 
+    finance by Cox, Ingersoll, and Ross (1985), is used 
+    to model mean-reverting quantities like interest 
+    rates and volatility; in addition to being mean-reverting, the process stays positive, which is 
+    generally a desirable characteristic for those 
+    quantities.(((stochastic processes, square-root diffusion)))(((square-root diffusion)))
+
+The chapter proceeds in the first section with developing a function to generate standard normally distributed random numbers using variance reduction techniques.footnote:[We speak of "random" numbers knowing that they are in general "pseudorandom" only.] Subsequent sections then develop a generic simulation class and three specific simulation classes, one for each of the aforementioned stochastic processes of interest.
+
+For further details on the simulation of the models presented in this chapter, refer also to Hilpisch (2015). In particular, that book also contains a complete case study based on the jump diffusion model of Merton (1976).
+
+=== Random Number Generation
+
+(((simulation, random number generation)))(((random number generation)))(((standard normally distributed random numbers)))Random number generation is a central task of Monte Carlo simulation.footnote:[Cf. Glasserman (2004), Chapter 2, on generating random numbers and random variables.] <<stochastics>> shows how to use +Python+ and libraries such as +numpy.random+ to generate random numbers with different distributions. For our project at hand, _standard normally distributed_ random numbers are the most important ones. That is why it pays off to have a convenience function available for generating this particular type of random numbers. <<sn_random_numbers>> presents such a function.
+
+[[sn_random_numbers]]
+.Function to generate standard normally distributed random numbers
+====
+[source, python]
+----
+include::python/dx/sn_random_numbers.py[]
+----
+====
+
+(((antithetic paths)))(((moment matching)))The variance reduction techniques used in this function, namely _antithetic paths_ and _moment matching_, are also illustrated in <<stochastics>>.footnote:[Glasserman (2004) presents in Chapter 4 an overview and theoretical details of different variance reduction techniques.]
+
+The application of the function is straightforward:
+
+[source, python]
+----
+In [1]: from sn_random_numbers import *
+
+In [2]: snrn = sn_random_numbers((2, 2, 2), antithetic=False,
+   ...:                          moment_matching=False,
+   ...:                          fixed_seed=True)
+
+In [3]: snrn
+Out[3]: 
+array([[[-0.8044583 ,  0.32093155],
+        [-0.02548288,  0.64432383]],
+
+       [[-0.30079667,  0.38947455],
+        [-0.1074373 , -0.47998308]]])
+
+In [4]: snrn_mm = sn_random_numbers((2, 3, 2), antithetic=False,
+   ...:                          moment_matching=True,
+   ...:                          fixed_seed=True)
+
+In [5]: snrn_mm
+Out[5]: 
+array([[[-1.47414161,  0.67072537],
+        [ 0.01049828,  1.28707482],
+        [-0.51421897,  0.80136066]],
+
+       [[-0.14569767, -0.85572818],
+        [ 1.19313679, -0.82653845],
+        [ 1.3308292 , -1.47730025]]])
+
+In [6]: snrn_mm.mean()
+Out[6]: 1.8503717077085941e-17
+
+In [7]: snrn_mm.std()
+Out[7]: 1.0
+----
+
+This function will prove a workhorse for the simulation classes to follow.
+
+=== Generic Simulation Class
+
+(((simulation, generic simulation class)))(((classes, generic simulation class)))Object-oriented modeling--as introduced in <<objects_guis>>—allows inheritance of attributes and methods. This is what we want to make use of when building our simulation classes: we start with a _generic_ simulation class containing those attributes and methods that all other simulation classes share.
+
+To begin with, it is noteworthy that we instantiate an object of any simulation class by "only" providing three attributes:
+
+++name++::
+  A +string+ object as a name for the model simulation object
+++mar_env++::
+  An instance of the +market_environment+ class
+++corr++::
+  A flag (+bool+) indicating whether the object is correlated or not
+
+This again illustrates the role of a _market environment_: to provide in a single step all data and objects required for simulation and valuation. The methods of the generic pass:[<phrase role="keep-together">class are</phrase>]:
+
+++generate_time_grid++::
+  This method generates the time grid of relevant dates used for the simulation; this task is the same for every simulation class.
+++get_instrument_values++::
+  Every simulation class has to return the +ndarray+ object with the simulated instrument values (e.g., simulated stock prices, commodities prices, volatilities).
+
+<<simulation_class>> presents such a generic model simulation class. The methods make use of other methods that the model-tailored classes will provide, like +self.generate_paths+. All details in this regard will become clear when we have the full picture of a specialized, nongeneric simulation class.
+
+[[simulation_class]]
+.Generic financial model simulation class
+====
+[source, python]
+----
+include::python/dx/simulation_class.py[]
+----
+====
+
+Parsing of the market environment is embedded in a _single_ +try-except+ clause, which raises an exception whenever the parsing fails. To keep the code concise, there are _no_ sanity checks implemented. For example, the following line of code is considered a "success," no matter if the content is indeed an instance of a discounting class or not. Therefore, one has to be rather careful when compiling and passing +market_environment+ objects to any simulation class:
+
+[source, python]
+----
+self.discount_curve = mar_env.get_curve('discount_curve')
+----
+
+<<sim_class_mar_env>> shows all components that a +market_environment+ object must contain for the generic and therefore for all other simulation classes.
+
+[[sim_class_mar_env]]
+.Elements of market environment for all simulation classes
+[options="header, unbreakable"]
+|=======
+|Element           | Type      | Mandatory | Description
+|+initial_value+   | Constant  | Yes       | Initial value of process at +pricing_date+
+|+volatility+      | Constant  | Yes       | Volatility coefficient of process
+|+final_date+      | Constant  | Yes       | Simulation horizon
+|+currency+        | Constant  | Yes       | Currency of the financial entity
+|+frequency+       | Constant  | Yes       | Date frequency, as +pandas+ +freq+ parameter
+|+paths+           | Constant  | Yes       | Number of paths to be simulated
+|+discount_curve+  | Curve     | Yes       | Instance of +constant_short_rate+
+|+time_grid+       | List      | No        | Time grid of relevant dates (in portfolio context)
+|+random_numbers+  | List      | No        | Random number array (for correlated objects)
+|+cholesky_matrix+ | List      | No        | Cholesky matrix (for correlated objects)
+|+rn_set+          | List      | No        | +dict+ object with pointer to relevant random number set
+|=======
+
+Everything that has to do with the correlation of model simulation objects is explained in subsequent chapters. In this chapter, we focus on the simulation of single, uncorrelated processes. Similarly, the option to pass a +time_grid+ is only relevant in a portfolio context, something also explained later.
+
+
+=== Geometric Brownian Motion
+
+(((simulation, geometric Brownian motion)))(((geometric Brownian motion)))(((classes, geometric Brownian motion)))(((stochastic processes, geometric Brownian motion)))Geometric Brownian motion is a stochastic process as described in <<bsm_dynamic_dx>> (see also <<bsm_dynamic>> in <<stochastics>>, in particular for the meaning of the parameters and variables). The drift of the process is already set equal to the riskless, constant short rate __r__, implying that we operate under the equivalent martingale measure (see <<valuation_framework>>).
+
+++++
+<equation id="bsm_dynamic_dx">
+<title>Stochastic differential equation of geometric Brownian motion</title>
+  <mathphrase>
+    <emphasis>dS<subscript>t</subscript></emphasis> = <emphasis>rS<subscript>t</subscript>dt</emphasis> + &#x1d70e;<emphasis>S<subscript>t</subscript>dZ<subscript>t</subscript></emphasis>
+  </mathphrase>
+</equation>
+++++
+
+<<bsm_dyn_disc_dx>> presents an Euler discretization of the stochastic differential equation for simulation purposes (see also <<bsm_dyn_disc>> in <<stochastics>> for further details). We work in a discrete time market model, such as the general market model &#x2133; from <<valuation_framework>>, with a finite set of relevant dates  0 < __t~1~__ < __t~2~__ < ... < __T__.
+
+[[bsm_dyn_disc_dx]]
+[latexmath]
+.Difference equation to simulate the geometric Brownian motion
+++++
+\begin{eqnarray*}
+S_{t_{m+1}} &=& S_{t_{m}} \exp \left( \left(r- \frac{1}{2}\sigma^2 \right) (t_{m+1} - t_{m}) + \sigma \sqrt{t_{m+1} - t_{m}} z_t \right) \\
+0 &\leq& t_m < t_{m+1} \leq T
+\end{eqnarray*}
+++++
+
+==== The Simulation Class
+
+<<geometric_brownian_motion>> now presents the specialized class for the GBM model. We present it in its entirety first and highlight selected aspects afterward.
+
+[[geometric_brownian_motion]]
+.Simulation class for geometric Brownian motion
+====
+[source, python]
+----
+include::python/dx/geometric_brownian_motion.py[]
+----
+====
+
+In this particular case, the +market_environment+ object has to contain only the data and objects shown in <<sim_class_mar_env>>—i.e., the minimum set of components.
+
+The method +update+ does what its name suggests: it allows the updating of selected important parameters of the model. The method +generate_paths+ is, of course, a bit more involved. However, it has a number of inline comments that should make clear the most important aspects. Some complexity is brought into this method by, in pass:[<phrase role="keep-together">principle</phrase>], allowing for the correlation between different model simulation objects. This will become clearer, especially in <<derivatives_portfolio>>.
+
+==== A Use Case
+
+The following interactive +IPython+ session illustrates the use of the +geometric_brownian_motion+ class. First, we have to generate a +market_environment+ object with all mandatory elements:
+
+// code cell start uuid: febffe6c-139c-4b57-afe7-7726f3dfcd81
+[source, python]
+----
+In [1]: from dx import *
+----
+
+// code cell end
+
+// code cell start uuid: 28c63fae-ba64-490e-9cf5-9af3049c8390
+[source, python]
+----
+In [2]: me_gbm = market_environment('me_gbm', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 203dd06e-3da9-4bfa-89b3-9325cbf7cb7f
+[source, python]
+----
+In [3]: me_gbm.add_constant('initial_value', 36.)
+        me_gbm.add_constant('volatility', 0.2)
+        me_gbm.add_constant('final_date', dt.datetime(2015, 12, 31))
+        me_gbm.add_constant('currency', 'EUR')
+        me_gbm.add_constant('frequency', 'M')
+          # monthly frequency (respective month end)
+        me_gbm.add_constant('paths', 10000)
+----
+
+// code cell end
+
+// code cell start uuid: e6b1ff10-c5e9-4e1d-bf7e-e235520c2480
+[source, python]
+----
+In [4]: csr = constant_short_rate('csr', 0.05)
+----
+
+// code cell end
+
+// code cell start uuid: 19547cb3-feeb-44e5-bbd4-9fd01df707ff
+[source, python]
+----
+In [5]: me_gbm.add_curve('discount_curve', csr)
+----
+
+// code cell end
+
+Second, we instantiate a model simulation object:
+
+// code cell start uuid: ed7759ad-f2c0-48f3-a3a8-116d1e76a28e
+[source, python]
+----
+In [6]: from dx_simulation import *
+----
+
+// code cell end
+
+// code cell start uuid: 5d5231c5-d79e-4846-89d3-0558eb2e96e3
+[source, python]
+----
+In [7]: gbm = geometric_brownian_motion('gbm', me_gbm)
+----
+
+// code cell end
+
+Third, we can work with the object. For example, let us generate and inspect the +time_grid+. You will notice that we have 13 +datetime+ objects in the +time_grid+ array object (all the month ends in the relevant year, plus the +pricing_date+):
+
+// code cell start uuid: 19768d9c-80c4-4202-82ea-2bd779a326de
+[source, python]
+----
+In [8]: gbm.generate_time_grid()
+----
+
+// code cell end
+
+// code cell start uuid: 99670178-6322-427a-81a9-73fdfb4283fe
+[source, python]
+----
+In [9]: gbm.time_grid
+----
+
+----
+Out[9]: array([datetime.datetime(2015, 1, 1, 0, 0),
+               datetime.datetime(2015, 1, 31, 0, 0),
+               datetime.datetime(2015, 2, 28, 0, 0),
+               datetime.datetime(2015, 3, 31, 0, 0),
+               datetime.datetime(2015, 4, 30, 0, 0),
+               datetime.datetime(2015, 5, 31, 0, 0),
+               datetime.datetime(2015, 6, 30, 0, 0),
+               datetime.datetime(2015, 7, 31, 0, 0),
+               datetime.datetime(2015, 8, 31, 0, 0),
+               datetime.datetime(2015, 9, 30, 0, 0),
+               datetime.datetime(2015, 10, 31, 0, 0),
+               datetime.datetime(2015, 11, 30, 0, 0),
+               datetime.datetime(2015, 12, 31, 0, 0)], dtype=object)
+----
+
+// code cell end
+
+Next, we might ask for the simulated instrument values:
+
+// code cell start uuid: 44973ec5-fc3e-46e2-af88-548d20ca83fd
+[source, python]
+----
+In [10]: %time paths_1 = gbm.get_instrument_values()
+----
+
+----
+Out[10]: CPU times: user 10.7 ms, sys: 2.91 ms, total: 13.6 ms
+         Wall time: 12.8 ms
+         
+----
+
+// code cell end
+
+// code cell start uuid: 9e1ede2b-f9fd-45c0-85a9-60ff0bbca637
+[source, python]
+----
+In [11]: paths_1
+----
+
+----
+Out[11]: array([[ 36.        ,  36.        ,  36.        , ...,  36.        ,
+                  36.        ,  36.        ],
+                [ 37.37221481,  38.08890977,  34.37156575, ...,  36.22258915,
+                  35.05503522,  39.63544014],
+                [ 39.45866146,  42.18817025,  32.38579992, ...,  34.80319951,
+                  33.60600939,  37.62733874],
+                ..., 
+                [ 40.15717404,  33.16701733,  23.32556112, ...,  37.5619937 ,
+                  29.89282508,  30.2202427 ],
+                [ 42.0974104 ,  36.59006321,  21.70771374, ...,  35.70950512,
+                  30.64670854,  30.45901309],
+                [ 43.33170027,  37.42993532,  23.8840177 , ...,  35.92624556,
+                  27.87720187,  28.77424561]])
+----
+
+// code cell end
+
+Let us generate instrument values for a higher volatility as well:
+
+// code cell start uuid: d9096118-2ff0-4ff0-89f5-8dc011a1b557
+[source, python]
+----
+In [12]: gbm.update(volatility=0.5)
+----
+
+// code cell end
+
+// code cell start uuid: 02d90527-f346-46e5-8b24-d4cb128ff0d7
+[source, python]
+----
+In [13]: %time paths_2 = gbm.get_instrument_values()
+----
+
+----
+Out[13]: CPU times: user 9.78 ms, sys: 1.36 ms, total: 11.1 ms
+         Wall time: 10.2 ms
+         
+----
+
+// code cell end
+
+The difference in the two sets of paths is illustrated in <<gbm_class_fig>>:
+
+// code cell start uuid: bda423fa-5a76-419f-ac10-64624d1aa295
+[source, python]
+----
+In [14]: import matplotlib.pyplot as plt
+         %matplotlib inline
+         plt.figure(figsize=(8, 4))
+         p1 = plt.plot(gbm.time_grid, paths_1[:, :10], 'b')
+         p2 = plt.plot(gbm.time_grid, paths_2[:, :10], 'r-.')
+         plt.grid(True)
+         l1 = plt.legend([p1[0], p2[0]],
+                         ['low volatility', 'high volatility'], loc=2)
+         plt.gca().add_artist(l1)
+         plt.xticks(rotation=30)
+----
+
+[[gbm_class_fig]]
+.Simulated paths from GBM simulation class
+image::images/pyfi_1601.png[]
+
+// code cell end
+
+
+=== Jump Diffusion
+
+(((simulation, jump diffusion)))(((jump diffusion)))(((classes, jump diffusion)))(((stochastic processes, jump diffusion)))Equipped with the background knowledge from the +geometric_brownian_motion+ class, it is now straightforward to implement a class for the jump diffusion model described by Merton (1976). Recall the stochastic differential equation of the jump diffusion, as shown in <<jd_sde_dx>> (see also <<jd_sde>> in <<stochastics>>, in particular for the meaning of the parameters and variables).
+
+++++
+<equation id="jd_sde_dx">
+<title>Stochastic differential equation for Merton jump diffusion model</title>
+  <mathphrase>
+    <emphasis>dS<subscript>t</subscript></emphasis> = (<emphasis>r</emphasis> – <emphasis>r<subscript>J</subscript></emphasis>)<emphasis>S<subscript>t</subscript>dt</emphasis> + &#x1d70e;<emphasis>S<subscript>t</subscript>dZ<subscript>t</subscript></emphasis> + <emphasis>J<subscript>t</subscript>S<subscript>t</subscript>dN<subscript>t</subscript></emphasis>
+  </mathphrase>
+</equation>
+++++
+
+An Euler discretization for simulation purposes is presented in <<jd_disc_dx>> (see also <<jd_disc>> in <<stochastics>> and the more detailed explanations given there).
+
+[[jd_disc_dx]]
+[latexmath]
+.Euler discretization for Merton jump diffusion model
+++++
+\begin{eqnarray*}
+S_{t_{m+1}} &=& S_{t_{m}}  \left( \exp \left( \left(r - r_{J} - \frac{1}{2} \sigma^2 \right) (t_{m+1} -
+t_{m}) + \sigma \sqrt{t_{m+1} - t_{m}} z^{1}_{t} \right) + \left( e^{\mu_{J}+\delta
+z^{2}_{t}} - 1 \right) y_{t} \right) \\
+0 &\leq& t_m < t_{m+1} \leq T
+\end{eqnarray*}
+++++
+
+==== The Simulation Class
+
+<<jump_diffusion>> presents the +Python+ code for the +jump_diffusion+ simulation class. This class should by now contain no surprises. Of course, the model is different, but the design and the methods are essentially the same.
+
+[[jump_diffusion]]
+.Simulation class for jump diffusion
+====
+[source, python]
+----
+include::python/dx/jump_diffusion.py[]
+----
+====
+
+Of course, since we are dealing now with a different model, we need a different set of elements in the +market_environment+ object. In addition to those for the +geometric_brownian_motion+ class (see <<sim_class_mar_env>>), there are three additions, as outlined in <<jd_mar_env>>: namely, the parameters of the log-normal jump component, +lambda+, +mu+, and +delta+.
+
+[[jd_mar_env]]
+.Specific elements of market environment for jump_diffusion class
+[options="header, unbreakable"]
+|=======
+|Element           | Type      | Mandatory | Description
+|+lambda+          | Constant  | Yes       | Jump intensity (probability p.a.)
+|+mu+              | Constant  | Yes       | Expected jump size
+|+delta+           | Constant  | Yes       | Standard deviation of jump size
+|=======
+
+For the generation of the paths, this class of course needs further random numbers because of the jump component. Inline comments in the method +generate_paths+ highlight the two spots where these additional random numbers are generated. For the generation of Poisson-distributed random numbers, see also <<stochastics>>.
+
+==== A Use Case
+
+In what follows, we again illustrate the use of the simulation class +jump_diffusion+ interactively. We make use of the +market_environment+ object defined for the GBM object in the previous section:
+
+// code cell start uuid: 32912563-dcc1-4399-b5ed-1603c83f19f6
+[source, python]
+----
+In [15]: me_jd = market_environment('me_jd', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 66dda0df-b62e-4596-803f-3f74d0b83320
+[source, python]
+----
+In [16]: # add jump diffusion specific parameters
+         me_jd.add_constant('lambda', 0.3)
+         me_jd.add_constant('mu', -0.75)
+         me_jd.add_constant('delta', 0.1)
+----
+
+// code cell end
+
+To this environment, we add the complete environment of the GBM simulation class, which completes the input needed:
+
+// code cell start uuid: c1e390cc-dd6b-4186-a7be-012f8187ebe4
+[source, python]
+----
+In [17]: me_jd.add_environment(me_gbm)
+----
+
+// code cell end
+
+Based on this +market_environment+ object, we can instantiate the simulation class for the jump diffusion:
+
+// code cell start uuid: 31aeb150-6007-4eaa-b70b-8a798f044f0c
+[source, python]
+----
+In [18]: from jump_diffusion import jump_diffusion
+----
+
+// code cell end
+
+// code cell start uuid: e9c72a6e-3433-442e-9db3-02abf8efaff2
+[source, python]
+----
+In [19]: jd = jump_diffusion('jd', me_jd)
+----
+
+// code cell end
+
+Due to the modeling approach we have implemented, the generation of instrument values is now formally the same. The method call in this case is a bit slower, however, since we need to simulate more numerical values due to the jump component:
+
+// code cell start uuid: 18fd9ba5-e1c6-4e90-ac6a-fa3727acc524
+[source, python]
+----
+In [20]: %time paths_3 = jd.get_instrument_values()
+----
+
+----
+Out[20]: CPU times: user 19.7 ms, sys: 2.92 ms, total: 22.6 ms
+         Wall time: 21.9 ms
+         
+----
+
+// code cell end
+
+With the aim of again comparing two different sets of paths, change, for example, the jump probability:
+
+// code cell start uuid: 38806874-53b2-4e91-9bd5-5764654446b8
+[source, python]
+----
+In [21]: jd.update(lamb=0.9)
+----
+
+// code cell end
+
+// code cell start uuid: a2bd3f5d-44cb-458d-ae7d-9238d7a6b93b
+[source, python]
+----
+In [22]: %time paths_4 = jd.get_instrument_values()
+----
+
+----
+Out[22]: CPU times: user 26.3 ms, sys: 2.07 ms, total: 28.4 ms
+         Wall time: 27.7 ms
+         
+----
+
+// code cell end
+
+<<jd_class_fig>> compares a couple of simulated paths from the two sets with low and high intensity (jump probability), respectively. You can spot a few jumps for the low intensity case and multiple jumps for the high intensity case in the figure:
+
+// code cell start uuid: 5b744e93-dac1-4868-8499-6a8f70bcfc42
+[source, python]
+----
+In [23]: plt.figure(figsize=(8, 4))
+         p1 = plt.plot(gbm.time_grid, paths_3[:, :10], 'b')
+         p2 = plt.plot(gbm.time_grid, paths_4[:, :10], 'r-.')
+         plt.grid(True)
+         l1 = plt.legend([p1[0], p2[0]],
+                         ['low intensity', 'high intensity'], loc=3)
+         plt.gca().add_artist(l1)
+         plt.xticks(rotation=30)
+----
+
+[[jd_class_fig]]
+.Simulated paths from jump diffusion simulation class
+image::images/pyfi_1602.png[]
+
+// code cell end
+
+=== Square-Root Diffusion
+
+(((simulation, square-root diffusion)))(((square-root diffusion)))(((classes, square-root diffusion)))(((stochastic processes, square-root diffusion)))The third stochastic process to be simulated is the square-root diffusion as used by Cox, Ingersoll, and Ross (1985) to model stochastic short rates. <<srd_dynamic_dx>> shows the stochastic differential equation of the process (see also <<srd_dynamic>> in <<stochastics>> for further details).
+
+
+[[srd_dynamic_dx]]
+[latexmath]
+.Stochastic differential equation of square-root diffusion
+++++
+\begin{equation}
+dx_{t} = \kappa (\theta -x_{t})dt+\sigma \sqrt{x_{t}} dZ_{t}
+\end{equation}
+++++
+
+(((full truncation)))(((Euler scheme)))We use the discretization scheme as presented in <<srd_disc_1_dx>> (see also <<srd_disc_1>> in <<stochastics>>, as well as <<srd_disc_2>>, for an alternative, exact scheme).
+
+[[srd_disc_1_dx]]
+[latexmath]
+.Euler discretization for square-root diffusion (full truncation scheme)
+++++
+\begin{eqnarray*}
+\tilde{x}_{t_{m+1}} &=& \tilde{x}_{t_m} + \kappa(\theta - \tilde{x}_{s}^+) (t_{m+1} - t_{m})+ \sigma \sqrt{\tilde{x}_{s}^+} \sqrt{t_{m+1} - t_{m}} z_t \\
+x_{t_{m+1}} &=& \tilde{x}_{t_{m+1}}^+
+\end{eqnarray*}
+++++
+
+==== The Simulation Class
+
+<<square_root_diffusion>> presents the +Python+ code for the +square_root_diffusion+ simulation class. Apart from, of course, a different model and discretization scheme, the class does not contain anything new compared to the other two specialized classes.
+
+[[square_root_diffusion]]
+.Simulation class for square-root diffusion
+====
+[source, python]
+----
+include::python/dx/square_root_diffusion.py[]
+----
+====
+
+<<srd_mar_env>> lists the two elements of the market environment that are specific to this class.
+
+[[srd_mar_env]]
+.Specific elements of market environment for square_root_diffusion class
+[options="header, unbreakable"]
+|=======
+|Element           | Type      | Mandatory | Description
+|+kappa+           | Constant  | Yes       | Mean reversion factor
+|+theta+           | Constant  | Yes       | Long-term mean of process
+|=======
+
+
+==== A Use Case
+
+A rather brief use case illustrates the use of the simulation class. As usual, we need a market environment, for example to model a volatility (index) process:
+
+// code cell start uuid: 91c6d872-1b59-42f6-a6eb-6c3f962fd4f8
+[source, python]
+----
+In [35]: me_srd = market_environment('me_srd', dt.datetime(2015, 1, 1))
+----
+
+// code cell end
+
+// code cell start uuid: 87ab9b12-4be3-4cda-8098-ea2a6e1e6c01
+[source, python]
+----
+In [36]: me_srd.add_constant('initial_value', .25)
+         me_srd.add_constant('volatility', 0.05)
+         me_srd.add_constant('final_date', dt.datetime(2015, 12, 31))
+         me_srd.add_constant('currency', 'EUR')
+         me_srd.add_constant('frequency', 'W')
+         me_srd.add_constant('paths', 10000)
+----
+
+// code cell end
+
+Two components of the market environment are specific to the class:
+
+// code cell start uuid: 9d17030a-0a3f-49ec-9d5b-d9bf4b899f49
+[source, python]
+----
+In [37]: # specific to simualation class
+         me_srd.add_constant('kappa', 4.0)
+         me_srd.add_constant('theta', 0.2)
+----
+
+// code cell end
+
+Although we do not need it here to implement the simulation, the generic simulation class requires a discounting object. This requirement can be justified from a risk-neutral valuation perspective, which is the overarching goal of the whole +DX+ analytics library:
+
+// code cell start uuid: 3fc4f220-8c47-45b5-b356-66134abebf92
+[source, python]
+----
+In [38]: # required but not needed for the class
+         me_srd.add_curve('discount_curve', constant_short_rate('r', 0.0))
+----
+
+// code cell end
+
+// code cell start uuid: ac75e6a7-40dc-4c94-8130-142177df1dc7
+[source, python]
+----
+In [39]: from square_root_diffusion import square_root_diffusion
+----
+
+// code cell end
+
+// code cell start uuid: 85a69a81-ffd6-438b-b5f3-f837a64b0781
+[source, python]
+----
+In [40]: srd = square_root_diffusion('srd', me_srd)
+----
+
+// code cell end
+
+As before, we get simulation paths, given the +market_environment+ object as input, by calling the +get_instrument_values+ method:
+
+// code cell start uuid: 80e2e203-3dd5-429f-b031-48f5bbbd46a7
+[source, python]
+----
+In [41]: srd_paths = srd.get_instrument_values()[:, :10]
+----
+
+// code cell end
+
+(((range="endofrange", startref="ix_DALsim")))(((range="endofrange", startref="ix_ALsim")))<<srd_class_fig>> illustrates the mean-reverting characteristic by showing how the single simulated paths on average revert to the long-term mean +theta+ (dashed line):
+
+// code cell start uuid: 1158211b-7092-4fbf-b5eb-367928faca32
+[source, python]
+----
+In [42]: plt.figure(figsize=(8, 4))
+         plt.plot(srd.time_grid, srd.get_instrument_values()[:, :10])
+         plt.axhline(me_srd.get_constant('theta'), color='r', ls='--', lw=2.0)
+         plt.grid(True)
+         plt.xticks(rotation=30)
+----
+
+[[srd_class_fig]]
+.Simulated paths from square-root diffusion simulation class (dashed line = long-term mean theta)
+image::images/pyfi_1603.png[]
+
+// code cell end
+
+
+=== Conclusions
+
+This chapter develops all the tools and classes needed for the simulation of the three stochastic processes of interest: geometric Brownian motions, jump diffusions, and square-root diffusions. The chapter presents a function to conveniently generate standard normally distributed random numbers. It then proceeds by introducing a generic model simulation class. Based on this foundation, the chapter introduces three specialized simulation classes and presents use cases for these classes.
+
+To simplify future imports, we can again use a wrapper module called +dx_simulation.py+, as presented in <<dx_simulation>>.
+
+[[dx_simulation]]
+.Wrapper module for simulation components
+====
+[source, python]
+----
+include::python/dx/dx_simulation.py[]
+----
+====
+
+As with the first wrapper module, +dx_frame.py+, the benefit is that a single +import+ statement makes available all simulation components in a single step:
+
+[source, python]
+----
+from dx_simulation import *
+----
+
+Since +dx_simulation.py+ also imports everything from +dx_frame.py+, this single import in fact exposes _all functionality_ developed so far. The same holds true for the enhanced +init+ file in the +dx+ directory, as shown in <<dx_lib_2>>.
+
+[[dx_lib_2]]
+.Enhanced Python packaging file
+====
+[source, python]
+----
+include::python/dx/__init__2.py[]
+----
+====
+
+=== Further Reading
+
+Useful references in book form for the topics covered in this chapter are:
+
+* Glasserman, Paul (2004): _Monte Carlo Methods in Financial Engineering_. Springer, New York.
+* Hilpisch, Yves (2015): _Derivatives Analytics with Python_. Wiley Finance, Chichester, England. http://derivatives-analytics-with-python.com[].
+
+Original papers cited in this chapter are:
+
+* Black, Fischer and Myron Scholes (1973): "The Pricing of Options and Corporate Liabilities." _Journal of Political Economy_, Vol. 81, No. 3, pp. 638–659.
+* Cox, John, Jonathan Ingersoll, and Stephen Ross (1985): "A Theory of the Term Structure of Interest Rates." _Econometrica_, Vol. 53, No. 2, pp. 385–407.
+* Merton, Robert (1973): "Theory of Rational Option Pricing." _Bell Journal of Economics and Management Science_, Vol. 4, pp. 141–183.
+* Merton, Robert (1976): "Option Pricing When the Underlying Stock Returns Are Discontinuous." _Journal of Financial Economics_, Vol. 3, No. 3, pp. 125–144.
+
+
+

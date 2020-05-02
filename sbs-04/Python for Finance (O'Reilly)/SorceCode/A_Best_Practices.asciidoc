@@ -1,0 +1,180 @@
+[appendix]
+[[best_practices]]
+== Selected Best Practices
+
+_Best practices_ in general are those rules, either written down formally or just practiced in daily life, that may distinguish the expert +Python+ developer from the casual +Python+ user. There are many of these, and this appendix will introduce some of the more important ones.
+
+=== Python Syntax
+
+One really helpful feature of http://code.google.com/p/spyderlib/[+Spyder+] as an integrated development environment is its automatic syntax and code checking, which checks +Python+ code for compliance with the http://www.python.org/dev/peps/pep-0008[PEP 8 recommendations for +Python+ syntax]. But what is codified in "Python Enhancement Proposal 8"? Principally, there are some code formatting rules that should both establish a common standard and allow for better readability of the code. In that sense, this approach is not too dissimilar from a written or printed natural language where certain syntax rules also apply.(((application development, syntax best practices)))(((best practices, syntax)))((("PEP (Python Enhancement Proposal) 8")))(((syntax, best practices)))
+
+For example, consider the code in <<bsm_mcs_euro>> of <<why_python_for_finance>> for the valuation of a European call option via Monte Carlo simulation. First, have a look at the version of this code in <<bsm_mcs_false>> that does not conform to PEP 8. It is rather packed, because there are blank lines and spaces missing (sometimes there are also too many spaces or blank lines).
+
+[[bsm_mcs_false]]
+.A Python script that does not conform to PEP 8
+====
+[source, python]
+----
+include::python/best_practices/bsm_euro_syntax_false.py[]
+----
+====
+
+Now, take a look at the version in <<bsm_mcs_correct>> that conforms to PEP 8 (i.e., exactly the one found in <<bsm_mcs_euro>>). The main difference in readability stems from two facts:
+
+* Use of blank lines to indicate code blocks
+* Use of spaces around +Python+ operators (e.g., +=+ 
+    or +*+) as well as before any hash character for 
+    comments (here: two spaces)
+
+[[bsm_mcs_correct]]
+.A Python script that conforms to PEP 8
+====
+[source, python]
+----
+include::python/best_practices/bsm_euro_syntax_correct.py[]
+----
+====
+
+Although the first version is perfectly executable by the +Python+ interpreter, the second version for sure is more readable for both the programmer and any others who may try to understand it.
+
+Some special rules apply to functions and classes when it comes to formatting. In general, there are supposed to be _two_ blank lines before any new function (method) definition as well as any new class definition. With functions, _indentation_ also comes into play. In general, indentation is achieved through _spaces_ and _not_ through tabulators. As a general rule, take _four spaces_ per level of indentation.footnote:[The majority of (+Python+) editors allow us to configure the use of a certain number of spaces even when pushing the Tab key. Some editors also allow semiautomatic replacement of tabs with spaces.] Consider now <<is_prime_no_doc>>.
+
+[[is_prime_no_doc]]
+.A Python function with multiple indentations
+====
+[source, python]
+----
+include::python/best_practices/is_prime_no_doc.py[]
+----
+====
+
+We immediately notice the role indentation plays in +Python+. There are multiple levels of indentation to indicate code blocks, here mainly "caused" by control structure elements (e.g., +if+ or +else+) or loops (e.g., the +for+ loop).
+
+Control structure elements are explained in <<data_structures>>, but the basic working of the function should be clear even if you are not yet used to +Python+ syntax. <<operators>> lists a number of heavily used +Python+ operators. Whenever there is a question mark in the description column of <<operators>>, the operation returns a Boolean object (i.e., +True+ or +False+).
+
+[[operators]]
+.Selected Python operators
+[options="header, unbreakable"]
+|=======
+|Symbol | Description
+|+      | Addition
+|- 	    | Subtraction
+|/    	| Division
+|* 	    | Multiplication
+|%  	| Modulo
+|==     | Is equal?
+|!=     | Is not equal?
+|<      | Is smaller?
+|\<=    | Is equal or smaller?
+|>      | Is larger?
+|>=     | Is equal or larger?
+|=======
+
+
+=== Documentation
+
+(((operators)))(((application development, documentation best practices)))(((best practices, documentation)))(((documentation, best practices)))(((inline documentation)))(((documentation, documentation strings)))(((strings, documentation strings)))The two main elements of +Python+ documentation are:
+
+Inline documentation:: 
+    Inline documentation can in principle be placed 
+    anywhere in the code; it is indicated by the use 
+    of one or more leading hash characters (++#++). In 
+    general, there should be at least two spaces 
+    before a hash.
+Documentation strings:: 
+    Such strings are used to provide documentation for 
+    +Python+ functions (methods) and classes, and are 
+    generally placed within their definition (at the 
+    beginning of the indented code).
+
+The code in <<bsm_mcs_correct>> contains multiple examples of inline documentation. <<is_prime_with_doc>> shows the same function definition as in <<is_prime_no_doc>>, but this time with a documentation string added.
+
+[[is_prime_with_doc]]
+.The Python function is_prime with documentation string
+====
+[source, python]
+----
+include::python/best_practices/is_prime_with_doc.py[]
+----
+====
+
+In general, such a documentation string provides information about the following pass:[<phrase role="keep-together">elements</phrase>]:
+
+Input:: 
+    Which parameters/arguments to provide, and in which 
+    format (e.g., +int+)
+Output:: 
+    What the function/method returns, and in which 
+    format
+Errors:: 
+    Which ("special") errors might be raised
+Examples:: 
+    Example usage of the function/methods 
+
+The use of documentation strings is not only helpful for those who take a look at the code itself. The majority of +Python+ tools, like +IPython+ and +Spyder+, allow direct access to this documentation and help source. <<spyder_docu>> shows a screenshot of +Spyder+, this time with the function +is_prime+ shown in the editor and the rendered documentation string of the function in the object inspector (upper right). This illustrates how helpful it is to always include meaningful documentation strings in functions and classes.
+
+[[spyder_docu]]
+.Screenshot of Spyder with custom function and nicely rendered documentation string
+image::images/pyfi_aa01.png[]
+
+=== Unit Testing
+
+As a final best practice, we want to consider _unit testing_. Among the different testing approaches, unit testing can indeed be considered a best practice because it tests +Python+ code on a rather fundamental level--i.e., the single _units_. What it does not test, however, is the _integration_ of the single units. Typically, such units are functions, classes, or methods of classes. As a pretty simple example of a +Python+ function that is also easily testable, consider the one in <<simple_function>>.(((application development, unit testing best practices)))(((best practices, unit testing)))(((unit testing best practices)))((("testing, unit testing")))
+
+[[simple_function]]
+.A rather simple Python function
+====
+[source, python]
+----
+include::python/best_practices/simple_function.py[]
+----
+====
+
+There are many tools available that help support unit tests. We will make use of https://nose.readthedocs.org/en/latest/[+nose+] in what follows. <<nose_test>> contains a small test suite for the simple function +f+ from <<simple_function>>.
+
+[[nose_test]]
+.A test suite for the function f
+====
+[source, python]
+----
+include::python/best_practices/nose_test.py[]
+----
+====
+
+<<test_functions>> describes the test functions that are implemented.
+
+[[test_functions]]
+.Test functions for simple function f
+[options="header, unbreakable"]
+|=======
+|Function | Description
+|+test_f_calculation+ | Tests if the function generates correct results
+|+test_f_type_error+ | Checks if the function raises a type error when expected
+|+test_f_value_error+ | Checks if the function raises a value error when expected
+|+test_f_test_fails+ | Tests if the calculation test fails as expected (for illustration)
+|=======
+
+From the command line/shell, you can run the following tests:
+
+----
+$ nosetests nose_test.py
+...F
+======================================================================
+FAIL: Test if function test fails.
+ ----------------------------------------------------------------------
+ Traceback (most recent call last):
+   File "/Library/anaconda/lib/python2.7/site-packages/nose/case.py",
+   line 197, in runTest self.test(*self.arg)
+   File "//Users/yhilpisch/Documents/Work/Python4Finance/python/nose_test.py",
+   line 30, in test_f_test_fails
+     nt.assert_equal(f(5.), 10)
+ AssertionError: 5.000000000000001 != 10
+
+ ----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+FAILED (failures=1)
+$ 
+----
+
+Obviously, the first three tests are successful, while the last one fails as expected. Using such tools--and more importantly, implementing a rigorous approach to unit pass:[<phrase role="keep-together">testing—</phrase>]may require more effort up front, but you and those working with your code will benefit in the long run.
